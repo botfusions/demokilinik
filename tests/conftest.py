@@ -5,16 +5,24 @@ böylece `pytest` docker ayakta olmadan da anlamlı bir sonuç verir.
 """
 
 import os
-import pytest
+from pathlib import Path
 
-os.environ.setdefault("CALISMA_GUNLERI", "1,2,3,4,5,6")
-os.environ.setdefault("CALISMA_SAATLERI", "09:00-18:00")
-os.environ.setdefault("WEBHOOK_SECRET", "test-gizli")
-os.environ.setdefault("PANEL_PAROLA", "test-parola")
-os.environ.setdefault("COOKIE_SECRET", "test-cookie-secret")
-os.environ.setdefault("IC_API_ANAHTARI", "test-ic-anahtar")
-os.environ.setdefault("OPENWA_URL", "http://localhost:2785")
-os.environ.setdefault("OPENWA_SESSION", "test")
+import pytest
+from dotenv import load_dotenv
+
+# DATABASE_URL gibi ortama özgü ayarlar .env'den gelir...
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# ...ama sırlar ve kurallar test sabitidir. Gerçek .env değerleri testleri
+# sessizce bozmasın diye burada kesin olarak eziliyor.
+os.environ["CALISMA_GUNLERI"] = "1,2,3,4,5,6"
+os.environ["CALISMA_SAATLERI"] = "09:00-18:00"
+os.environ["WEBHOOK_SECRET"] = "test-gizli"
+os.environ["PANEL_PAROLA"] = "test-parola"
+os.environ["COOKIE_SECRET"] = "test-cookie-secret"
+os.environ["IC_API_ANAHTARI"] = "test-ic-anahtar"
+os.environ["OPENWA_SESSION"] = "test"
+os.environ["SAGLIK_NOBETCISI"] = "0"   # testlerde arka plan nöbetçisi çalışmaz
 
 
 @pytest.fixture

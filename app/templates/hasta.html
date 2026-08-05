@@ -1,0 +1,34 @@
+{% extends "temel.html" %}
+{% block baslik %}{{ kisi.ad or kisi.telefon }} — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="kart">
+  <h2>{{ kisi.ad or 'İsimsiz' }} — {{ kisi.telefon }}</h2>
+  <p class="bos" style="margin-top:-8px">
+    İlk temas {{ kisi.ilk_temas.strftime('%d.%m.%Y') }} ·
+    son temas {{ kisi.son_temas.strftime('%d.%m.%Y %H:%M') }}
+  </p>
+  <form method="post" action="/hastalar/{{ kisi.id }}/not">
+    <label for="n">Personel notu (hasta görmez)</label>
+    <textarea id="n" name="personel_notu">{{ kisi.personel_notu or '' }}</textarea>
+    <div style="margin-top:12px"><button>Notu kaydet</button></div>
+  </form>
+</div>
+
+<div class="kart">
+  <h2>WhatsApp yazışması</h2>
+  {% if gorusmeler %}
+  <table>
+    <tr><th style="width:140px">Zaman</th><th style="width:80px">Kim</th><th>Mesaj</th></tr>
+    {% for g in gorusmeler %}
+    <tr>
+      <td>{{ g.olusturma.strftime('%d.%m %H:%M') }}</td>
+      <td>{{ 'Hasta' if g.yon == 'gelen' else 'Ajan' }}</td>
+      <td>{{ g.mesaj }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Yazışma yok.</p>{% endif %}
+</div>
+
+{% endblock %}

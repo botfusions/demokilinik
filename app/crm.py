@@ -1,0 +1,235 @@
+"""Kişi, görüşme ve randevu işlemleri.
+
+Randevu kuralları burada tek yerde duruyor: hem panelden elle girilen hem de ajanın
+iç API üzerinden açtığı randevu aynı kontrollerden geçer. Ajanın kendi kararına
+bırakılan bir doluluk kontrolü, er ya da geç iki hastayı aynı saate koyar.
+"""
+
+import os
+from datetime import datetime, time
+
+import psycopg
+from psycopg.rows import dict_row
+
+
+class RandevuCakismasi(Exception):
+    """İstenen aralık dolu."""
+
+
+class GecmisTarih(Exception):
+    """Geçmişe randevu açılamaz."""
+
+
+class CalismaSaatiDisi(Exception):
+    """Klinik o gün/saat kapalı."""
+
+
+# ── kişiler ─────────────────────────────────────────────────
+
+def kisi_upsert(conn: psycopg.Connection, telefon: str, ad: str | None = None) -> int:
+    """Telefona göre kişiyi bulur ya da açar; her çağrıda son_temas'ı günceller.
+
+    `ad` yalnızca doluysa yazılır — ikinci mesajda ad gelmiyor diye kayıtlı isim silinmez.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO kisiler (telefon, ad) VALUES (%s, %s)
+            ON CONFLICT (telefon) DO UPDATE
+                SET son_temas = now(),
+                    ad = COALESCE(EXCLUDED.ad, kisiler.ad)
+            RETURNING id
+            """,
+            (telefon, ad),
+        )
+        kid = cur.fetchone()[0]
+    conn.commit()
+    return kid
+
+
+def kisi_bul(conn: psycopg.Connection, telefon: str) -> dict | None:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT * FROM kisiler WHERE telefon = %s", (telefon,))
+        return cur.fetchone()
+
+
+def kisiler_listele(conn: psycopg.Connection) -> list[dict]:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT * FROM kisiler ORDER BY son_temas DESC")
+        return cur.fetchall()
+
+
+def personel_notu_yaz(conn: psycopg.Connection, kisi_id: int, not_: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute("UPDATE kisiler SET personel_notu = %s WHERE id = %s", (not_, kisi_id))
+    conn.commit()
+
+
+# ── görüşmeler ──────────────────────────────────────────────
+
+def gorusme_ekle(
+    conn: psycopg.Connection,
+    kisi_id: int,
+    yon: str,
+    mesaj: str,
+    wa_message_id: str | None = None,
+    maliyet_usd: float | None = None,
+) -> int | None:
+    """Görüşmeyi kaydeder. Aynı wa_message_id ikinci kez gelirse None döner.
+
+    OpenWA teslimatı at-least-once; aynı mesaj için iki kez cevap yazmamak
+    tekrar teslimatın burada durdurulmasına bağlı.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO gorusmeler (kisi_id, yon, mesaj, wa_message_id, maliyet_usd)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (wa_message_id) DO NOTHING
+            RETURNING id
+            """,
+            (kisi_id, yon, mesaj, wa_message_id, maliyet_usd),
+        )
+        satir = cur.fetchone()
+    conn.commit()
+    return satir[0] if satir else None
+
+
+def gorusme_gecmisi(conn: psycopg.Connection, kisi_id: int, limit: int = 10) -> list[dict]:
+    """Son `limit` görüşme, eskiden yeniye — prompt'a bu sırayla girer."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT * FROM (
+                SELECT * FROM gorusmeler WHERE kisi_id = %s ORDER BY id DESC LIMIT %s
+            ) s ORDER BY id
+            """,
+            (kisi_id, limit),
+        )
+        return cur.fetchall()
+
+
+# ── çalışma saatleri ────────────────────────────────────────
+
+def _calisma_penceresi() -> tuple[set[int], time, time]:
+    gunler = {int(g) for g in os.environ.get("CALISMA_GUNLERI", "1,2,3,4,5").split(",") if g.strip()}
+    aralik = os.environ.get("CALISMA_SAATLERI", "09:00-18:00")
+    ac, kapa = aralik.split("-")
+    return gunler, time.fromisoformat(ac.strip()), time.fromisoformat(kapa.strip())
+
+
+def calisma_saati_icinde(baslangic: datetime, bitis: datetime) -> bool:
+    """Randevunun tamamı açık günün açık saatleri içinde mi.
+
+    Kapanışı aşan randevu (17:45-18:15) reddedilir — personel kapıda kalmasın.
+    """
+    gunler, ac, kapa = _calisma_penceresi()
+    if baslangic.isoweekday() not in gunler:
+        return False
+    if baslangic.date() != bitis.date():
+        return False
+    return ac <= baslangic.time() and bitis.time() <= kapa
+
+
+# ── randevular ──────────────────────────────────────────────
+
+def randevu_olustur(
+    conn: psycopg.Connection,
+    kisi_id: int,
+    hizmet: str,
+    baslangic: datetime,
+    bitis: datetime,
+    notlar: str | None = None,
+) -> int:
+    if baslangic < datetime.now(tz=baslangic.tzinfo):
+        raise GecmisTarih(f"{baslangic:%d.%m.%Y %H:%M} geçmiş bir tarih")
+
+    if not calisma_saati_icinde(baslangic, bitis):
+        gunler, ac, kapa = _calisma_penceresi()
+        raise CalismaSaatiDisi(
+            f"Klinik o saatte kapalı. Çalışma saatleri: {ac:%H:%M}-{kapa:%H:%M}"
+        )
+
+    with conn.cursor() as cur:
+        # Kesişim testi: sınır teması (mevcut.bitis == yeni.baslangic) çakışma değil
+        cur.execute(
+            """
+            SELECT 1 FROM randevular
+            WHERE durum <> 'iptal' AND baslangic < %s AND bitis > %s
+            LIMIT 1
+            """,
+            (bitis, baslangic),
+        )
+        if cur.fetchone():
+            raise RandevuCakismasi(f"{baslangic:%d.%m.%Y %H:%M} saati dolu")
+
+        cur.execute(
+            """
+            INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, notlar)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+            """,
+            (kisi_id, hizmet, baslangic, bitis, notlar),
+        )
+        rid = cur.fetchone()[0]
+    conn.commit()
+    return rid
+
+
+def randevu_iptal(conn: psycopg.Connection, randevu_id: int) -> None:
+    with conn.cursor() as cur:
+        cur.execute("UPDATE randevular SET durum = 'iptal' WHERE id = %s", (randevu_id,))
+    conn.commit()
+
+
+def randevu_durum_yaz(
+    conn: psycopg.Connection, randevu_id: int, durum: str, google_event_id: str | None = None
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE randevular
+               SET durum = %s,
+                   google_event_id = COALESCE(%s, google_event_id)
+             WHERE id = %s
+            """,
+            (durum, google_event_id, randevu_id),
+        )
+    conn.commit()
+
+
+def randevular_listele(conn: psycopg.Connection, gun=None) -> list[dict]:
+    """Randevular, başlangıca göre artan. `gun` verilirse yalnız o gün."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        if gun is None:
+            cur.execute(
+                """
+                SELECT r.*, k.ad, k.telefon
+                  FROM randevular r JOIN kisiler k ON k.id = r.kisi_id
+                 ORDER BY r.baslangic
+                """
+            )
+        else:
+            cur.execute(
+                """
+                SELECT r.*, k.ad, k.telefon
+                  FROM randevular r JOIN kisiler k ON k.id = r.kisi_id
+                 WHERE r.baslangic::date = %s
+                 ORDER BY r.baslangic
+                """,
+                (gun,),
+            )
+        return cur.fetchall()
+
+
+def dolu_araliklar(conn: psycopg.Connection, gun) -> list[dict]:
+    """Ajanın uygunluk sorgusu için: o günün dolu saatleri."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT baslangic, bitis FROM randevular
+             WHERE durum <> 'iptal' AND baslangic::date = %s
+             ORDER BY baslangic
+            """,
+            (gun,),
+        )
+        return cur.fetchall()

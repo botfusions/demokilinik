@@ -119,3 +119,17 @@ def test_pazar_gunu_reddedilir(conn, kisi_id):
 
     with pytest.raises(CalismaSaatiDisi):
         randevu_olustur(conn, kisi_id, "Kontrol", g, g + timedelta(minutes=30))
+
+
+def test_saat_kaymasi_yok(conn, kisi_id):
+    """Saatsiz gelen zaman klinik saatinde kaydedilmeli.
+
+    Regresyon: bağlantı UTC'ye düşerse ajanın yazdığı 14:00 randevusu
+    panelde 17:00 görünüyordu.
+    """
+    bas = _yarin(14)
+    randevu_olustur(conn, kisi_id, "Kontrol", bas, bas + timedelta(minutes=30))
+
+    r = randevular_listele(conn, gun=bas.date())[0]
+    assert r["baslangic"].strftime("%H:%M") == "14:00"
+    assert r["bitis"].strftime("%H:%M") == "14:30"

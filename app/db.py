@@ -1,0 +1,99 @@
+"""Veritabanı bağlantısı ve şema.
+
+ORM yok — beş tablo ve düz SQL. Migration aracı da yok: şema `CREATE TABLE IF NOT EXISTS`
+ile açılışta kurulur. Şema büyüyüp geçmişe dönük veri taşımak gerekirse Alembic ekle.
+"""
+
+import os
+from pathlib import Path
+
+import psycopg
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+SEMA = """
+CREATE TABLE IF NOT EXISTS kisiler (
+    id            serial PRIMARY KEY,
+    telefon       text NOT NULL UNIQUE,
+    ad            text,
+    ilk_temas     timestamptz NOT NULL DEFAULT now(),
+    son_temas     timestamptz NOT NULL DEFAULT now(),
+    personel_notu text
+);
+
+CREATE TABLE IF NOT EXISTS gorusmeler (
+    id             serial PRIMARY KEY,
+    kisi_id        integer NOT NULL REFERENCES kisiler(id) ON DELETE CASCADE,
+    yon            text NOT NULL CHECK (yon IN ('gelen', 'giden')),
+    mesaj          text NOT NULL,
+    kanal          text NOT NULL DEFAULT 'whatsapp',
+    -- Tekil; NULL'lar Postgres'te çakışmaz, giden mesajların bir kısmı id'siz olabilir
+    wa_message_id  text UNIQUE,
+    maliyet_usd    numeric(10, 6),
+    olusturma      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS gorusmeler_kisi_idx ON gorusmeler (kisi_id, id);
+
+CREATE TABLE IF NOT EXISTS randevular (
+    id              serial PRIMARY KEY,
+    kisi_id         integer NOT NULL REFERENCES kisiler(id) ON DELETE CASCADE,
+    hizmet          text NOT NULL,
+    baslangic       timestamptz NOT NULL,
+    bitis           timestamptz NOT NULL,
+    durum           text NOT NULL DEFAULT 'bekliyor'
+                    CHECK (durum IN ('bekliyor', 'onayli', 'iptal')),
+    google_event_id text,
+    notlar          text,
+    olusturma       timestamptz NOT NULL DEFAULT now(),
+    CHECK (bitis > baslangic)
+);
+CREATE INDEX IF NOT EXISTS randevular_zaman_idx ON randevular (baslangic);
+
+CREATE TABLE IF NOT EXISTS bilgi_tabani (
+    id         serial PRIMARY KEY,
+    baslik     text NOT NULL,
+    icerik     text NOT NULL,
+    kategori   text NOT NULL DEFAULT 'genel',
+    aktif      boolean NOT NULL DEFAULT true,
+    guncelleme timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS baglanti_saglik (
+    servis           text PRIMARY KEY,
+    durum            text NOT NULL DEFAULT 'saglikli',
+    son_kontrol      timestamptz NOT NULL DEFAULT now(),
+    son_basarili     timestamptz,
+    hata             text,
+    ardisik_hata     integer NOT NULL DEFAULT 0,
+    uyari_gonderildi boolean NOT NULL DEFAULT false
+);
+"""
+
+
+def baglan() -> psycopg.Connection:
+    """Bağlantı açar ve saat dilimini klinik saatine sabitler.
+
+    Ajan ve panel saat dilimi olmayan zamanlar üretir ("14:00"). Postgres bunları
+    oturumun TimeZone'una göre yorumlar; varsayılan UTC bırakılsaydı 14:00 randevu
+    panelde 17:00 görünürdü. Konteyner TZ env'i postgresql.conf'u ezmediği için
+    ayar bağlantı seviyesinde yapılıyor — hangi yoldan bağlanılırsa bağlanılsın geçerli.
+    """
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL tanımlı değil — .env dosyasını kontrol et")
+
+    tz = os.environ.get("TZ", "Europe/Istanbul")
+    return psycopg.connect(url, autocommit=False, options=f"-c timezone={tz}")
+
+
+def sema_kur(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        cur.execute(SEMA)
+    conn.commit()
+
+
+if __name__ == "__main__":
+    c = baglan()
+    sema_kur(c)
+    print("Şema kuruldu.")

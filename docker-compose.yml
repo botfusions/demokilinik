@@ -5,8 +5,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: klinik_crm
+      # Saatsiz gelen randevu zamanları (ajan "14:00" yazar) Türkiye saati
+      # olarak yorumlanmalı; varsayılan UTC olsaydı panelde 17:00 görünürdü.
+      TZ: ${TZ:-Europe/Istanbul}
+      PGTZ: ${TZ:-Europe/Istanbul}
     ports:
-      - "127.0.0.1:5432:5432"
+      # 5432 makinede başka bir postgres tarafından kullanılıyordu
+      - "127.0.0.1:5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # openwa kendi veritabanını ilk açılışta oluşturur
@@ -27,9 +32,11 @@ services:
       AUTO_START_SESSIONS: "true"
 
       # whatsapp-web.js: Chromium kullanır, ~400MB RAM, ban riski baileys'ten düşük
-      ENGINE_TYPE: whatsapp-web.js
+      # VPS'te (x86 Linux) whatsapp-web.js kalsın — ban riski baileys'ten düşük.
+      # Yerel makinede Chromium açılmıyorsa .env'de ENGINE_TYPE=baileys yap.
+      ENGINE_TYPE: ${ENGINE_TYPE:-whatsapp-web.js}
       PUPPETEER_HEADLESS: "true"
-      PUPPETEER_ARGS: --no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+      PUPPETEER_ARGS: --no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--no-zygote,--disable-software-rasterizer,--disable-extensions
       SESSION_DATA_PATH: /app/data/sessions
 
       DATABASE_TYPE: postgres
@@ -38,15 +45,26 @@ services:
       DATABASE_USERNAME: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_NAME: openwa
-      DATABASE_SYNCHRONIZE: "true"
+      # Postgres'te synchronize yasak: migration'ın kurduğu body_ts sütununu düşürür
+      # ve /search her restartta 501 döner. Şemayı OpenWA migration'ları yönetir.
+      DATABASE_SYNCHRONIZE: "false"
 
       STORAGE_TYPE: local
       STORAGE_LOCAL_PATH: /app/data/media
       API_MASTER_KEY: ${OPENWA_API_KEY}
+      # Olmazsa API anahtarları düz SHA-256 ile saklanır
+      API_KEY_PEPPER: ${OPENWA_API_KEY_PEPPER}
 
       # Ban riskini düşüren guardrail'ler — kapatma
       RATE_LIMIT_ENABLED: "true"
       SIMULATE_TYPING: "true"
+
+      # Webhook hedefimiz konteyner dışındaki köprü; SSRF koruması varsayılan
+      # olarak iç adresleri engelliyor. Genel koruma açık kalır, yalnız bu host geçer.
+      SSRF_ALLOWED_HOSTS: ${KOPRU_HOST:-host.docker.internal}
+
+      # Chromium ilk açılışta 60s'e sığmıyor (özellikle macOS/Docker Desktop'ta)
+      WWEBJS_AUTH_TIMEOUT_MS: "180000"
     ports:
       # Yalnız localhost. VPS'te dışarıya açılmaz, SSH tüneliyle erişilir.
       - "127.0.0.1:2785:2785"

@@ -1,0 +1,53 @@
+{% extends "temel.html" %}
+{% block baslik %}Randevular — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="kart">
+  <h2>Elle randevu ekle</h2>
+  <form method="post" action="/randevular">
+    <div class="satir">
+      <div><label for="t">Telefon</label><input id="t" name="telefon" placeholder="905321112233" required></div>
+      <div><label for="h">Hizmet</label><input id="h" name="hizmet" placeholder="Kontrol" required></div>
+    </div>
+    <div class="satir">
+      <div><label for="bs">Başlangıç</label><input id="bs" type="datetime-local" name="baslangic" required></div>
+      <div><label for="bt">Bitiş</label><input id="bt" type="datetime-local" name="bitis" required></div>
+    </div>
+    <button>Randevu oluştur</button>
+  </form>
+</div>
+
+<div class="kart">
+  <h2>Randevular</h2>
+  <form method="get" style="margin-bottom:14px; max-width:220px">
+    <label for="g">Güne göre süz</label>
+    <input id="g" type="date" name="gun" value="{{ gun }}" onchange="this.form.submit()">
+  </form>
+
+  {% if randevular %}
+  <table>
+    <tr><th>Tarih</th><th>Saat</th><th>Hasta</th><th>Hizmet</th><th>Durum</th><th>Takvim</th><th></th></tr>
+    {% for r in randevular %}
+    <tr>
+      <td>{{ r.baslangic.strftime('%d.%m.%Y') }}</td>
+      <td>{{ r.baslangic.strftime('%H:%M') }} – {{ r.bitis.strftime('%H:%M') }}</td>
+      <td><a href="/hastalar/{{ r.kisi_id }}">{{ r.ad or r.telefon }}</a></td>
+      <td>{{ r.hizmet }}</td>
+      <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
+      <td>
+        {% if r.google_event_id %}
+        <a href="https://calendar.google.com/calendar/r/eventedit/{{ r.google_event_id }}" target="_blank">aç</a>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if r.durum != 'iptal' %}
+        <form method="post" action="/randevular/{{ r.id }}/iptal"><button class="sade">İptal et</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Randevu yok.</p>{% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "temel.html" %}
+{% block baslik %}Bilgi Tabanı — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="kart">
+  <h2>Yeni bilgi ekle</h2>
+  <p class="bos" style="margin-top:-8px">
+    Buraya girdiğiniz bilgiler ajanın hastaya söyleyebileceği tek kaynaktır.
+    Kaydettiğiniz an geçerli olur.
+  </p>
+  <form method="post" action="/bilgi">
+    <div class="satir">
+      <div>
+        <label for="b">Başlık</label>
+        <input id="b" name="baslik" placeholder="Örn: İmplant" required>
+      </div>
+      <div>
+        <label for="k">Kategori</label>
+        <select id="k" name="kategori">
+          <option value="fiyatlar">Fiyatlar</option>
+          <option value="hizmetler">Hizmetler</option>
+          <option value="calisma_saatleri">Çalışma Saatleri</option>
+          <option value="adres">Adres ve Ulaşım</option>
+          <option value="sss">Sık Sorulan Sorular</option>
+          <option value="genel">Genel</option>
+        </select>
+      </div>
+    </div>
+    <label for="i">İçerik</label>
+    <textarea id="i" name="icerik" placeholder="Örn: Tek diş implant 25.000 TL, 2 seansta tamamlanır." required></textarea>
+    <div style="margin-top:12px"><button>Kaydet</button></div>
+  </form>
+</div>
+
+<div class="kart">
+  <h2>Kayıtlı bilgiler</h2>
+  {% if bilgiler %}
+  <table>
+    <tr><th>Kategori</th><th>Başlık</th><th>İçerik</th><th>Durum</th><th></th></tr>
+    {% for b in bilgiler %}
+    <tr>
+      <td>{{ b.kategori }}</td>
+      <td>{{ b.baslik }}</td>
+      <td>{{ b.icerik }}</td>
+      <td><span class="rozet {{ 'onayli' if b.aktif else 'iptal' }}">{{ 'aktif' if b.aktif else 'pasif' }}</span></td>
+      <td>
+        {% if b.aktif %}
+        <form method="post" action="/bilgi/{{ b.id }}/pasiflestir"><button class="sade">Pasifleştir</button></form>
+        {% else %}
+        <form method="post" action="/bilgi/{{ b.id }}/aktiflestir"><button class="sade">Aktifleştir</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Henüz bilgi girilmemiş. Ajan bu haliyle hiçbir soruya cevap veremez.</p>{% endif %}
+</div>
+
+{% endblock %}

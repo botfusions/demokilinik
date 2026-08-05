@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block baslik %}Klinik Paneli{% endblock %}</title>
+<style>
+  :root { --çizgi:#dfe3e8; --metin:#1c2430; --soluk:#5f6b7a; --vurgu:#0b6bcb; --kirmizi:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--metin); background:#f6f8fa; }
+  header { background:#fff; border-bottom:1px solid var(--çizgi); padding:0 20px; display:flex; align-items:center; gap:24px; }
+  header h1 { font-size:16px; margin:14px 0; }
+  nav a { color:var(--soluk); text-decoration:none; padding:16px 0; display:inline-block; margin-right:18px; border-bottom:2px solid transparent; }
+  nav a:hover { color:var(--vurgu); }
+  main { max-width:1000px; margin:24px auto; padding:0 20px; }
+  .kart { background:#fff; border:1px solid var(--çizgi); border-radius:8px; padding:18px; margin-bottom:18px; }
+  h2 { font-size:15px; margin:0 0 14px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--soluk); padding:8px 10px; border-bottom:1px solid var(--çizgi); }
+  td { padding:9px 10px; border-bottom:1px solid #f0f2f4; }
+  tr:last-child td { border-bottom:0; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--çizgi); border-radius:6px; font:inherit; background:#fff; }
+  textarea { min-height:70px; resize:vertical; }
+  label { display:block; font-size:12px; color:var(--soluk); margin-bottom:4px; }
+  .satir { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .satir > div { flex:1; min-width:150px; }
+  button { padding:8px 16px; border:0; border-radius:6px; background:var(--vurgu); color:#fff; font:inherit; cursor:pointer; }
+  button.sade { background:#eef1f4; color:var(--metin); }
+  .rozet { font-size:12px; padding:2px 8px; border-radius:99px; background:#eef1f4; color:var(--soluk); }
+  .rozet.onayli { background:#e3f5e8; color:#1e7b34; }
+  .rozet.iptal { background:#f3f4f6; color:#8a94a0; text-decoration:line-through; }
+  .uyari { background:#fdecea; border:1px solid #f5c6c2; color:var(--kirmizi); padding:12px 16px; border-radius:8px; margin-bottom:18px; }
+  .uyari a { color:var(--kirmizi); font-weight:600; }
+  .bos { color:var(--soluk); padding:14px 0; }
+  a { color:var(--vurgu); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Klinik Paneli</h1>
+  <nav>
+    <a href="/">Özet</a>
+    <a href="/bilgi">Bilgi Tabanı</a>
+    <a href="/randevular">Randevular</a>
+    <a href="/hastalar">Hastalar</a>
+  </nav>
+  <form method="post" action="/cikis" style="margin-left:auto">
+    <button class="sade">Çıkış</button>
+  </form>
+</header>
+<main>
+  {% for s in saglik or [] %}
+    {% if s.durum != 'saglikli' and s.uyari_gonderildi %}
+      <div class="uyari">
+        <strong>{{ s.servis }} bağlantısı koptu.</strong> {{ s.hata }}
+        {% if s.servis == 'whatsapp' %}
+          — <a href="http://localhost:2785" target="_blank">OpenWA panelinden QR okutun</a>
+        {% else %}
+          — <a href="https://app.composio.dev" target="_blank">Composio'dan yeniden bağlanın</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endfor %}
+  {% block icerik %}{% endblock %}
+</main>
+</body>
+</html>

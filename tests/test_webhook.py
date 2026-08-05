@@ -185,3 +185,73 @@ def test_ajan_hatasinda_hasta_sessiz_kalmaz(istemci, conn, monkeypatch):
         assert cur.fetchone()[0] == 1
     # Hastaya bir şey söylenmeli
     assert len(istemci.gonderilenler) == 1
+
+
+# ── oturum adı → UUID çözümü ────────────────────────────────
+
+def test_uuid_verilmisse_oldugu_gibi_kullanilir(monkeypatch):
+    """Regresyon: OpenWA uçları UUID ister, .env okunabilir ad tutar."""
+    from app import openwa
+
+    uuid = "f14d9382-9425-44ff-ba80-d5404ba81fdb"
+    monkeypatch.setenv("OPENWA_SESSION", uuid)
+    assert openwa.oturum_id() == uuid   # ağa çıkmadan döner
+
+
+def test_ad_uuide_cevrilir_ve_onbelleklenir(monkeypatch):
+    from app import openwa
+
+    monkeypatch.setenv("OPENWA_SESSION", "klinik-test")
+    openwa._UUID_ONBELLEK.clear()
+    cagri = []
+
+    class SahteIstemci:
+        def get(self, yol):
+            cagri.append(yol)
+            class Y:
+                @staticmethod
+                def raise_for_status(): pass
+                @staticmethod
+                def json(): return [{"name": "klinik-test", "id": "abc-123"}]
+            return Y()
+
+    c = SahteIstemci()
+    assert openwa.oturum_id(c) == "abc-123"
+    assert openwa.oturum_id(c) == "abc-123"
+    assert len(cagri) == 1, "ikinci çağrı önbellekten gelmeliydi"
+
+
+def test_olmayan_oturum_acik_hata_verir(monkeypatch):
+    from app import openwa
+
+    monkeypatch.setenv("OPENWA_SESSION", "yok-boyle")
+    openwa._UUID_ONBELLEK.clear()
+
+    class SahteIstemci:
+        def get(self, yol):
+            class Y:
+                @staticmethod
+                def raise_for_status(): pass
+                @staticmethod
+                def json(): return []
+            return Y()
+
+    with pytest.raises(RuntimeError, match="oturum yok"):
+        openwa.oturum_id(SahteIstemci())
+
+
+def test_gonderim_coksede_cevap_kaydedilir(istemci, conn, monkeypatch):
+    """Regresyon: WhatsApp'a ulaşılamayınca ajanın cevabı kayboluyordu."""
+    import app.openwa as openwa_mod
+
+    def patla(tel, metin):
+        raise ConnectionError("Connection refused")
+
+    monkeypatch.setattr(openwa_mod, "mesaj_gonder", patla)
+
+    g = _govde("Adresiniz?", wamid="wamid.GONDERIMHATA")
+    istemci.post("/webhook/whatsapp", content=g, headers={"X-OpenWA-Signature": _imzala(g)})
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM gorusmeler WHERE yon = 'giden' AND mesaj = 'Test yanıtı'")
+        assert cur.fetchone()[0] == 1, "gönderim başarısızken cevap panelde görünmeli"

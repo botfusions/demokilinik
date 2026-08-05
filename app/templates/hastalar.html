@@ -1,0 +1,23 @@
+{% extends "temel.html" %}
+{% block baslik %}Hastalar — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="kart">
+  <h2>Hastalar</h2>
+  {% if kisiler %}
+  <table>
+    <tr><th>Ad</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th><th>Not</th></tr>
+    {% for k in kisiler %}
+    <tr>
+      <td><a href="/hastalar/{{ k.id }}">{{ k.ad or '—' }}</a></td>
+      <td>{{ k.telefon }}</td>
+      <td>{{ k.ilk_temas.strftime('%d.%m.%Y') }}</td>
+      <td>{{ k.son_temas.strftime('%d.%m.%Y %H:%M') }}</td>
+      <td>{{ k.personel_notu or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Henüz hasta kaydı yok.</p>{% endif %}
+</div>
+
+{% endblock %}

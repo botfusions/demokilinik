@@ -1,0 +1,55 @@
+{% extends "temel.html" %}
+{% block baslik %}Özet — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="kart">
+  <h2>Bugünün randevuları</h2>
+  {% if randevular %}
+  <table>
+    <tr><th>Saat</th><th>Hasta</th><th>Hizmet</th><th>Durum</th></tr>
+    {% for r in randevular %}
+    <tr>
+      <td>{{ r.baslangic.strftime('%H:%M') }} – {{ r.bitis.strftime('%H:%M') }}</td>
+      <td>{{ r.ad or r.telefon }}</td>
+      <td>{{ r.hizmet }}</td>
+      <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Bugün için randevu yok.</p>{% endif %}
+</div>
+
+<div class="kart">
+  <h2>Son yazışanlar</h2>
+  {% if kisiler %}
+  <table>
+    <tr><th>Hasta</th><th>Telefon</th><th>Son temas</th></tr>
+    {% for k in kisiler %}
+    <tr>
+      <td><a href="/hastalar/{{ k.id }}">{{ k.ad or '—' }}</a></td>
+      <td>{{ k.telefon }}</td>
+      <td>{{ k.son_temas.strftime('%d.%m.%Y %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Henüz kimse yazmadı.</p>{% endif %}
+</div>
+
+<div class="kart">
+  <h2>Bağlantı durumu</h2>
+  {% if saglik %}
+  <table>
+    <tr><th>Servis</th><th>Durum</th><th>Son kontrol</th><th>Hata</th></tr>
+    {% for s in saglik %}
+    <tr>
+      <td>{{ s.servis }}</td>
+      <td><span class="rozet {{ 'onayli' if s.durum == 'saglikli' else '' }}">{{ s.durum }}</span></td>
+      <td>{{ s.son_kontrol.strftime('%d.%m %H:%M') }}</td>
+      <td>{{ s.hata or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="bos">Henüz kontrol yapılmadı.</p>{% endif %}
+</div>
+
+{% endblock %}

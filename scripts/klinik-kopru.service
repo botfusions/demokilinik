@@ -1,0 +1,28 @@
+# /etc/systemd/system/klinik-kopru.service
+# Kurulum:
+#   sudo cp scripts/klinik-kopru.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now klinik-kopru
+
+[Unit]
+Description=Klinik WhatsApp resepsiyonist köprüsü
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=klinik
+WorkingDirectory=/opt/hermes-klinik
+EnvironmentFile=/opt/hermes-klinik/.env
+# Ajan bu klasöre özel — global ~/.hermes kullanılmaz
+Environment=HERMES_HOME=/opt/hermes-klinik/hermes-home
+Environment=PATH=/opt/hermes-klinik/.venv/bin:/home/klinik/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/hermes-klinik/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+# Ajan subprocess olarak hermes çalıştırır; kaçak bir döngüde makineyi yemesin
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

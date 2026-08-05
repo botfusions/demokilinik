@@ -7,12 +7,14 @@ __pycache__/
 # OpenWA oturum verisi ve medya — asla repoya girmez
 openwa-data/
 
-# Hermes çalışma verisi; config.yaml, SOUL.md ve skills/ takip edilir
-hermes-home/sessions/
-hermes-home/memories/
-hermes-home/mcp-tokens/
-hermes-home/.env
-hermes-home/auth.json
+# Hermes çalışma verisi. Yalnız config.yaml, SOUL.md ve skills/ takip edilir —
+# logs/ içinde hasta mesajları geçebilir, repoya asla girmemeli (KVKK).
+hermes-home/*
+!hermes-home/config.yaml
+!hermes-home/SOUL.md
+!hermes-home/skills/
+hermes-home/skills/.hub/
 
 # Referans zip'ler (inşada kullanılmıyor)
 referans/
+hermes-home/skills/.usage.json*
