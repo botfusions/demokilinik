@@ -8,12 +8,30 @@
   </div>
 </div>
 
+{% if hata %}<div class="uyari-kutu"><span>⚠</span><div>{{ hata }}</div></div>{% endif %}
+
 <div class="kart" style="margin-bottom:14px">
   <h2>Elle randevu ekle</h2>
   <form method="post" action="/randevular">
     <div class="satir">
       <div><label for="t">Telefon</label><input id="t" name="telefon" placeholder="905321112233" required></div>
       <div><label for="h">Hizmet</label><input id="h" name="hizmet" placeholder="Kontrol" required></div>
+    </div>
+    <div class="satir">
+      <div>
+        <label for="d">Doktor</label>
+        <select id="d" name="doktor_id">
+          <option value="">Otomatik — en boş doktor</option>
+          {% for d in doktorlar %}<option value="{{ d.id }}">{{ d.ad }}{% if d.uzmanlik %} · {{ d.uzmanlik }}{% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="ac">Aciliyet</label>
+        <select id="ac" name="acil">
+          <option value="">Normal</option>
+          <option value="1">Acil</option>
+        </select>
+      </div>
     </div>
     <div class="satir">
       <div><label for="bs">Başlangıç</label><input id="bs" type="datetime-local" name="baslangic" required></div>
@@ -32,13 +50,14 @@
 
   {% if randevular %}
   <div class="kaydir"><table>
-    <tr><th>Tarih</th><th>Saat</th><th>Hasta</th><th>Hizmet</th><th>Durum</th><th>Takvim</th><th></th></tr>
+    <tr><th>Tarih</th><th>Saat</th><th>Hasta</th><th>Doktor</th><th>Hizmet</th><th>Durum</th><th>Takvim</th><th></th></tr>
     {% for r in randevular %}
     <tr>
       <td>{{ r.baslangic.strftime('%d.%m.%Y') }}</td>
       <td>{{ r.baslangic.strftime('%H:%M') }} – {{ r.bitis.strftime('%H:%M') }}</td>
       <td><a href="/hastalar/{{ r.kisi_id }}">{{ r.ad or r.telefon }}</a></td>
-      <td>{{ r.hizmet }}</td>
+      <td>{{ r.doktor_ad or '—' }}</td>
+      <td>{{ r.hizmet }}{% if r.acil %} <span class="rozet acil">acil</span>{% endif %}</td>
       <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
       <td>
         {% if r.google_event_id %}

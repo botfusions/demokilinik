@@ -1,0 +1,99 @@
+{% extends "temel.html" %}
+{% block baslik %}Kullanıcılar — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>Kullanıcılar</h1>
+    <div class="alt-baslik">Panele kim girebilir ve kim ne yaptı</div>
+  </div>
+</div>
+
+{% if hata %}<div class="uyari-kutu"><span>⚠</span><div>{{ hata }}</div></div>{% endif %}
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Kullanıcı ekle</h2>
+  <p class="ipucu">
+    Parola en az 8 karakter. Personel randevu ve bilgi girer; yönetici ayrıca
+    doktor ve kullanıcı tanımlar.
+  </p>
+  <form method="post" action="/kullanicilar">
+    <div class="satir">
+      <div>
+        <label for="ka">Kullanıcı adı</label>
+        <input id="ka" name="kullanici_adi" placeholder="ayse" autocapitalize="none" required>
+      </div>
+      <div>
+        <label for="ad">Ad soyad</label>
+        <input id="ad" name="ad" placeholder="Ayşe Yılmaz">
+      </div>
+    </div>
+    <div class="satir">
+      <div>
+        <label for="pr">Parola</label>
+        <input id="pr" type="password" name="parola" minlength="8" required>
+      </div>
+      <div>
+        <label for="rl">Rol</label>
+        <select id="rl" name="rol">
+          <option value="personel">Personel</option>
+          <option value="admin">Yönetici</option>
+        </select>
+      </div>
+    </div>
+    <button>Kullanıcı oluştur</button>
+  </form>
+</div>
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Kayıtlı kullanıcılar</h2>
+  <div class="kaydir">
+    <table>
+      <tr><th>Kullanıcı</th><th>Ad</th><th>Rol</th><th>Son giriş</th><th>Durum</th><th>Yeni parola</th><th></th></tr>
+      {% for k in kullanicilar %}
+      <tr>
+        <td style="color:var(--murekkep)">{{ k.kullanici_adi }}</td>
+        <td>{{ k.ad or '—' }}</td>
+        <td><span class="rozet">{{ 'Yönetici' if k.rol == 'admin' else 'Personel' }}</span></td>
+        <td>{{ k.son_giris.strftime('%d.%m.%Y %H:%M') if k.son_giris else 'hiç girmedi' }}</td>
+        <td><span class="rozet {{ 'aktif' if k.aktif else 'pasif' }}">{{ 'aktif' if k.aktif else 'pasif' }}</span></td>
+        <td>
+          <form method="post" action="/kullanicilar/{{ k.id }}/parola" style="display:flex; gap:6px">
+            <input type="password" name="parola" minlength="8" placeholder="en az 8 karakter"
+                   required style="min-width:130px">
+            <button class="sade">Değiştir</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/kullanicilar/{{ k.id }}/durum">
+            {% if k.aktif %}<button class="sade">Pasifleştir</button>
+            {% else %}<input type="hidden" name="aktif" value="1"><button class="sade">Aktifleştir</button>{% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<div class="kart">
+  <h2>İşlem izi</h2>
+  <p class="ipucu">Son 60 işlem. Randevuyu kimin değiştirdiği buradan görülür.</p>
+  {% if kayitlar %}
+  <div class="kaydir">
+    <table>
+      <tr><th style="width:130px">Zaman</th><th style="width:110px">Kim</th><th>Ne yaptı</th><th>Detay</th></tr>
+      {% for i in kayitlar %}
+      <tr>
+        <td style="font-variant-numeric:tabular-nums">{{ i.olusturma.strftime('%d.%m %H:%M:%S') }}</td>
+        <td style="color:var(--murekkep)">{{ i.kullanici_adi or '—' }}</td>
+        <td>{{ i.eylem }}</td>
+        <td>{{ i.detay or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}<p class="bos">Henüz işlem yok.</p>{% endif %}
+</div>
+
+{% endblock %}

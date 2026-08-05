@@ -64,9 +64,11 @@ def conn():
                     f"Oluştur: docker compose exec postgres createdb -U klinik klinik_crm_test")
     sema_kur(c)
     with c.cursor() as cur:
+        # Yeni bir tablo eklendiğinde buraya da eklenmeli — eksik kalırsa testler
+        # birbirinin verisini görür ve id'ler beklenmedik yerden gelir.
         cur.execute(
-            "TRUNCATE gorusmeler, randevular, kisiler, bilgi_tabani, "
-            "baglanti_saglik RESTART IDENTITY CASCADE"
+            "TRUNCATE gorusmeler, randevular, kisiler, bilgi_tabani, baglanti_saglik, "
+            "doktorlar, kullanicilar, islem_kaydi RESTART IDENTITY CASCADE"
         )
     c.commit()
     yield c

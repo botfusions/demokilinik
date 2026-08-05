@@ -24,6 +24,10 @@ class CalismaSaatiDisi(Exception):
     """Klinik o gün/saat kapalı."""
 
 
+class DoktorYok(Exception):
+    """Verilen doktor kayıtlı değil ya da pasif."""
+
+
 # ── kişiler ─────────────────────────────────────────────────
 
 def kisi_upsert(conn: psycopg.Connection, telefon: str, ad: str | None = None) -> int:
@@ -140,7 +144,14 @@ def randevu_olustur(
     baslangic: datetime,
     bitis: datetime,
     notlar: str | None = None,
+    doktor_id: int | None = None,
+    acil: bool = False,
 ) -> int:
+    """Randevu açar. Çakışma **doktor bazında** ölçülür.
+
+    İki doktor aynı saatte iki hastaya bakabilir; aynı doktor bakamaz. Doktor
+    seçilmemiş randevular (klinik tek hekimliyse) kendi aralarında çakışır.
+    """
     if baslangic < datetime.now(tz=baslangic.tzinfo):
         raise GecmisTarih(f"{baslangic:%d.%m.%Y %H:%M} geçmiş bir tarih")
 
@@ -151,24 +162,34 @@ def randevu_olustur(
         )
 
     with conn.cursor() as cur:
-        # Kesişim testi: sınır teması (mevcut.bitis == yeni.baslangic) çakışma değil
+        if doktor_id is not None:
+            cur.execute("SELECT ad FROM doktorlar WHERE id = %s AND aktif", (doktor_id,))
+            if not cur.fetchone():
+                raise DoktorYok(f"{doktor_id} numaralı aktif doktor yok")
+
+        # Kesişim testi: sınır teması (mevcut.bitis == yeni.baslangic) çakışma değil.
+        # IS NOT DISTINCT FROM: iki NULL da aynı "doktor" sayılır.
         cur.execute(
             """
-            SELECT 1 FROM randevular
-            WHERE durum <> 'iptal' AND baslangic < %s AND bitis > %s
+            SELECT r.id, d.ad FROM randevular r
+            LEFT JOIN doktorlar d ON d.id = r.doktor_id
+            WHERE r.durum <> 'iptal'
+              AND r.doktor_id IS NOT DISTINCT FROM %s
+              AND r.baslangic < %s AND r.bitis > %s
             LIMIT 1
             """,
-            (bitis, baslangic),
+            (doktor_id, bitis, baslangic),
         )
-        if cur.fetchone():
-            raise RandevuCakismasi(f"{baslangic:%d.%m.%Y %H:%M} saati dolu")
+        if (mevcut := cur.fetchone()):
+            kim = f" ({mevcut[1]})" if mevcut[1] else ""
+            raise RandevuCakismasi(f"{baslangic:%d.%m.%Y %H:%M} saati dolu{kim}")
 
         cur.execute(
             """
-            INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, notlar)
-            VALUES (%s, %s, %s, %s, %s) RETURNING id
+            INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, notlar, doktor_id, acil)
+            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
             """,
-            (kisi_id, hizmet, baslangic, bitis, notlar),
+            (kisi_id, hizmet, baslangic, bitis, notlar, doktor_id, acil),
         )
         rid = cur.fetchone()[0]
     conn.commit()
@@ -203,16 +224,20 @@ def randevular_listele(conn: psycopg.Connection, gun=None) -> list[dict]:
         if gun is None:
             cur.execute(
                 """
-                SELECT r.*, k.ad, k.telefon
-                  FROM randevular r JOIN kisiler k ON k.id = r.kisi_id
+                SELECT r.*, k.ad, k.telefon, d.ad AS doktor_ad
+                  FROM randevular r
+                  JOIN kisiler k ON k.id = r.kisi_id
+                  LEFT JOIN doktorlar d ON d.id = r.doktor_id
                  ORDER BY r.baslangic
                 """
             )
         else:
             cur.execute(
                 """
-                SELECT r.*, k.ad, k.telefon
-                  FROM randevular r JOIN kisiler k ON k.id = r.kisi_id
+                SELECT r.*, k.ad, k.telefon, d.ad AS doktor_ad
+                  FROM randevular r
+                  JOIN kisiler k ON k.id = r.kisi_id
+                  LEFT JOIN doktorlar d ON d.id = r.doktor_id
                  WHERE r.baslangic::date = %s
                  ORDER BY r.baslangic
                 """,
@@ -221,16 +246,18 @@ def randevular_listele(conn: psycopg.Connection, gun=None) -> list[dict]:
         return cur.fetchall()
 
 
-def dolu_araliklar(conn: psycopg.Connection, gun) -> list[dict]:
-    """Ajanın uygunluk sorgusu için: o günün dolu saatleri."""
+def dolu_araliklar(conn: psycopg.Connection, gun, doktor_id: int | None = None) -> list[dict]:
+    """O günün dolu saatleri. `doktor_id` verilirse yalnız o doktorunkiler."""
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            SELECT baslangic, bitis FROM randevular
-             WHERE durum <> 'iptal' AND baslangic::date = %s
-             ORDER BY baslangic
+            SELECT r.baslangic, r.bitis, r.doktor_id, d.ad AS doktor_ad
+              FROM randevular r LEFT JOIN doktorlar d ON d.id = r.doktor_id
+             WHERE r.durum <> 'iptal' AND r.baslangic::date = %s
+               AND (%s::int IS NULL OR r.doktor_id = %s)
+             ORDER BY r.baslangic
             """,
-            (gun,),
+            (gun, doktor_id, doktor_id),
         )
         return cur.fetchall()
 
@@ -323,3 +350,162 @@ def ozet_sayilar(conn: psycopg.Connection) -> dict:
         "toplam_hasta": hasta,
         "haftalik_mesaj": mesaj,
     }
+
+
+# ── doktorlar ───────────────────────────────────────────────
+
+def doktor_ekle(conn: psycopg.Connection, ad: str, uzmanlik: str | None = None,
+                notlar: str | None = None) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO doktorlar (ad, uzmanlik, notlar) VALUES (%s, %s, %s) RETURNING id",
+            (ad, uzmanlik, notlar),
+        )
+        did = cur.fetchone()[0]
+    conn.commit()
+    return did
+
+
+def doktor_durum_yaz(conn: psycopg.Connection, doktor_id: int, aktif: bool) -> None:
+    """Pasifleştirilen doktora yeni randevu açılamaz; mevcut randevuları durur."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE doktorlar SET aktif = %s WHERE id = %s", (aktif, doktor_id))
+    conn.commit()
+
+
+def doktorlar_listele(conn: psycopg.Connection, yalniz_aktif: bool = False) -> list[dict]:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT d.*,
+                   (SELECT count(*) FROM randevular r
+                     WHERE r.doktor_id = d.id AND r.durum <> 'iptal'
+                       AND r.baslangic >= now()) AS gelecek_randevu
+              FROM doktorlar d
+             WHERE (%s = false OR d.aktif)
+             ORDER BY d.aktif DESC, d.ad
+            """,
+            (yalniz_aktif,),
+        )
+        return cur.fetchall()
+
+
+def hastanin_doktoru(conn: psycopg.Connection, kisi_id: int) -> dict | None:
+    """Hastanın en son gittiği doktor. İlk kez gelen hasta için None.
+
+    Ajan bunu "geçen sefer Dr. X'e gelmiştiniz, yine onu ister misiniz?" demek
+    için kullanır — hastaya her seferinde baştan doktor sordurmaz.
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT d.id, d.ad, d.uzmanlik, d.aktif, r.baslangic AS son_randevu
+              FROM randevular r JOIN doktorlar d ON d.id = r.doktor_id
+             WHERE r.kisi_id = %s AND r.durum <> 'iptal'
+             ORDER BY r.baslangic DESC LIMIT 1
+            """,
+            (kisi_id,),
+        )
+        return cur.fetchone()
+
+
+def doktor_musait_mi(conn: psycopg.Connection, doktor_id: int,
+                     baslangic: datetime, bitis: datetime) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1 FROM randevular
+             WHERE durum <> 'iptal' AND doktor_id = %s
+               AND baslangic < %s AND bitis > %s
+             LIMIT 1
+            """,
+            (doktor_id, bitis, baslangic),
+        )
+        return cur.fetchone() is None
+
+
+def en_bos_doktor(conn: psycopg.Connection, baslangic: datetime,
+                  bitis: datetime) -> dict | None:
+    """O aralıkta müsait doktorlar arasında **o gün en az yüklü** olanı seçer.
+
+    İlk kez gelen hastanın doktor tercihi olmaz; iş en boş hekime dağıtılır.
+    Eşitlikte ada göre — aynı girdi hep aynı doktoru verir, ajan iki kez
+    sorulduğunda farklı cevap vermez.
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT d.id, d.ad, d.uzmanlik,
+                   (SELECT count(*) FROM randevular r
+                     WHERE r.doktor_id = d.id AND r.durum <> 'iptal'
+                       AND r.baslangic::date = %s::date) AS gun_yuku
+              FROM doktorlar d
+             WHERE d.aktif
+               AND NOT EXISTS (
+                   SELECT 1 FROM randevular r
+                    WHERE r.doktor_id = d.id AND r.durum <> 'iptal'
+                      AND r.baslangic < %s AND r.bitis > %s)
+             ORDER BY gun_yuku ASC, d.ad ASC
+             LIMIT 1
+            """,
+            (baslangic, bitis, baslangic),
+        )
+        return cur.fetchone()
+
+
+def en_erken_uygun(conn: psycopg.Connection, sure_dk: int = 30,
+                   gun_ufku: int = 14, doktor_id: int | None = None) -> dict | None:
+    """En erken müsait slot — acil vakalar için.
+
+    Bugünden başlayarak çalışma saatleri içinde yarım saatlik adımlarla tarar,
+    ilk boş aralığı ve o aralıkta en boş doktoru döndürür. Hiç yer yoksa None.
+    """
+    from datetime import timedelta
+
+    gunler, ac, kapa = _calisma_penceresi()
+    simdi = datetime.now()
+
+    for gun_ekle in range(gun_ufku + 1):
+        g = (simdi + timedelta(days=gun_ekle)).date()
+        if g.isoweekday() not in gunler:
+            continue
+
+        an = datetime.combine(g, ac)
+        kapanis = datetime.combine(g, kapa)
+        # Bugünse geçmiş saatleri atla, sonraki yarım saate yuvarla
+        if an < simdi:
+            an = simdi.replace(second=0, microsecond=0)
+            an += timedelta(minutes=(30 - an.minute % 30) % 30)
+            if an.minute % 30:
+                an = an.replace(minute=0 if an.minute < 30 else 30)
+
+        while an + timedelta(minutes=sure_dk) <= kapanis:
+            bitis = an + timedelta(minutes=sure_dk)
+            if doktor_id is not None:
+                if doktor_musait_mi(conn, doktor_id, an, bitis):
+                    return {"baslangic": an, "bitis": bitis, "doktor_id": doktor_id}
+            else:
+                d = en_bos_doktor(conn, an, bitis)
+                if d:
+                    return {"baslangic": an, "bitis": bitis,
+                            "doktor_id": d["id"], "doktor_ad": d["ad"]}
+            an += timedelta(minutes=30)
+
+    return None
+
+
+def doktor_bazli_doluluk(conn: psycopg.Connection, hafta_sayisi: int = 8) -> list[dict]:
+    """Panel grafiği: hangi doktor ne kadar yüklü."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT d.ad, count(r.id) AS adet
+              FROM doktorlar d
+              LEFT JOIN randevular r ON r.doktor_id = d.id AND r.durum <> 'iptal'
+                   AND r.baslangic >= now() - make_interval(weeks => %s)
+             WHERE d.aktif
+             GROUP BY d.id, d.ad ORDER BY adet DESC, d.ad
+            """,
+            (hafta_sayisi,),
+        )
+        return cur.fetchall()

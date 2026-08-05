@@ -35,9 +35,22 @@ CREATE TABLE IF NOT EXISTS gorusmeler (
 );
 CREATE INDEX IF NOT EXISTS gorusmeler_kisi_idx ON gorusmeler (kisi_id, id);
 
+CREATE TABLE IF NOT EXISTS doktorlar (
+    id        serial PRIMARY KEY,
+    ad        text NOT NULL,
+    uzmanlik  text,
+    aktif     boolean NOT NULL DEFAULT true,
+    notlar    text,
+    olusturma timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS randevular (
     id              serial PRIMARY KEY,
     kisi_id         integer NOT NULL REFERENCES kisiler(id) ON DELETE CASCADE,
+    -- Doktor listesi boşken NULL kalır; klinik tek hekimliyse hiç doldurulmaz.
+    -- Silinen doktorun randevusu kaybolmasın diye ON DELETE SET NULL.
+    doktor_id       integer REFERENCES doktorlar(id) ON DELETE SET NULL,
+    acil            boolean NOT NULL DEFAULT false,
     hizmet          text NOT NULL,
     baslangic       timestamptz NOT NULL,
     bitis           timestamptz NOT NULL,
@@ -49,6 +62,34 @@ CREATE TABLE IF NOT EXISTS randevular (
     CHECK (bitis > baslangic)
 );
 CREATE INDEX IF NOT EXISTS randevular_zaman_idx ON randevular (baslangic);
+
+-- Doktor katmanı sonradan eklendi; mevcut kurulumlarda randevular tablosu zaten
+-- var, o yüzden kolonlar ALTER ile geliyor. İndeks kolondan SONRA gelmeli.
+ALTER TABLE randevular ADD COLUMN IF NOT EXISTS doktor_id integer REFERENCES doktorlar(id) ON DELETE SET NULL;
+ALTER TABLE randevular ADD COLUMN IF NOT EXISTS acil boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS randevular_doktor_idx ON randevular (doktor_id, baslangic);
+
+CREATE TABLE IF NOT EXISTS kullanicilar (
+    id           serial PRIMARY KEY,
+    kullanici_adi text NOT NULL UNIQUE,
+    ad           text,
+    parola_hash  text NOT NULL,
+    rol          text NOT NULL DEFAULT 'personel' CHECK (rol IN ('admin', 'personel')),
+    aktif        boolean NOT NULL DEFAULT true,
+    son_giris    timestamptz,
+    olusturma    timestamptz NOT NULL DEFAULT now()
+);
+
+-- Kim ne yaptı. Randevu değiştiren, bilgi silen, kullanıcı ekleyen hep buraya düşer.
+CREATE TABLE IF NOT EXISTS islem_kaydi (
+    id           serial PRIMARY KEY,
+    kullanici_id integer REFERENCES kullanicilar(id) ON DELETE SET NULL,
+    kullanici_adi text,          -- kullanıcı silinse de iz kalsın
+    eylem        text NOT NULL,
+    detay        text,
+    olusturma    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS islem_kaydi_zaman_idx ON islem_kaydi (olusturma DESC);
 
 CREATE TABLE IF NOT EXISTS bilgi_tabani (
     id         serial PRIMARY KEY,

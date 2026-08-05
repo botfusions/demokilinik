@@ -1,10 +1,10 @@
 ---
 name: randevu-al
-description: Hastaya randevu ayarlamak için izlenecek adımlar. Randevu, tarih, saat, "gelmek istiyorum", "müsait misiniz" gibi konular açıldığında kullan.
-version: 1.0.0
+description: Hastaya randevu ayarlamak için izlenecek adımlar — doktor seçimi, uygunluk kontrolü, acil vaka yönlendirmesi. Randevu, tarih, saat, doktor, "gelmek istiyorum", "müsait misiniz" gibi konular açıldığında kullan.
+version: 2.0.0
 metadata:
   hermes:
-    tags: [randevu, klinik, takvim]
+    tags: [randevu, klinik, takvim, doktor]
     category: klinik
 ---
 
@@ -12,96 +12,147 @@ metadata:
 
 ## Ne zaman kullanılır
 
-Hasta randevu istediğinde, tarih/saat sorduğunda, "gelebilir miyim", "müsait
-misiniz", "ne zaman boş" benzeri bir şey yazdığında.
+Hasta randevu istediğinde, tarih/saat/doktor sorduğunda, "gelebilir miyim",
+"müsait misiniz", "ne zaman boş" benzeri bir şey yazdığında.
 
-## En önemli kural
+## İki kural
 
-**Uygunluğu kontrol etmeden asla saat teyit etme.** Hafızandan "muhtemelen boştur"
-diye saat vermek iki hastayı aynı saate koymak demektir. Her seferinde `/api/uygunluk`
-sor — konuşmanın başında baktıysan bile, çünkü aradan geçen sürede o saat dolmuş olabilir.
+1. **Uygunluğu kontrol etmeden asla saat teyit etme.** Hafızandan "muhtemelen
+   boştur" diye saat vermek iki hastayı aynı saate koymak demektir. Her seferinde
+   sor — konuşmanın başında baktıysan bile, çünkü aradan geçen sürede dolmuş olabilir.
+2. **Randevuyu yazmadan hastaya "oluşturdum" deme.** API `409` dönerse randevu
+   açılmamıştır.
 
 ## Adımlar
 
-### 1. Eksik bilgiyi topla
+### 1. Hastayı ve doktor geçmişini öğren
 
-Randevu için üç şey gerekir: **hangi işlem**, **hangi gün**, **hangi saat**.
-Eksik olanı tek tek değil, bir mesajda sor. Hasta "yarın gelebilir miyim" derse gün
-belli, işlem ve saat eksik.
-
-Hastanın adını bilmiyorsan randevuyu yazmadan önce bir kez sor.
-
-### 2. Uygunluğu sorgula
+İlk iş: hastanın daha önce hangi doktora gittiğine bak.
 
 ```
 curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  "http://localhost:8000/api/uygunluk?gun=2026-08-07"
+  "http://localhost:8000/api/doktorlar?telefon=905321112233"
 ```
 
 Dönen cevap:
-- `acik: false` → klinik o gün kapalı. Hastaya söyle, en yakın açık günü öner.
+- `doktorlar` → klinikte çalışan aktif hekimler (ad + uzmanlık)
+- `onceki_doktor` → hastanın en son gittiği hekim (varsa)
+- `ilk_ziyaret: true` → bu hasta kliniğe ilk kez geliyor
+
+**Liste boşsa** (`doktorlar: []`) klinik tek hekimlidir; doktor sorma, doğrudan
+saat ayarla ve 4. adıma geç.
+
+### 2. Doktoru belirle
+
+Üç durum var:
+
+**a) Hasta daha önce gelmiş** (`onceki_doktor` dolu) — hekimini hatırla, sorma:
+> Geçen sefer Dr. Ayla Tuncer'e gelmiştiniz. Yine onunla mı devam edelim?
+
+Hasta "evet" derse o doktorun `id`'siyle devam et. Başka doktor isterse listeyi ver.
+
+**b) Hasta ilk kez geliyor** (`ilk_ziyaret: true`) — doktor tercihi sor, ama
+zorlama. Uzmanlıkları kısaca söyle:
+> Dr. Ayla Tuncer (ortodonti), Dr. Kerem Aksoy (implantoloji) ve Dr. Nihal Erdoğan
+> (genel diş hekimliği) var. Tercihiniz var mı, yoksa en uygun hekime ayarlayayım mı?
+
+Hasta "farketmez" derse **doktor seçme** — 5. adımda `doktor_id` göndermezsen
+sistem o saatte en boş hekime dağıtır. Kendi kafandan hekim seçmek yükü dengesizleştirir.
+
+**c) Hasta belirli bir hekim istiyor** — listede varsa `id`'sini kullan. Listede
+yoksa (ayrılmış ya da pasif) nazikçe söyle ve alternatif sun.
+
+### 3. Aciliyeti değerlendir
+
+Hasta ağrı, şişlik, kırık diş, düşen dolgu gibi bir şikayet anlatıyorsa bu **acil**
+sayılır. Teşhis koyma, ama en erken slotu ara:
+
+```
+curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
+  "http://localhost:8000/api/en-erken?sure_dk=30"
+```
+
+`bulundu: true` ise dönen `baslangic`, `bitis` ve `doktor_id`'yi kullan:
+> En erken bugün 15:30'da Dr. Nihal Erdoğan'a alabiliriz. Uygun mu?
+
+Belirli bir doktor isteniyorsa `&doktor_id=2` ekle. Acil randevuyu yazarken
+gövdeye `"acil": true` koy — personel panelde acil vakaları ayırt eder.
+
+### 4. Uygunluğu sorgula
+
+Hasta belirli bir gün istiyorsa:
+
+```
+curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
+  "http://localhost:8000/api/uygunluk?gun=2026-08-07&doktor_id=1"
+```
+
+`doktor_id` verirsen yalnız o hekimin doluluğu, vermezsen kliniğin tamamı gelir.
+
+- `acik: false` → klinik o gün kapalı. En yakın açık günü öner.
 - `dolu: []` → o gün tamamen boş.
-- `dolu: [{baslangic, bitis}]` → bu aralıklar dolu. Hastanın istediği saat bu
-  aralıklardan biriyle çakışıyorsa **boş olan 2-3 alternatif saat öner.**
+- `dolu: [...]` → bu aralıklar dolu; hastanın istediği saat çakışıyorsa **boş olan
+  2-3 alternatif saat öner.**
 
-`acilis` ve `kapanis` alanları o günün çalışma penceresidir. Randevunun tamamı
-bu pencerenin içinde bitmeli.
+`acilis`/`kapanis` o günün çalışma penceresidir; randevunun tamamı içinde bitmeli.
 
-### 3. İşlem süresini belirle
+**İşlem süresi:** bilgi tabanından al. Yazmıyorsa 30 dakika varsay ve hastaya süre
+hakkında bir şey söyleme.
 
-Süreyi bilgi tabanından al. Yazmıyorsa **30 dakika** varsay ve hastaya
-"yaklaşık yarım saat sürüyor" deme — süre hakkında emin değilsen hiç söz etme.
+### 5. Teyit al, sonra yaz
 
-### 4. Hastadan teyit al
+Yazmadan önce tek cümleyle teyit ettir:
+> 7 Ağustos Perşembe 14:00, Dr. Ayla Tuncer, diş taşı temizliği. Onaylıyor musunuz?
 
-Saati yazmadan önce hastaya tek cümleyle teyit ettir:
-"7 Ağustos Perşembe 14:00, diş taşı temizliği. Onaylıyor musunuz?"
-
-### 5. Randevuyu yaz
+Onay gelince:
 
 ```
 curl -s -X POST -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
   -H "Content-Type: application/json" \
   -d '{"telefon":"905321112233","ad":"Ayşe Yılmaz","hizmet":"Diş taşı temizliği",
-       "baslangic":"2026-08-07T14:00:00","bitis":"2026-08-07T14:30:00"}' \
+       "baslangic":"2026-08-07T14:00:00","bitis":"2026-08-07T14:30:00",
+       "doktor_id":1,"acil":false}' \
   http://localhost:8000/api/randevu
 ```
 
-Telefon numarası konuştuğun hastanın numarasıdır — sana zaten verilmiştir, hastaya sorma.
+`doktor_id`'yi **atlarsan** sistem o saatte en boş hekimi seçer ve cevapta
+`doktor_otomatik_secildi: true` ile hangisini seçtiğini söyler — hastaya o hekimin
+adını bildir.
+
+Telefon numarası konuştuğun hastanınkidir; hastaya sorma.
 
 Cevaplar:
-- `200/201` → randevu açıldı, `randevu_id` döner.
-- `409` → **o saat bu arada dolmuş.** Hastaya "az önce o saat alınmış, şu saatler
-  boş" de ve 2. adıma dön. Asla yazdım deme.
-- `422` → çalışma saati dışı ya da geçmiş tarih. Hastaya sebebi söyle, alternatif öner.
+- `200/201` → randevu açıldı. `doktor_ad` alanını hastaya söyle.
+- `409` → **o saat bu arada dolmuş.** 4. adıma dön, alternatif öner. Asla "yazdım" deme.
+- `422` → çalışma saati dışı, geçmiş tarih ya da geçersiz doktor. Sebebi söyle.
+- Cevapta `hata` alanı varsa işlem başarısızdır.
 
 ### 6. Google Takvim'e ekle
 
-Composio'nun Google Takvim aracıyla etkinlik oluştur. Başlık: `<hizmet> — <hasta adı>`.
-Açıklamaya hastanın telefonunu yaz.
+Composio'nun Takvim aracıyla etkinlik oluştur.
+Başlık: `<hizmet> — <hasta adı>`. Açıklamaya hastanın telefonunu **ve doktorun
+adını** yaz. Doktorun kendi takvimi varsa etkinliği ona da davetli ekle.
 
 Takvim aracı hata verirse **randevuyu iptal etme** — CRM kaydı geçerlidir, personel
-panelden görür. Sadece hastaya normal onayı ver.
+panelden görür. Hastaya normal onayı ver.
 
-### 7. Onay maili (varsa)
+### 7. Hastaya onayla
 
-Hastanın e-posta adresi varsa Composio'nun Gmail aracıyla kısa bir onay maili at.
-E-posta adresi yoksa mail için ısrar etme.
-
-### 8. Hastaya onayla
-
-Tek cümle: "7 Ağustos Perşembe 14:00'e randevunuzu oluşturdum, bekliyoruz."
+Tek cümle, doktor adıyla:
+> 7 Ağustos Perşembe 14:00'e Dr. Ayla Tuncer'den randevunuzu oluşturdum, bekliyoruz.
 
 ## Sık yapılan hatalar
 
 - **Uygunluk sormadan saat vermek.** En sık ve en pahalı hata.
-- **409 aldıktan sonra "randevunuz oluştu" demek.** Randevu oluşmadı.
-- Hastaya kendi telefon numarasını sormak — zaten elinde.
+- **409 aldıktan sonra "randevunuz oluştu" demek.** Oluşmadı.
+- Hasta "farketmez" dediğinde kendi kafandan doktor seçmek — `doktor_id` gönderme,
+  sistem dengeli dağıtsın.
+- Daha önce gelmiş hastaya doktorunu baştan sormak — `onceki_doktor` zaten elinde.
+- Ağrı anlatan hastayı normal sıraya koymak — `/api/en-erken` kullan.
+- Hastaya kendi telefon numarasını sormak.
 - İşlem süresini uydurmak.
-- Randevu iptali istendiğinde kendi başına silmeye çalışmak: iptal işlemini
-  personel panelden yapar. Hastaya "personelimiz iptalinizi işleyecek" de.
 
 ## Doğrulama
 
-Randevuyu yazdıktan sonra emin olmak istersen aynı günün uygunluğunu tekrar sor;
-yazdığın aralık `dolu` listesinde görünmeli.
+Randevuyu yazdıktan sonra emin olmak istersen aynı gün ve doktor için uygunluğu
+tekrar sor; yazdığın aralık `dolu` listesinde görünmeli.

@@ -1,0 +1,90 @@
+{% extends "temel.html" %}
+{% block baslik %}Doktorlar — Klinik Paneli{% endblock %}
+{% block icerik %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>Doktorlar</h1>
+    <div class="alt-baslik">Ajan randevu alırken bu listeden doktor seçer</div>
+  </div>
+</div>
+
+{% if hata %}<div class="uyari-kutu"><span>⚠</span><div>{{ hata }}</div></div>{% endif %}
+
+{% if kullanici and kullanici.rol == 'admin' %}
+<div class="kart" style="margin-bottom:14px">
+  <h2>Doktor ekle</h2>
+  <p class="ipucu">Eklenen doktor ajanın seçenekleri arasına anında girer.</p>
+  <form method="post" action="/doktorlar">
+    <div class="satir">
+      <div><label for="a">Ad</label><input id="a" name="ad" placeholder="Dr. Ayla Tuncer" required></div>
+      <div><label for="u">Uzmanlık</label><input id="u" name="uzmanlik" placeholder="Ortodonti"></div>
+    </div>
+    <label for="n">Not (hastaya söylenmez)</label>
+    <input id="n" name="notlar" placeholder="Salı günleri gelmiyor">
+    <div style="margin-top:12px"><button>Kaydet</button></div>
+  </form>
+</div>
+{% endif %}
+
+<div class="izgara k2">
+  <div class="kart">
+    <h2>Kayıtlı doktorlar</h2>
+    <p class="ipucu">
+      {% if not doktorlar %}Hiç doktor yoksa sistem tek hekimli klinik gibi çalışır.
+      {% else %}Pasifleştirilen doktora yeni randevu açılmaz; mevcut randevuları durur.{% endif %}
+    </p>
+    {% if doktorlar %}
+    <div class="kaydir">
+      <table>
+        <tr><th>Ad</th><th>Uzmanlık</th><th>Gelecek randevu</th><th>Durum</th>
+          {% if kullanici and kullanici.rol == 'admin' %}<th></th>{% endif %}</tr>
+        {% for d in doktorlar %}
+        <tr>
+          <td style="color:var(--murekkep)">{{ d.ad }}</td>
+          <td>{{ d.uzmanlik or '—' }}</td>
+          <td style="font-variant-numeric:tabular-nums">{{ d.gelecek_randevu }}</td>
+          <td><span class="rozet {{ 'aktif' if d.aktif else 'pasif' }}">{{ 'aktif' if d.aktif else 'pasif' }}</span></td>
+          {% if kullanici and kullanici.rol == 'admin' %}
+          <td>
+            <form method="post" action="/doktorlar/{{ d.id }}/durum">
+              {% if d.aktif %}<button class="sade">Pasifleştir</button>
+              {% else %}<input type="hidden" name="aktif" value="1"><button class="sade">Aktifleştir</button>{% endif %}
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% else %}
+      <p class="bos">Henüz doktor eklenmemiş.</p>
+    {% endif %}
+  </div>
+
+  <div class="kart">
+    <h2>Doktor yükü</h2>
+    <p class="ipucu">Son 8 hafta. Yeni hasta en az yüklü doktora yönlendirilir.</p>
+    {% if yuk %}
+      {% set y_max = (yuk | map(attribute='adet') | max) or 1 %}
+      <table>
+        {% for d in yuk %}
+        <tr>
+          <td style="color:var(--murekkep); width:45%">{{ d.ad }}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:9px">
+              <div style="flex:1; height:8px; background:var(--yuzey-2); border-radius:4px; overflow:hidden">
+                <div style="width:{{ (d.adet / y_max * 100) | round }}%; height:100%;
+                            background:var(--{{ 'seri' if d.adet == y_max else 'seri-sonuk' }}); border-radius:4px"></div>
+              </div>
+              <span style="color:var(--murekkep); font-variant-numeric:tabular-nums; min-width:18px; text-align:right">{{ d.adet }}</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}<p class="bos">Aktif doktor yok.</p>{% endif %}
+  </div>
+</div>
+
+{% endblock %}

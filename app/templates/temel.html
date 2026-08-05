@@ -57,6 +57,10 @@
   .lamba.iyi { background:var(--iyi); }
   .lamba.bozuk { background:var(--kritik); }
   .cikis button { width:100%; margin-top:10px; }
+  .kimlik { padding:9px 10px; margin-top:10px; background:var(--yuzey-2);
+            border-radius:8px; border:1px solid var(--cizgi); }
+  .kimlik-ad { font-size:13px; font-weight:550; }
+  .kimlik-rol { font-size:11.5px; color:var(--sessiz); }
 
   /* ── ana alan ───────────────────────────────────────────── */
   main { padding: 22px 26px 40px; min-width: 0; }
@@ -102,6 +106,8 @@
   .rozet.iptal { text-decoration:line-through; }
   .rozet.aktif::before { background:var(--iyi); }
   .rozet.pasif::before { background:var(--sessiz); }
+  .rozet.acil::before { background:var(--kritik); }
+  .rozet.acil { color:#f0b8b8; }
 
   /* ── form ───────────────────────────────────────────────── */
   input, textarea, select {
@@ -151,6 +157,12 @@
   <a href="/randevular"  class="{% if sayfa == 'randevular' %}aktif{% endif %}"><span class="ikon">▤</span> Randevular</a>
   <a href="/hastalar"    class="{% if sayfa == 'hastalar' %}aktif{% endif %}"><span class="ikon">◇</span> Hastalar</a>
 
+  <div class="grup">Klinik</div>
+  <a href="/doktorlar"   class="{% if sayfa == 'doktorlar' %}aktif{% endif %}"><span class="ikon">✚</span> Doktorlar</a>
+  {% if kullanici and kullanici.rol == 'admin' %}
+  <a href="/kullanicilar" class="{% if sayfa == 'kullanicilar' %}aktif{% endif %}"><span class="ikon">⚭</span> Kullanıcılar</a>
+  {% endif %}
+
   <div class="grup">Ajan</div>
   <a href="/bilgi"       class="{% if sayfa == 'bilgi' %}aktif{% endif %}"><span class="ikon">✎</span> Bilgi Tabanı</a>
   <a href="http://localhost:2785" target="_blank"><span class="ikon">▣</span> WhatsApp (QR)</a>
@@ -165,6 +177,12 @@
     {% else %}
       <div class="durum-satir"><span class="lamba"></span> henüz kontrol yok</div>
     {% endfor %}
+    {% if kullanici %}
+    <div class="kimlik">
+      <div class="kimlik-ad">{{ kullanici.ad or kullanici.kullanici_adi }}</div>
+      <div class="kimlik-rol">{{ 'Yönetici' if kullanici.rol == 'admin' else 'Personel' }}</div>
+    </div>
+    {% endif %}
     <form method="post" action="/cikis" class="cikis"><button class="sade">Çıkış</button></form>
   </div>
 </aside>

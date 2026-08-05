@@ -15,8 +15,12 @@ def istemci(conn):
 
 @pytest.fixture
 def girisli(conn):
+    """Yönetici oturumu — panel sayfalarının tamamına erişir."""
+    from app.kullanici import kullanici_ekle
+
+    kullanici_ekle(conn, "admin", "test-parola", "admin")
     c = TestClient(main.app, follow_redirects=False)
-    c.post("/giris", data={"parola": "test-parola"})
+    c.post("/giris", data={"kullanici_adi": "admin", "parola": "test-parola"})
     return c
 
 
@@ -29,8 +33,11 @@ def test_parolasiz_erisim_girise_yonlendirir(istemci, yol):
     assert "/giris" in r.headers["location"]
 
 
-def test_yanlis_parola_iceri_almaz(istemci):
-    istemci.post("/giris", data={"parola": "yanlis"})
+def test_yanlis_parola_iceri_almaz(istemci, conn):
+    from app.kullanici import kullanici_ekle
+
+    kullanici_ekle(conn, "admin", "test-parola", "admin")
+    istemci.post("/giris", data={"kullanici_adi": "admin", "parola": "yanlis"})
     assert istemci.get("/").status_code in (302, 303, 307)
 
 

@@ -32,9 +32,15 @@
 <form method="post" action="/giris">
   <div class="marka"><span class="nokta">◔</span> Klinik Paneli</div>
   <div class="alt">Yalnızca klinik personeli içindir.</div>
-  {% if hata %}<div class="hata"><span>⚠</span> Parola hatalı.</div>{% endif %}
+  {% if hata == 'oturum' %}
+    <div class="hata"><span>⚠</span> Oturumunuz kapandı. Yeniden giriş yapın.</div>
+  {% elif hata %}
+    <div class="hata"><span>⚠</span> Kullanıcı adı veya parola hatalı.</div>
+  {% endif %}
+  <label for="k">Kullanıcı adı</label>
+  <input id="k" name="kullanici_adi" autocapitalize="none" autofocus required>
   <label for="p">Parola</label>
-  <input id="p" type="password" name="parola" autofocus required>
+  <input id="p" type="password" name="parola" required>
   <button>Giriş yap</button>
 </form>
 </body>
