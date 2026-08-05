@@ -69,6 +69,21 @@ ALTER TABLE randevular ADD COLUMN IF NOT EXISTS doktor_id integer REFERENCES dok
 ALTER TABLE randevular ADD COLUMN IF NOT EXISTS acil boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS randevular_doktor_idx ON randevular (doktor_id, baslangic);
 
+-- Giden hatırlatmalar. UNIQUE(randevu_id, tur): aynı randevu için aynı tür
+-- hatırlatma ikinci kez gönderilemez — nöbetçi iki kez çalışsa bile.
+CREATE TABLE IF NOT EXISTS hatirlatmalar (
+    id            serial PRIMARY KEY,
+    randevu_id    integer NOT NULL REFERENCES randevular(id) ON DELETE CASCADE,
+    tur           text NOT NULL CHECK (tur IN ('24s', '1s')),
+    planlanan     timestamptz NOT NULL,
+    gonderildi    timestamptz,
+    wa_message_id text,
+    hata          text,
+    UNIQUE (randevu_id, tur)
+);
+CREATE INDEX IF NOT EXISTS hatirlatmalar_bekleyen_idx
+    ON hatirlatmalar (planlanan) WHERE gonderildi IS NULL;
+
 CREATE TABLE IF NOT EXISTS kullanicilar (
     id           serial PRIMARY KEY,
     kullanici_adi text NOT NULL UNIQUE,

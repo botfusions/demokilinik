@@ -93,6 +93,47 @@ ihlali; geçmişten silmek de commit geçmişi yazmayı gerektirir.
 
 ---
 
+## 6. İç API hata durumunda HTML dönüyordu
+
+**Ne oluyordu:** Genel hata yakalayıcı tüm `HTTPException`'ları HTML sayfasına
+çeviriyordu. Ajan `/api/randevu`'ya istek atıp `409` (o saat dolu) alınca cevabı
+`<h1>409</h1>` olarak görüyordu.
+
+**Neden tehlikeliydi:** Ajan "o saat dolu" ile "sunucu çöktü" arasındaki farkı
+göremezdi. Hastaya "randevunuz oluştu" diyebilirdi — oluşmamışken.
+
+**Düzeltme:** `/api/` ile başlayan yollar artık `{"hata": "..."}` JSON döner.
+
+`app/main.py:yonlendir_ya_da_hata()`
+
+---
+
+## 7. scrypt OpenSSL'in bellek sınırını aşıyordu
+
+**Ne oluyordu:** Parola hash'i `n=2^17` ile ~134MB iş belleği istiyor, OpenSSL'in
+varsayılan `maxmem` sınırı 32MB. Uygulama açılışta `ValueError: memory limit
+exceeded` ile çöküyordu.
+
+**Düzeltme:** `n=2^16` (~67MB) + açık `maxmem=192MB`. Hash süresi ~107ms — panel
+girişinde görünmez, sözlük saldırısı için pahalı.
+
+`app/kullanici.py`
+
+---
+
+## 8. Testler yeni tabloları temizlemiyordu
+
+**Ne oluyordu:** `conftest` TRUNCATE listesi `doktorlar`, `kullanicilar`,
+`islem_kaydi` eklendiğinde güncellenmemişti. Testler birbirinin verisini görüyor,
+id'ler beklenmedik yerden geliyordu.
+
+**Düzeltme:** Liste güncellendi ve yanına not düşüldü: yeni tablo eklendiğinde
+buraya da eklenmeli.
+
+`tests/conftest.py`
+
+---
+
 ## Kusur sayılmayan ama takılınan noktalar
 
 Bunlar bizim hatamız değildi; OpenWA'nın kurulum gereklilikleriydi. Hepsi

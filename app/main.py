@@ -20,7 +20,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, hatirlatma, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -45,6 +45,7 @@ from app.crm import (  # noqa: E402
     kisiler_listele,
     personel_notu_yaz,
     randevu_iptal,
+    randevu_durum_yaz,
     randevu_olustur,
     randevular_listele,
 )
@@ -93,12 +94,14 @@ async def yasam(app: FastAPI):
         log.warning("İlk yönetici oluşturuldu: kullanıcı 'admin', parola .env'deki PANEL_PAROLA")
     c.close()
 
-    gorev = None
+    gorevler = []
     if os.environ.get("SAGLIK_NOBETCISI", "1") == "1":
-        gorev = asyncio.create_task(saglik.nobetci(baglan))
+        gorevler.append(asyncio.create_task(saglik.nobetci(baglan)))
+    if os.environ.get("HATIRLATMA_NOBETCISI", "1") == "1":
+        gorevler.append(asyncio.create_task(hatirlatma.nobetci(baglan)))
     yield
-    if gorev:
-        gorev.cancel()
+    for g in gorevler:
+        g.cancel()
 
 
 app = FastAPI(title="Klinik Resepsiyonist", lifespan=yasam)
@@ -308,6 +311,7 @@ def randevu_ekle_elle(
     except (RandevuCakismasi, GecmisTarih, CalismaSaatiDisi, DoktorYok) as e:
         return RedirectResponse(f"/randevular?hata={e}", status_code=303)
 
+    hatirlatma.hatirlatma_planla(conn, rid)
     islem_yaz(conn, _kim(request), "randevu açtı", f"#{rid} {telefon} {baslangic}")
     return RedirectResponse("/randevular", status_code=303)
 
@@ -315,6 +319,7 @@ def randevu_ekle_elle(
 @app.post("/randevular/{randevu_id}/iptal", dependencies=[Depends(personel)])
 def randevu_iptal_et(request: Request, randevu_id: int, conn=Depends(db)):
     randevu_iptal(conn, randevu_id)
+    hatirlatma.hatirlatmalari_iptal_et(conn, randevu_id)
     islem_yaz(conn, _kim(request), "randevu iptal etti", f"#{randevu_id}")
     return RedirectResponse("/randevular", status_code=303)
 
@@ -537,6 +542,8 @@ def randevu_api(govde: dict, conn=Depends(db)):
     except KeyError as e:
         raise HTTPException(400, f"Eksik alan: {e}")
 
+    hatirlatma.hatirlatma_planla(conn, rid)
+
     doktor = kullanilan = None
     if doktor_id:
         kullanilan = next((d for d in doktorlar_listele(conn) if d["id"] == doktor_id), None)
@@ -544,6 +551,93 @@ def randevu_api(govde: dict, conn=Depends(db)):
 
     return {"randevu_id": rid, "durum": "bekliyor",
             "doktor_id": doktor_id, "doktor_ad": doktor, "doktor_otomatik_secildi": otomatik}
+
+
+@app.get("/api/hasta-randevulari", dependencies=[Depends(ic_anahtar)])
+def hasta_randevulari(telefon: str, conn=Depends(db)):
+    """Hastanın gelecek randevuları — hatırlatmaya 'iptal' cevabı geldiğinde gerekir."""
+    k = kisi_bul(conn, telefon)
+    if not k:
+        return {"randevular": []}
+
+    from psycopg.rows import dict_row
+
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT r.id, r.hizmet, r.baslangic, r.bitis, r.durum, d.ad AS doktor_ad
+              FROM randevular r LEFT JOIN doktorlar d ON d.id = r.doktor_id
+             WHERE r.kisi_id = %s AND r.durum <> 'iptal' AND r.baslangic > now()
+             ORDER BY r.baslangic
+            """,
+            (k["id"],),
+        )
+        satirlar = cur.fetchall()
+
+    return {"randevular": [
+        {
+            "randevu_id": r["id"],
+            "hizmet": r["hizmet"],
+            "baslangic": r["baslangic"].isoformat(),
+            "doktor_ad": r["doktor_ad"],
+            "durum": r["durum"],
+        }
+        for r in satirlar
+    ]}
+
+
+@app.post("/api/randevu/{randevu_id}/iptal", dependencies=[Depends(ic_anahtar)])
+def randevu_iptal_api(randevu_id: int, govde: dict | None = None, conn=Depends(db)):
+    """Hasta WhatsApp'tan iptal ettiğinde ajan burayı çağırır.
+
+    Telefon zorunlu: ajan yalnızca konuştuğu hastanın randevusunu iptal edebilsin,
+    rastgele bir numarayla başkasının randevusunu düşüremesin.
+    """
+    telefon = (govde or {}).get("telefon")
+    if not telefon:
+        raise HTTPException(400, "telefon alanı zorunlu")
+
+    k = kisi_bul(conn, telefon)
+    if not k:
+        raise HTTPException(404, "Hasta bulunamadı")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT kisi_id, durum FROM randevular WHERE id = %s", (randevu_id,)
+        )
+        r = cur.fetchone()
+
+    if not r:
+        raise HTTPException(404, "Randevu bulunamadı")
+    if r[0] != k["id"]:
+        raise HTTPException(403, "Bu randevu başka bir hastaya ait")
+    if r[1] == "iptal":
+        return {"randevu_id": randevu_id, "durum": "iptal", "zaten_iptal": True}
+
+    randevu_iptal(conn, randevu_id)
+    hatirlatma.hatirlatmalari_iptal_et(conn, randevu_id)
+    return {"randevu_id": randevu_id, "durum": "iptal"}
+
+
+@app.post("/api/randevu/{randevu_id}/onayla", dependencies=[Depends(ic_anahtar)])
+def randevu_onayla_api(randevu_id: int, govde: dict | None = None, conn=Depends(db)):
+    """Hasta hatırlatmaya 'evet' dediğinde randevu 'onayli' olur."""
+    telefon = (govde or {}).get("telefon")
+    if not telefon:
+        raise HTTPException(400, "telefon alanı zorunlu")
+
+    k = kisi_bul(conn, telefon)
+    with conn.cursor() as cur:
+        cur.execute("SELECT kisi_id FROM randevular WHERE id = %s", (randevu_id,))
+        r = cur.fetchone()
+
+    if not k or not r:
+        raise HTTPException(404, "Randevu bulunamadı")
+    if r[0] != k["id"]:
+        raise HTTPException(403, "Bu randevu başka bir hastaya ait")
+
+    randevu_durum_yaz(conn, randevu_id, "onayli")
+    return {"randevu_id": randevu_id, "durum": "onayli"}
 
 
 # ── WhatsApp webhook ────────────────────────────────────────

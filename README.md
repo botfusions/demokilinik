@@ -20,7 +20,7 @@ Sonra `.env` içinde şunları doldur:
 
 | Değişken | Ne için |
 |---|---|
-| `PANEL_PAROLA` | Personelin panele gireceği parola |
+| `PANEL_PAROLA` | İlk kurulumda `admin` kullanıcısının parolası (en az 8 karakter). Sonrasında kullanıcılar panelden yönetilir |
 | `ZAI_API_KEY` | Test ortamı modeli (GLM) |
 | `OPENAI_API_KEY` | VPS'te `gpt-5.6-luna` için |
 | `COMPOSIO_API_KEY`, `COMPOSIO_MCP_URL` | Google Takvim + Gmail |
@@ -34,7 +34,7 @@ Köprüyü başlat:
 
 | Ne | Nerede | Kim |
 |---|---|---|
-| Panel | http://localhost:8000 | Klinik personeli |
+| Panel | http://localhost:8000 | Klinik personeli (kullanıcı adı + parola) |
 | OpenWA dashboard (QR) | http://localhost:2785 | Klinik personeli |
 | Hasta | WhatsApp | — |
 
@@ -85,6 +85,27 @@ ve `KOPRU_HOST=172.17.0.1`.
 
 **En az 2GB RAM gerekir** — whatsapp-web.js Chromium çalıştırır.
 
+## Randevu hatırlatmaları ve toplu mesaj yasağı
+
+Klinik iki otomatik mesaj gönderir: randevudan **24 saat önce** teyit isteği,
+**1 saat kala** hatırlatma. Hasta "iptal" yazarsa ajan randevuyu iptal eder,
+"evet" derse onaylar.
+
+**Toplu mesaj gönderilemez — bu bir ayar değil, mimari bir kilit:**
+
+| Kilit | Nasıl |
+|---|---|
+| Alıcı listesi alan fonksiyon yok | `app/hatirlatma.py` ve `app/openwa.py`'de tek alıcılı imza; `test_toplu_gonderim_fonksiyonu_yok` bunu her koşuda denetler |
+| Her mesaj bir randevuya bağlı | Randevusu olmayan numaraya buradan mesaj gidemez |
+| Randevu başına en çok 2 mesaj | `UNIQUE(randevu_id, tur)` — nöbetçi iki kez çalışsa da tekrar gitmez |
+| Saatlik / günlük tavan | `GIDEN_SAATLIK_TAVAN=20`, `GIDEN_GUNLUK_TAVAN=100`; dolunca gönderim durur, kuyruk sonraki tura kalır |
+| Gönderimler arası bekleme | `GIDEN_ARALIK_SN=8` — arka arkaya yığın görüntüsü vermez |
+| Sessiz saat | 21:00–09:00 arası mesaj gitmez, sabaha ertelenir |
+| Tur başına iş sınırı | Bir turda en çok 10 hatırlatma |
+
+Ajanın skill'i de bunu biliyor: personel toplu mesaj isterse "Bu panelden
+yapılamıyor" der.
+
 ## Ajanın sınırları
 
 `hermes-home/SOUL.md` içinde yazılı ve tartışmaya kapalı: teşhis koymaz, ilaç
@@ -114,5 +135,7 @@ app/kb.py        bilgi tabanı → .hermes.md
 app/ajan.py      hermes -z köprüsü
 app/openwa.py    WhatsApp istemcisi + HMAC doğrulama
 app/saglik.py    bağlantı nöbetçisi
+app/hatirlatma.py randevu hatırlatmaları + giden mesaj kilitleri
+app/kullanici.py  kullanıcılar, parolalar, işlem izi
 hermes-home/     ajanın kimliği, yapılandırması, skill'leri (bu klasöre özel)
 ```
