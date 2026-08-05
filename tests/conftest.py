@@ -25,15 +25,43 @@ os.environ["OPENWA_SESSION"] = "test"
 os.environ["SAGLIK_NOBETCISI"] = "0"   # testlerde arka plan nöbetçisi çalışmaz
 
 
+def _test_veritabani_url() -> str | None:
+    """Testler ASLA canlı veritabanına dokunmaz.
+
+    Fixture TRUNCATE atıyor; DATABASE_URL'e yönelseydi bir `pytest` komutu
+    kliniğin hasta kayıtlarını silerdi. Bu yüzden ayrı bir `_test` veritabanı
+    kullanılır ve yoksa testler atlanır — sessizce canlıya düşmez.
+    """
+    if os.environ.get("TEST_DATABASE_URL"):
+        return os.environ["TEST_DATABASE_URL"]
+
+    canli = os.environ.get("DATABASE_URL")
+    if not canli:
+        return None
+
+    temel, _, ad = canli.rpartition("/")
+    ad_yalin = ad.split("?", 1)[0]
+    if ad_yalin.endswith("_test"):
+        return canli
+    return f"{temel}/{ad_yalin}_test"
+
+
 @pytest.fixture
 def conn():
     """Boş şemalı bir bağlantı. Her test kendi işlemini geri alır."""
-    if not os.environ.get("DATABASE_URL"):
+    url = _test_veritabani_url()
+    if not url:
         pytest.skip("DATABASE_URL yok — `docker compose up -d` ve .env gerekli")
+
+    os.environ["DATABASE_URL"] = url  # uygulama kodu da test veritabanına baksın
 
     from app.db import baglan, sema_kur
 
-    c = baglan()
+    try:
+        c = baglan()
+    except Exception as e:
+        pytest.skip(f"Test veritabanı yok ({url}): {e}\n"
+                    f"Oluştur: docker compose exec postgres createdb -U klinik klinik_crm_test")
     sema_kur(c)
     with c.cursor() as cur:
         cur.execute(
