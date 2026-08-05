@@ -2,54 +2,176 @@
 {% block baslik %}Özet — Klinik Paneli{% endblock %}
 {% block icerik %}
 
-<div class="kart">
-  <h2>Bugünün randevuları</h2>
-  {% if randevular %}
-  <table>
-    <tr><th>Saat</th><th>Hasta</th><th>Hizmet</th><th>Durum</th></tr>
-    {% for r in randevular %}
-    <tr>
-      <td>{{ r.baslangic.strftime('%H:%M') }} – {{ r.bitis.strftime('%H:%M') }}</td>
-      <td>{{ r.ad or r.telefon }}</td>
-      <td>{{ r.hizmet }}</td>
-      <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}<p class="bos">Bugün için randevu yok.</p>{% endif %}
+<div class="baslik-satir">
+  <div>
+    <h1>Özet</h1>
+    <div class="alt-baslik">{{ bugun }}</div>
+  </div>
 </div>
 
+{# ── künyeler ──────────────────────────────────────────── #}
+<div class="izgara k4" style="margin-bottom:14px">
+  <div class="kart kunye">
+    <div class="etiket">Bugünkü randevu</div>
+    <div class="rakam">{{ sayilar.bugunku_randevu }}</div>
+    <div class="not">iptaller hariç</div>
+  </div>
+  <div class="kart kunye">
+    <div class="etiket">Onay bekleyen</div>
+    <div class="rakam">{{ sayilar.bekleyen_randevu }}</div>
+    <div class="not">gelecek randevular</div>
+  </div>
+  <div class="kart kunye">
+    <div class="etiket">Kayıtlı hasta</div>
+    <div class="rakam">{{ sayilar.toplam_hasta }}</div>
+    <div class="not">toplam</div>
+  </div>
+  <div class="kart kunye">
+    <div class="etiket">Gelen mesaj</div>
+    <div class="rakam">{{ sayilar.haftalik_mesaj }}</div>
+    <div class="not">son 7 gün</div>
+  </div>
+</div>
+
+{# ── hangi gün daha dolu ───────────────────────────────── #}
+<div class="izgara k2" style="margin-bottom:14px">
+  <div class="kart">
+    <h2>Hangi gün daha dolu</h2>
+    <p class="ipucu">
+      Son 8 haftanın randevuları.
+      {% if yogun_gun %}En yoğun gün <strong style="color:var(--murekkep)">{{ yogun_gun.ad }}</strong>
+      ({{ yogun_gun.adet }} randevu).{% endif %}
+    </p>
+
+    {% set en_cok = (gunler | map(attribute='adet') | max) or 1 %}
+    <svg class="grafik" viewBox="0 0 420 170" role="img"
+         aria-label="Haftanın günlerine göre randevu sayısı">
+      {% for g in gunler %}
+        {% set x = 12 + loop.index0 * 58 %}
+        {% set y = 130 - (g.adet / en_cok * 96) %}
+        <g class="sutun">
+          <title>{{ g.ad }}: {{ g.adet }} randevu{% if not g.acik %} (kapalı gün){% endif %}</title>
+          {# tıklama/hover alanı çubuktan geniş #}
+          <rect x="{{ x - 4 }}" y="0" width="52" height="145" fill="transparent"></rect>
+          {% if g.adet > 0 %}
+            <text class="deger" x="{{ x + 22 }}" y="{{ y - 7 }}" text-anchor="middle">{{ g.adet }}</text>
+            <rect class="cubuk {% if g.adet == en_cok %}tepe{% endif %}"
+                  x="{{ x }}" y="{{ y }}" width="44" height="{{ 130 - y }}" rx="4"></rect>
+          {% else %}
+            <rect class="cubuk {% if not g.acik %}kapali{% endif %}"
+                  x="{{ x }}" y="126" width="44" height="4" rx="2" opacity=".5"></rect>
+          {% endif %}
+          <text x="{{ x + 22 }}" y="147" text-anchor="middle"
+                class="{% if g.acik %}acik{% endif %}">{{ g.ad }}</text>
+          {% if not g.acik %}
+            <text x="{{ x + 22 }}" y="160" text-anchor="middle" font-size="9.5">kapalı</text>
+          {% endif %}
+        </g>
+      {% endfor %}
+      <line class="taban" x1="8" y1="130.5" x2="412" y2="130.5"></line>
+    </svg>
+  </div>
+
+  {# ── günün hangi saati ───────────────────────────────── #}
+  <div class="kart">
+    <h2>Günün hangi saati</h2>
+    <p class="ipucu">
+      Son 8 haftanın randevuları, saat başına.
+      {% if yogun_saat %}En yoğun saat <strong style="color:var(--murekkep)">{{ yogun_saat.etiket }}:00</strong>.{% endif %}
+    </p>
+
+    {% set saat_max = (saatler | map(attribute='adet') | max) or 1 %}
+    <svg class="grafik" viewBox="0 0 320 170" role="img"
+         aria-label="Saat başına randevu sayısı">
+      {% set adim = 300 / (saatler | length) %}
+      {% for s in saatler %}
+        {% set x = 10 + loop.index0 * adim %}
+        {% set y = 130 - (s.adet / saat_max * 96) %}
+        <g class="sutun">
+          <title>{{ s.etiket }}:00 — {{ s.adet }} randevu</title>
+          <rect x="{{ x - 2 }}" y="0" width="{{ adim }}" height="145" fill="transparent"></rect>
+          {% if s.adet > 0 %}
+            <text class="deger" x="{{ x + adim/2 - 2 }}" y="{{ y - 7 }}" text-anchor="middle">{{ s.adet }}</text>
+            <rect class="cubuk {% if s.adet == saat_max %}tepe{% endif %}"
+                  x="{{ x }}" y="{{ y }}" width="{{ adim - 6 }}" height="{{ 130 - y }}" rx="4"></rect>
+          {% else %}
+            <rect class="cubuk" x="{{ x }}" y="126" width="{{ adim - 6 }}" height="4" rx="2" opacity=".5"></rect>
+          {% endif %}
+          <text x="{{ x + adim/2 - 2 }}" y="147" text-anchor="middle">{{ s.etiket }}</text>
+        </g>
+      {% endfor %}
+      <line class="taban" x1="6" y1="130.5" x2="314" y2="130.5"></line>
+    </svg>
+  </div>
+</div>
+
+{# ── bugünün randevuları + hizmet dağılımı ─────────────── #}
+<div class="izgara k2" style="margin-bottom:14px">
+  <div class="kart">
+    <h2>Bugünün randevuları</h2>
+    <p class="ipucu">{{ bugun }}</p>
+    {% if randevular %}
+    <div class="kaydir">
+      <table>
+        <tr><th>Saat</th><th>Hasta</th><th>Hizmet</th><th>Durum</th></tr>
+        {% for r in randevular %}
+        <tr>
+          <td style="color:var(--murekkep); font-variant-numeric:tabular-nums">
+            {{ r.baslangic.strftime('%H:%M') }}–{{ r.bitis.strftime('%H:%M') }}</td>
+          <td><a href="/hastalar/{{ r.kisi_id }}">{{ r.ad or r.telefon }}</a></td>
+          <td>{{ r.hizmet }}</td>
+          <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% else %}<p class="bos">Bugün için randevu yok.</p>{% endif %}
+  </div>
+
+  <div class="kart">
+    <h2>En çok istenen hizmetler</h2>
+    <p class="ipucu">Tüm zamanlar, iptaller hariç</p>
+    {% if hizmetler %}
+      {% set h_max = (hizmetler | map(attribute='adet') | max) or 1 %}
+      <table>
+        {% for h in hizmetler %}
+        <tr>
+          <td style="color:var(--murekkep); width:45%">{{ h.hizmet }}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:9px">
+              <div style="flex:1; height:8px; background:var(--yuzey-2); border-radius:4px; overflow:hidden">
+                <div style="width:{{ (h.adet / h_max * 100) | round }}%; height:100%;
+                            background:var(--{{ 'seri' if h.adet == h_max else 'seri-sonuk' }}); border-radius:4px"></div>
+              </div>
+              <span style="color:var(--murekkep); font-variant-numeric:tabular-nums; min-width:18px; text-align:right">{{ h.adet }}</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}<p class="bos">Henüz randevu yok.</p>{% endif %}
+  </div>
+</div>
+
+{# ── son yazışanlar ────────────────────────────────────── #}
 <div class="kart">
-  <h2>Son yazışanlar</h2>
+  <h2>Son yazışan hastalar</h2>
+  <p class="ipucu">WhatsApp üzerinden</p>
   {% if kisiler %}
-  <table>
-    <tr><th>Hasta</th><th>Telefon</th><th>Son temas</th></tr>
-    {% for k in kisiler %}
-    <tr>
-      <td><a href="/hastalar/{{ k.id }}">{{ k.ad or '—' }}</a></td>
-      <td>{{ k.telefon }}</td>
-      <td>{{ k.son_temas.strftime('%d.%m.%Y %H:%M') }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="kaydir">
+    <table>
+      <tr><th>Hasta</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th></tr>
+      {% for k in kisiler %}
+      <tr>
+        <td><a href="/hastalar/{{ k.id }}">{{ k.ad or 'İsimsiz' }}</a></td>
+        <td style="font-variant-numeric:tabular-nums">{{ k.telefon }}</td>
+        <td>{{ k.ilk_temas.strftime('%d.%m.%Y') }}</td>
+        <td>{{ k.son_temas.strftime('%d.%m.%Y %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
   {% else %}<p class="bos">Henüz kimse yazmadı.</p>{% endif %}
-</div>
-
-<div class="kart">
-  <h2>Bağlantı durumu</h2>
-  {% if saglik %}
-  <table>
-    <tr><th>Servis</th><th>Durum</th><th>Son kontrol</th><th>Hata</th></tr>
-    {% for s in saglik %}
-    <tr>
-      <td>{{ s.servis }}</td>
-      <td><span class="rozet {{ 'onayli' if s.durum == 'saglikli' else '' }}">{{ s.durum }}</span></td>
-      <td>{{ s.son_kontrol.strftime('%d.%m %H:%M') }}</td>
-      <td>{{ s.hata or '' }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}<p class="bos">Henüz kontrol yapılmadı.</p>{% endif %}
 </div>
 
 {% endblock %}

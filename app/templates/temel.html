@@ -5,62 +5,187 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block baslik %}Klinik Paneli{% endblock %}</title>
 <style>
-  :root { --çizgi:#dfe3e8; --metin:#1c2430; --soluk:#5f6b7a; --vurgu:#0b6bcb; --kirmizi:#c0392b; }
-  * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--metin); background:#f6f8fa; }
-  header { background:#fff; border-bottom:1px solid var(--çizgi); padding:0 20px; display:flex; align-items:center; gap:24px; }
-  header h1 { font-size:16px; margin:14px 0; }
-  nav a { color:var(--soluk); text-decoration:none; padding:16px 0; display:inline-block; margin-right:18px; border-bottom:2px solid transparent; }
-  nav a:hover { color:var(--vurgu); }
-  main { max-width:1000px; margin:24px auto; padding:0 20px; }
-  .kart { background:#fff; border:1px solid var(--çizgi); border-radius:8px; padding:18px; margin-bottom:18px; }
-  h2 { font-size:15px; margin:0 0 14px; }
-  table { width:100%; border-collapse:collapse; }
-  th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--soluk); padding:8px 10px; border-bottom:1px solid var(--çizgi); }
-  td { padding:9px 10px; border-bottom:1px solid #f0f2f4; }
+  :root {
+    color-scheme: dark;
+    --zemin:      #0d0d0d;   /* sayfa düzlemi */
+    --yuzey:      #1a1a19;   /* kart yüzeyi */
+    --yuzey-2:    #232322;
+    --cizgi:      #2e2e2c;
+    --murekkep:   #ffffff;
+    --soluk:      #c3c2b7;
+    --sessiz:     #8a8a80;
+
+    /* Grafikler tek hue (mavi) — hepsi büyüklük gösteriyor, kimlik değil */
+    --seri:       #3987e5;
+    --seri-sonuk: #1c5cab;
+
+    /* Durum renkleri sabit; her zaman ikon + etiketle birlikte */
+    --iyi:        #0ca30c;
+    --uyari:      #fab219;
+    --kritik:     #d03b3b;
+
+    --r: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--zemin); color: var(--murekkep);
+    font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: grid; grid-template-columns: 224px 1fr; min-height: 100vh;
+  }
+
+  /* ── kenar çubuğu ───────────────────────────────────────── */
+  aside {
+    background: var(--yuzey); border-right: 1px solid var(--cizgi);
+    padding: 18px 12px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .marka { display:flex; align-items:center; gap:9px; padding:4px 8px 18px; font-weight:650; font-size:15px; }
+  .marka .nokta { width:26px; height:26px; border-radius:7px; background:var(--seri);
+                  display:grid; place-items:center; font-size:14px; }
+  .grup { font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+          color:var(--sessiz); padding:16px 8px 6px; }
+  aside a {
+    display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:8px;
+    color:var(--soluk); text-decoration:none; font-size:13.5px;
+  }
+  aside a:hover { background: var(--yuzey-2); color: var(--murekkep); }
+  aside a.aktif { background: var(--yuzey-2); color: var(--murekkep); font-weight:550; }
+  aside a .ikon { width:16px; text-align:center; opacity:.85; }
+  .alt { margin-top:auto; padding-top:16px; }
+  .durum-satir { display:flex; align-items:center; gap:7px; padding:5px 10px;
+                 font-size:12px; color:var(--soluk); }
+  .lamba { width:7px; height:7px; border-radius:50%; flex:none; }
+  .lamba.iyi { background:var(--iyi); }
+  .lamba.bozuk { background:var(--kritik); }
+  .cikis button { width:100%; margin-top:10px; }
+
+  /* ── ana alan ───────────────────────────────────────────── */
+  main { padding: 22px 26px 40px; min-width: 0; }
+  .baslik-satir { display:flex; align-items:center; justify-content:space-between;
+                  gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+  h1 { font-size:20px; margin:0; font-weight:620; }
+  .alt-baslik { color:var(--sessiz); font-size:13px; margin-top:2px; }
+
+  .kart { background:var(--yuzey); border:1px solid var(--cizgi); border-radius:var(--r);
+          padding:16px 18px; }
+  .kart h2 { font-size:13.5px; margin:0 0 2px; font-weight:580; }
+  .kart .ipucu { font-size:12px; color:var(--sessiz); margin:0 0 14px; }
+
+  .izgara { display:grid; gap:14px; }
+  .k4 { grid-template-columns: repeat(4, 1fr); }
+  .k2 { grid-template-columns: 1.35fr 1fr; }
+  @media (max-width: 1100px) { .k4 { grid-template-columns: repeat(2,1fr); } .k2 { grid-template-columns:1fr; } }
+  @media (max-width: 720px) { body { grid-template-columns:1fr; } aside { display:none; } .k4 { grid-template-columns:1fr; } }
+
+  /* ── künye kartı (KPI) ──────────────────────────────────── */
+  .kunye .etiket { font-size:12px; color:var(--soluk); display:flex; align-items:center; gap:6px; }
+  .kunye .rakam { font-size:28px; font-weight:640; letter-spacing:-.02em; margin-top:6px; line-height:1.1; }
+  .kunye .not { font-size:12px; color:var(--sessiz); margin-top:3px; }
+
+  /* ── tablo ──────────────────────────────────────────────── */
+  .kaydir { overflow-x: auto; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
+       color:var(--sessiz); font-weight:560; padding:8px 10px; border-bottom:1px solid var(--cizgi); }
+  td { padding:10px; border-bottom:1px solid #232322; color:var(--soluk); }
+  td:first-child, th:first-child { padding-left:0; }
   tr:last-child td { border-bottom:0; }
-  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--çizgi); border-radius:6px; font:inherit; background:#fff; }
-  textarea { min-height:70px; resize:vertical; }
-  label { display:block; font-size:12px; color:var(--soluk); margin-bottom:4px; }
+  table a { color:var(--murekkep); text-decoration:none; border-bottom:1px solid var(--cizgi); }
+  table a:hover { border-bottom-color: var(--seri); }
+
+  /* ── rozet: renk tek başına anlam taşımaz, metin hep var ── */
+  .rozet { display:inline-flex; align-items:center; gap:5px; font-size:12px;
+           padding:2px 9px 2px 7px; border-radius:99px; background:var(--yuzey-2); color:var(--soluk); }
+  .rozet::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--sessiz); }
+  .rozet.onayli::before { background:var(--iyi); }
+  .rozet.bekliyor::before { background:var(--uyari); }
+  .rozet.iptal::before { background:var(--sessiz); }
+  .rozet.iptal { text-decoration:line-through; }
+  .rozet.aktif::before { background:var(--iyi); }
+  .rozet.pasif::before { background:var(--sessiz); }
+
+  /* ── form ───────────────────────────────────────────────── */
+  input, textarea, select {
+    width:100%; padding:8px 10px; border:1px solid var(--cizgi); border-radius:8px;
+    background:var(--zemin); color:var(--murekkep); font:inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline:2px solid var(--seri); outline-offset:-1px; border-color:transparent; }
+  textarea { min-height:72px; resize:vertical; }
+  label { display:block; font-size:12px; color:var(--soluk); margin-bottom:5px; }
   .satir { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
   .satir > div { flex:1; min-width:150px; }
-  button { padding:8px 16px; border:0; border-radius:6px; background:var(--vurgu); color:#fff; font:inherit; cursor:pointer; }
-  button.sade { background:#eef1f4; color:var(--metin); }
-  .rozet { font-size:12px; padding:2px 8px; border-radius:99px; background:#eef1f4; color:var(--soluk); }
-  .rozet.onayli { background:#e3f5e8; color:#1e7b34; }
-  .rozet.iptal { background:#f3f4f6; color:#8a94a0; text-decoration:line-through; }
-  .uyari { background:#fdecea; border:1px solid #f5c6c2; color:var(--kirmizi); padding:12px 16px; border-radius:8px; margin-bottom:18px; }
-  .uyari a { color:var(--kirmizi); font-weight:600; }
-  .bos { color:var(--soluk); padding:14px 0; }
-  a { color:var(--vurgu); }
+  button {
+    padding:8px 15px; border:0; border-radius:8px; background:var(--seri); color:#fff;
+    font:inherit; font-weight:520; cursor:pointer;
+  }
+  button:hover { filter:brightness(1.08); }
+  button.sade { background:var(--yuzey-2); color:var(--soluk); border:1px solid var(--cizgi); }
+  button.sade:hover { color:var(--murekkep); }
+
+  .uyari-kutu { display:flex; gap:10px; align-items:flex-start;
+    background:#2a1515; border:1px solid #4a2020; color:#f0b8b8;
+    padding:11px 15px; border-radius:var(--r); margin-bottom:16px; font-size:13.5px; }
+  .uyari-kutu a { color:#ffb3b3; font-weight:600; }
+  .bos { color:var(--sessiz); padding:16px 0; font-size:13.5px; }
+  a { color:var(--seri); }
+
+  /* ── grafik ─────────────────────────────────────────────── */
+  .grafik { width:100%; height:auto; display:block; overflow:visible; }
+  .grafik .cubuk { fill:var(--seri-sonuk); }
+  .grafik .cubuk.tepe { fill:var(--seri); }
+  .grafik .cubuk.kapali { fill:var(--yuzey-2); }
+  .grafik text { fill:var(--sessiz); font-size:11px; }
+  .grafik text.deger { fill:var(--murekkep); font-size:11px; font-weight:600; }
+  .grafik text.acik { fill:var(--soluk); }
+  .grafik .taban { stroke:var(--cizgi); stroke-width:1; }
+  .grafik g.sutun:hover .cubuk { fill:var(--seri); }
+  .grafik g.sutun title { pointer-events:none; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Klinik Paneli</h1>
-  <nav>
-    <a href="/">Özet</a>
-    <a href="/bilgi">Bilgi Tabanı</a>
-    <a href="/randevular">Randevular</a>
-    <a href="/hastalar">Hastalar</a>
-  </nav>
-  <form method="post" action="/cikis" style="margin-left:auto">
-    <button class="sade">Çıkış</button>
-  </form>
-</header>
+
+<aside>
+  <div class="marka"><span class="nokta">◔</span> Klinik Paneli</div>
+
+  <div class="grup">Genel</div>
+  <a href="/"            class="{% if sayfa == 'ozet' %}aktif{% endif %}"><span class="ikon">▦</span> Özet</a>
+  <a href="/randevular"  class="{% if sayfa == 'randevular' %}aktif{% endif %}"><span class="ikon">▤</span> Randevular</a>
+  <a href="/hastalar"    class="{% if sayfa == 'hastalar' %}aktif{% endif %}"><span class="ikon">◇</span> Hastalar</a>
+
+  <div class="grup">Ajan</div>
+  <a href="/bilgi"       class="{% if sayfa == 'bilgi' %}aktif{% endif %}"><span class="ikon">✎</span> Bilgi Tabanı</a>
+  <a href="http://localhost:2785" target="_blank"><span class="ikon">▣</span> WhatsApp (QR)</a>
+
+  <div class="alt">
+    <div class="grup" style="padding-top:0">Bağlantı</div>
+    {% for s in saglik or [] %}
+      <div class="durum-satir">
+        <span class="lamba {{ 'iyi' if s.durum == 'saglikli' else 'bozuk' }}"></span>
+        {{ s.servis }} — {{ 'çalışıyor' if s.durum == 'saglikli' else 'kopuk' }}
+      </div>
+    {% else %}
+      <div class="durum-satir"><span class="lamba"></span> henüz kontrol yok</div>
+    {% endfor %}
+    <form method="post" action="/cikis" class="cikis"><button class="sade">Çıkış</button></form>
+  </div>
+</aside>
+
 <main>
   {% for s in saglik or [] %}
     {% if s.durum != 'saglikli' and s.uyari_gonderildi %}
-      <div class="uyari">
-        <strong>{{ s.servis }} bağlantısı koptu.</strong> {{ s.hata }}
-        {% if s.servis == 'whatsapp' %}
-          — <a href="http://localhost:2785" target="_blank">OpenWA panelinden QR okutun</a>
-        {% else %}
-          — <a href="https://app.composio.dev" target="_blank">Composio'dan yeniden bağlanın</a>
-        {% endif %}
+      <div class="uyari-kutu">
+        <span>⚠</span>
+        <div>
+          <strong>{{ s.servis }} bağlantısı koptu.</strong> {{ s.hata }} —
+          {% if s.servis == 'whatsapp' %}
+            <a href="http://localhost:2785" target="_blank">OpenWA panelinden QR okutun</a>
+          {% else %}
+            <a href="https://app.composio.dev" target="_blank">Composio'dan yeniden bağlanın</a>
+          {% endif %}
+        </div>
       </div>
     {% endif %}
   {% endfor %}
+
   {% block icerik %}{% endblock %}
 </main>
 </body>

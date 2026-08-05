@@ -2,7 +2,13 @@
 {% block baslik %}Randevular — Klinik Paneli{% endblock %}
 {% block icerik %}
 
-<div class="kart">
+<div class="baslik-satir">
+  <div>
+    <h1>Randevular</h1>
+  </div>
+</div>
+
+<div class="kart" style="margin-bottom:14px">
   <h2>Elle randevu ekle</h2>
   <form method="post" action="/randevular">
     <div class="satir">
@@ -25,7 +31,7 @@
   </form>
 
   {% if randevular %}
-  <table>
+  <div class="kaydir"><table>
     <tr><th>Tarih</th><th>Saat</th><th>Hasta</th><th>Hizmet</th><th>Durum</th><th>Takvim</th><th></th></tr>
     {% for r in randevular %}
     <tr>
@@ -46,7 +52,7 @@
       </td>
     </tr>
     {% endfor %}
-  </table>
+  </table></div>
   {% else %}<p class="bos">Randevu yok.</p>{% endif %}
 </div>
 

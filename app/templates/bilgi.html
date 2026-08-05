@@ -2,7 +2,14 @@
 {% block baslik %}Bilgi Tabanı — Klinik Paneli{% endblock %}
 {% block icerik %}
 
-<div class="kart">
+<div class="baslik-satir">
+  <div>
+    <h1>Bilgi Tabanı</h1>
+    <div class="alt-baslik">Ajanın hastaya söyleyebileceği her şeyin kaynağı</div>
+  </div>
+</div>
+
+<div class="kart" style="margin-bottom:14px">
   <h2>Yeni bilgi ekle</h2>
   <p class="bos" style="margin-top:-8px">
     Buraya girdiğiniz bilgiler ajanın hastaya söyleyebileceği tek kaynaktır.
@@ -35,7 +42,7 @@
 <div class="kart">
   <h2>Kayıtlı bilgiler</h2>
   {% if bilgiler %}
-  <table>
+  <div class="kaydir"><table>
     <tr><th>Kategori</th><th>Başlık</th><th>İçerik</th><th>Durum</th><th></th></tr>
     {% for b in bilgiler %}
     <tr>
@@ -52,7 +59,7 @@
       </td>
     </tr>
     {% endfor %}
-  </table>
+  </table></div>
   {% else %}<p class="bos">Henüz bilgi girilmemiş. Ajan bu haliyle hiçbir soruya cevap veremez.</p>{% endif %}
 </div>
 

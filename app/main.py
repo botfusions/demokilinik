@@ -27,6 +27,10 @@ from app.crm import (  # noqa: E402
     RandevuCakismasi,
     dolu_araliklar,
     gorusme_ekle,
+    gun_bazli_doluluk,
+    hizmet_dagilimi,
+    ozet_sayilar,
+    saat_bazli_doluluk,
     gorusme_gecmisi,
     kisi_bul,
     kisi_upsert,
@@ -143,11 +147,32 @@ def cikis():
 
 # ── panel ───────────────────────────────────────────────────
 
+GUNLER_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+AYLAR_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+            "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(personel)])
 def ozet(request: Request, conn=Depends(db)):
+    gunler = gun_bazli_doluluk(conn)
+    saatler = saat_bazli_doluluk(conn)
+    b = date.today()
+
+    # Grafiğin başlığında "en yoğun gün" yazılır; hiç randevu yoksa bir gün seçilmez
+    yogun_gun = max(gunler, key=lambda g: g["adet"]) if gunler else None
+    yogun_saat = max(saatler, key=lambda s: s["adet"]) if saatler else None
+
     return sablonlar.TemplateResponse(request, "ozet.html", {
-        "randevular": randevular_listele(conn, gun=date.today()),
-        "kisiler": kisiler_listele(conn)[:10],
+        "sayfa": "ozet",
+        "bugun": f"{b.day} {AYLAR_TR[b.month - 1]} {b.year}, {GUNLER_TR[b.weekday()]}",
+        "sayilar": ozet_sayilar(conn),
+        "gunler": gunler,
+        "saatler": saatler,
+        "yogun_gun": yogun_gun if yogun_gun and yogun_gun["adet"] else None,
+        "yogun_saat": yogun_saat if yogun_saat and yogun_saat["adet"] else None,
+        "hizmetler": hizmet_dagilimi(conn),
+        "randevular": randevular_listele(conn, gun=b),
+        "kisiler": kisiler_listele(conn)[:8],
         "saglik": saglik.saglik_ozeti(conn),
     })
 
@@ -155,6 +180,7 @@ def ozet(request: Request, conn=Depends(db)):
 @app.get("/bilgi", response_class=HTMLResponse, dependencies=[Depends(personel)])
 def bilgi_sayfasi(request: Request, conn=Depends(db)):
     return sablonlar.TemplateResponse(request, "bilgi.html", {
+        "sayfa": "bilgi",
         "bilgiler": bilgiler_listele(conn),
         "saglik": saglik.saglik_ozeti(conn),
     })
@@ -188,6 +214,7 @@ def bilgi_ac(bilgi_id: int, conn=Depends(db)):
 def randevu_sayfasi(request: Request, gun: str = "", conn=Depends(db)):
     secilen = date.fromisoformat(gun) if gun else None
     return sablonlar.TemplateResponse(request, "randevular.html", {
+        "sayfa": "randevular",
         "randevular": randevular_listele(conn, gun=secilen),
         "gun": gun,
         "saglik": saglik.saglik_ozeti(conn),
@@ -218,6 +245,7 @@ def randevu_iptal_et(randevu_id: int, conn=Depends(db)):
 @app.get("/hastalar", response_class=HTMLResponse, dependencies=[Depends(personel)])
 def hastalar(request: Request, conn=Depends(db)):
     return sablonlar.TemplateResponse(request, "hastalar.html", {
+        "sayfa": "hastalar",
         "kisiler": kisiler_listele(conn),
         "saglik": saglik.saglik_ozeti(conn),
     })
@@ -234,6 +262,7 @@ def hasta_detay(request: Request, kisi_id: int, conn=Depends(db)):
         raise HTTPException(404, "Hasta bulunamadı")
 
     return sablonlar.TemplateResponse(request, "hasta.html", {
+        "sayfa": "hastalar",
         "kisi": kisi,
         "gorusmeler": gorusme_gecmisi(conn, kisi_id, limit=200),
         "saglik": saglik.saglik_ozeti(conn),

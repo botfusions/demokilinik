@@ -233,3 +233,93 @@ def dolu_araliklar(conn: psycopg.Connection, gun) -> list[dict]:
             (gun,),
         )
         return cur.fetchall()
+
+
+# ── panel istatistikleri ────────────────────────────────────
+
+def gun_bazli_doluluk(conn: psycopg.Connection, hafta_sayisi: int = 8) -> list[dict]:
+    """Haftanın hangi günü daha dolu. Son N haftanın randevuları gün gün toplanır."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT EXTRACT(ISODOW FROM baslangic)::int AS gun, count(*) AS adet
+              FROM randevular
+             WHERE durum <> 'iptal'
+               AND baslangic >= now() - make_interval(weeks => %s)
+             GROUP BY 1
+            """,
+            (hafta_sayisi,),
+        )
+        sayilar = {r["gun"]: r["adet"] for r in cur.fetchall()}
+
+    adlar = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+    acik = {int(g) for g in os.environ.get("CALISMA_GUNLERI", "1,2,3,4,5").split(",") if g.strip()}
+    return [
+        {"gun": i, "ad": adlar[i - 1], "adet": sayilar.get(i, 0), "acik": i in acik}
+        for i in range(1, 8)
+    ]
+
+
+def saat_bazli_doluluk(conn: psycopg.Connection, hafta_sayisi: int = 8) -> list[dict]:
+    """Günün hangi saati daha dolu — çalışma penceresi boyunca."""
+    _, ac, kapa = _calisma_penceresi()
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT EXTRACT(HOUR FROM baslangic)::int AS saat, count(*) AS adet
+              FROM randevular
+             WHERE durum <> 'iptal'
+               AND baslangic >= now() - make_interval(weeks => %s)
+             GROUP BY 1
+            """,
+            (hafta_sayisi,),
+        )
+        sayilar = {r["saat"]: r["adet"] for r in cur.fetchall()}
+
+    return [
+        {"saat": s, "etiket": f"{s:02d}", "adet": sayilar.get(s, 0)}
+        for s in range(ac.hour, kapa.hour)
+    ]
+
+
+def hizmet_dagilimi(conn: psycopg.Connection, limit: int = 6) -> list[dict]:
+    """En çok istenen hizmetler. Limitin dışı 'Diğer' olarak toplanır."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT hizmet, count(*) AS adet
+              FROM randevular WHERE durum <> 'iptal'
+             GROUP BY 1 ORDER BY 2 DESC
+            """
+        )
+        satirlar = cur.fetchall()
+
+    if len(satirlar) > limit:
+        diger = sum(r["adet"] for r in satirlar[limit:])
+        satirlar = satirlar[:limit] + [{"hizmet": "Diğer", "adet": diger}]
+    return satirlar
+
+
+def ozet_sayilar(conn: psycopg.Connection) -> dict:
+    """Panelin üst şeridindeki dört rakam."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              (SELECT count(*) FROM randevular
+                WHERE baslangic::date = current_date AND durum <> 'iptal'),
+              (SELECT count(*) FROM randevular
+                WHERE durum = 'bekliyor' AND baslangic >= now()),
+              (SELECT count(*) FROM kisiler),
+              (SELECT count(*) FROM gorusmeler
+                WHERE yon = 'gelen' AND olusturma >= now() - interval '7 days')
+            """
+        )
+        bugun, bekleyen, hasta, mesaj = cur.fetchone()
+
+    return {
+        "bugunku_randevu": bugun,
+        "bekleyen_randevu": bekleyen,
+        "toplam_hasta": hasta,
+        "haftalik_mesaj": mesaj,
+    }

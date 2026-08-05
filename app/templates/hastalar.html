@@ -2,10 +2,16 @@
 {% block baslik %}Hastalar — Klinik Paneli{% endblock %}
 {% block icerik %}
 
+<div class="baslik-satir">
+  <div>
+    <h1>Hastalar</h1>
+  </div>
+</div>
+
 <div class="kart">
-  <h2>Hastalar</h2>
+  <h2>Kayıtlı hastalar</h2>
   {% if kisiler %}
-  <table>
+  <div class="kaydir"><table>
     <tr><th>Ad</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th><th>Not</th></tr>
     {% for k in kisiler %}
     <tr>
@@ -16,7 +22,7 @@
       <td>{{ k.personel_notu or '' }}</td>
     </tr>
     {% endfor %}
-  </table>
+  </table></div>
   {% else %}<p class="bos">Henüz hasta kaydı yok.</p>{% endif %}
 </div>
 

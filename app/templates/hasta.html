@@ -18,7 +18,7 @@
 <div class="kart">
   <h2>WhatsApp yazışması</h2>
   {% if gorusmeler %}
-  <table>
+  <div class="kaydir"><table>
     <tr><th style="width:140px">Zaman</th><th style="width:80px">Kim</th><th>Mesaj</th></tr>
     {% for g in gorusmeler %}
     <tr>
@@ -27,7 +27,7 @@
       <td>{{ g.mesaj }}</td>
     </tr>
     {% endfor %}
-  </table>
+  </table></div>
   {% else %}<p class="bos">Yazışma yok.</p>{% endif %}
 </div>
 

@@ -5,19 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Giriş — Klinik Paneli</title>
 <style>
-  body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; background:#f6f8fa; color:#1c2430;
-         display:flex; align-items:center; justify-content:center; min-height:100vh; }
-  form { background:#fff; border:1px solid #dfe3e8; border-radius:10px; padding:28px; width:320px; }
-  h1 { font-size:17px; margin:0 0 18px; }
-  input { width:100%; padding:9px 11px; border:1px solid #dfe3e8; border-radius:6px; font:inherit; margin-bottom:14px; }
-  button { width:100%; padding:9px; border:0; border-radius:6px; background:#0b6bcb; color:#fff; font:inherit; cursor:pointer; }
-  .hata { background:#fdecea; color:#c0392b; padding:9px 12px; border-radius:6px; margin-bottom:14px; font-size:14px; }
+  :root { color-scheme: dark; }
+  body {
+    margin:0; min-height:100vh; background:#0d0d0d; color:#fff;
+    font:14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  form { background:#1a1a19; border:1px solid #2e2e2c; border-radius:12px; padding:30px; width:330px; }
+  .marka { display:flex; align-items:center; gap:9px; font-weight:650; font-size:16px; margin-bottom:6px; }
+  .nokta { width:28px; height:28px; border-radius:8px; background:#3987e5; display:grid; place-items:center; }
+  .alt { color:#8a8a80; font-size:13px; margin-bottom:22px; }
+  label { display:block; font-size:12px; color:#c3c2b7; margin-bottom:6px; }
+  input {
+    width:100%; padding:9px 11px; border:1px solid #2e2e2c; border-radius:8px;
+    background:#0d0d0d; color:#fff; font:inherit; margin-bottom:16px;
+  }
+  input:focus { outline:2px solid #3987e5; outline-offset:-1px; border-color:transparent; }
+  button { width:100%; padding:10px; border:0; border-radius:8px; background:#3987e5;
+           color:#fff; font:inherit; font-weight:550; cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+  .hata { display:flex; gap:8px; background:#2a1515; border:1px solid #4a2020; color:#f0b8b8;
+          padding:9px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; }
 </style>
 </head>
 <body>
 <form method="post" action="/giris">
-  <h1>Klinik Paneli</h1>
-  {% if hata %}<div class="hata">Parola hatalı.</div>{% endif %}
+  <div class="marka"><span class="nokta">◔</span> Klinik Paneli</div>
+  <div class="alt">Yalnızca klinik personeli içindir.</div>
+  {% if hata %}<div class="hata"><span>⚠</span> Parola hatalı.</div>{% endif %}
   <label for="p">Parola</label>
   <input id="p" type="password" name="parola" autofocus required>
   <button>Giriş yap</button>
