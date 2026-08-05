@@ -1,0 +1,18 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+.pytest_cache/
+
+# OpenWA oturum verisi ve medya — asla repoya girmez
+openwa-data/
+
+# Hermes çalışma verisi; config.yaml, SOUL.md ve skills/ takip edilir
+hermes-home/sessions/
+hermes-home/memories/
+hermes-home/mcp-tokens/
+hermes-home/.env
+hermes-home/auth.json
+
+# Referans zip'ler (inşada kullanılmıyor)
+referans/

@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: klinik_crm
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # openwa kendi veritabanını ilk açılışta oluşturur
+      - ./scripts/init-openwa-db.sql:/docker-entrypoint-initdb.d/10-openwa.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      retries: 10
+
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 2785
+      NODE_ENV: production
+      AUTO_START_SESSIONS: "true"
+
+      # whatsapp-web.js: Chromium kullanır, ~400MB RAM, ban riski baileys'ten düşük
+      ENGINE_TYPE: whatsapp-web.js
+      PUPPETEER_HEADLESS: "true"
+      PUPPETEER_ARGS: --no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+      SESSION_DATA_PATH: /app/data/sessions
+
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_NAME: openwa
+      DATABASE_SYNCHRONIZE: "true"
+
+      STORAGE_TYPE: local
+      STORAGE_LOCAL_PATH: /app/data/media
+      API_MASTER_KEY: ${OPENWA_API_KEY}
+
+      # Ban riskini düşüren guardrail'ler — kapatma
+      RATE_LIMIT_ENABLED: "true"
+      SIMULATE_TYPING: "true"
+    ports:
+      # Yalnız localhost. VPS'te dışarıya açılmaz, SSH tüneliyle erişilir.
+      - "127.0.0.1:2785:2785"
+    volumes:
+      - ./openwa-data:/app/data
+    shm_size: 1gb          # Chromium'un ihtiyacı; düşük olursa sekmeler çöker
+    restart: unless-stopped
+
+volumes:
+  pgdata:
