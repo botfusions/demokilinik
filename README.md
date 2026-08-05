@@ -6,7 +6,8 @@ Google Takvim'e yazar. Her mesaj CRM'e kaydedilir. Personel Türkçe panelden y�
 **Yığın:** Hermes Agent (ajan) · OpenWA (WhatsApp) · FastAPI + HTMX (köprü + panel) ·
 Postgres · Composio MCP (Google Takvim + Gmail)
 
-Ayrıntılı gereksinimler ve fazlar: [PRD.md](PRD.md) · Testler: [tests/README.md](tests/README.md)
+**Devir notu: [HANDOFF.md](HANDOFF.md)** — durum, sıradaki adımlar, verilmiş kararlar.
+Gereksinimler: [PRD.md](PRD.md) · Kusurlar: [KUSURLAR.md](KUSURLAR.md) · Testler: [tests/README.md](tests/README.md)
 
 ---
 
