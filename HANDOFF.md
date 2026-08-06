@@ -173,7 +173,9 @@ scripts/klinik-mcp.py  ajanın 7 randevu aracı (kabuk yerine)
 
 ## Son doğrulama (2026-08-06)
 
-- 253 test yeşil
+- 269 test yeşil
+- Ajan kabuksuz çalışıyor: doktor seçimi, uygunluk, randevu yazma ve iptal
+  `terminal` kapalıyken MCP araçlarıyla yürüdü (canlı denendi)
 - Panel 9 sayfa 200 dönüyor, rol ayrımı tutuyor (personel → 403)
 - Fiyat/kampanya panelden kaydedilince ajan yeni fiyatı söylüyor (canlı denendi)
 - Ajan konu dışı soruya sabit ret cümlesi veriyor, konu içi soruyu cevaplıyor
