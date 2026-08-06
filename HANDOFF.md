@@ -92,6 +92,14 @@ Bilgi tabanında olmayan klinik sorusu ret değil, "personelimiz size dönecek".
 **Ajan bu klasöre özel.** `HERMES_HOME=./hermes-home`; global `~/.hermes` hiç
 kullanılmıyor ve kullanılmamalı.
 
+**Tool şemaları maliyetin en büyük kalemiydi.** Ölçümde toplam prompt'un %69'u
+kullanılmayan 16 tool şemasıydı, hastanın mesajı %0,09. `config.yaml`'daki
+`disabled_toolsets` bunu 5 tool'a indirdi: mesaj başına 16.445 → 6.915 input
+token. Yalnız `terminal` (skill'ler CRM API'sini curl ile çağırıyor) ve `skills`
+açık. Bir toolset'i geri açmadan önce `hermes prompt-size` ile ölç — `computer_use`
+tek başına 9,7 KB. Kalan `skill_manage` 4,4 KB Hermes'in granülerlik sınırı,
+tek tool kapatılamıyor.
+
 **Postgres 5434'te.** 5432/5433 makinede başka projelerde dolu.
 
 **Python 3.13 gerekli** (kodda `X | None` var). Sistem `python3`'ü 3.9.
