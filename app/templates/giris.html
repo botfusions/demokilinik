@@ -1,47 +1,36 @@
 <!doctype html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Giriş — Klinik Paneli</title>
+<title>Giriş — {{ klinik_adi }}</title>
+<link rel="stylesheet" href="/static/panel.css">
 <style>
-  :root { color-scheme: dark; }
-  body {
-    margin:0; min-height:100vh; background:#0d0d0d; color:#fff;
-    font:14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
-    display:flex; align-items:center; justify-content:center; padding:20px;
-  }
-  form { background:#1a1a19; border:1px solid #2e2e2c; border-radius:12px; padding:30px; width:330px; }
-  .marka { display:flex; align-items:center; gap:9px; font-weight:650; font-size:16px; margin-bottom:6px; }
-  .nokta { width:28px; height:28px; border-radius:8px; background:#3987e5; display:grid; place-items:center; }
-  .alt { color:#8a8a80; font-size:13px; margin-bottom:22px; }
-  label { display:block; font-size:12px; color:#c3c2b7; margin-bottom:6px; }
-  input {
-    width:100%; padding:9px 11px; border:1px solid #2e2e2c; border-radius:8px;
-    background:#0d0d0d; color:#fff; font:inherit; margin-bottom:16px;
-  }
-  input:focus { outline:2px solid #3987e5; outline-offset:-1px; border-color:transparent; }
-  button { width:100%; padding:10px; border:0; border-radius:8px; background:#3987e5;
-           color:#fff; font:inherit; font-weight:550; cursor:pointer; }
-  button:hover { filter:brightness(1.08); }
-  .hata { display:flex; gap:8px; background:#2a1515; border:1px solid #4a2020; color:#f0b8b8;
-          padding:9px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+  /* Giriş tek kutu — panelin kenar çubuğu yok, ortalama burada */
+  body { min-height:100vh; display:flex; align-items:center; justify-content:center;
+         padding:20px; background:var(--canvas-soft); }
+  .giris-kutu { width:340px; }
 </style>
 </head>
 <body>
-<form method="post" action="/giris">
-  <div class="marka"><span class="nokta">◔</span> Klinik Paneli</div>
-  <div class="alt">Yalnızca klinik personeli içindir.</div>
+<form class="kart giris-kutu" method="post" action="/giris">
+  <div class="brand-mark" style="margin-bottom:2px"><span class="brand-name">{{ klinik_adi }}</span></div>
+  <div class="alt-baslik" style="margin-bottom:20px">Yalnızca klinik personeli içindir.</div>
+
   {% if hata == 'oturum' %}
-    <div class="hata"><span>⚠</span> Oturumunuz kapandı. Yeniden giriş yapın.</div>
+    <div class="hata">Oturumunuz kapandı. Yeniden giriş yapın.</div>
   {% elif hata %}
-    <div class="hata"><span>⚠</span> Kullanıcı adı veya parola hatalı.</div>
+    <div class="hata">Kullanıcı adı veya parola hatalı.</div>
   {% endif %}
+
   <label for="k">Kullanıcı adı</label>
   <input id="k" name="kullanici_adi" autocapitalize="none" autofocus required>
-  <label for="p">Parola</label>
+  <label for="p" style="margin-top:14px">Parola</label>
   <input id="p" type="password" name="parola" required>
-  <button>Giriş yap</button>
+  <button style="width:100%; margin-top:20px">Giriş yap</button>
 </form>
+{# panel.js kenar çubuğu yoksa çekmece kısmını atlıyor — burada yalnız
+   kayıtlı temayı uygular, giriş paneli ile aynı renkte açılsın #}
+<script src="/static/panel.js"></script>
 </body>
 </html>

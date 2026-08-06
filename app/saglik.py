@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 import smtplib
+from datetime import datetime, timezone
 from email.message import EmailMessage
 
 import httpx
@@ -70,7 +71,11 @@ def saglik_ozeti(conn: psycopg.Connection) -> list[dict]:
     from psycopg.rows import dict_row
 
     with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("SELECT * FROM baglanti_saglik ORDER BY servis")
+        # instagram_yoklama iç bir kalp atışı satırı; personele gösterilecek şey
+        # 'instagram' satırı — nöbetçi zaten kalp atışının yaşını oraya yansıtıyor.
+        cur.execute(
+            "SELECT * FROM baglanti_saglik WHERE servis <> 'instagram_yoklama' ORDER BY servis"
+        )
         return cur.fetchall()
 
 
@@ -134,6 +139,39 @@ def _composio_kontrol() -> tuple[bool, str | None]:
     return True, None
 
 
+def _instagram_yoklama_kontrol(conn: psycopg.Connection) -> tuple[bool, str | None]:
+    """Instagram yoklama döngüsü hâlâ dönüyor mu?
+
+    `_composio_kontrol` bağlantının sağlığına bakar; bağlantı ACTIVE kalıp
+    döngünün kendisi ölebilir (yakalanmamış hata, askıda kalan istek). O durumda
+    hiçbir alarm çalmaz ve DM'ler cevapsız birikir. Burada döngünün kendi yazdığı
+    kalp atışının yaşına bakılıyor.
+    """
+    from app.instagram import ARALIK_SN as YOKLAMA_ARALIK, yapilandirildi_mi
+
+    if not yapilandirildi_mi():
+        return True, None                  # kanal kapalıysa alarm çalmaz
+
+    # Üç tur kaçırmak tolere edilir: tek yavaş tur (LLM çağrıları) alarm çalmasın.
+    esik = max(YOKLAMA_ARALIK * 3, 180)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT son_basarili, hata FROM baglanti_saglik WHERE servis = 'instagram_yoklama'"
+        )
+        satir = cur.fetchone()
+
+    if not satir or satir[0] is None:
+        # Servis yeni açıldıysa ilk tur henüz yazmamış olabilir; ilk turdan
+        # sonra bu dal bir daha çalışmaz.
+        return False, "yoklama hiç çalışmadı"
+
+    yas = (datetime.now(timezone.utc) - satir[0]).total_seconds()
+    if yas > esik:
+        son_hata = f" — son hata: {satir[1]}" if satir[1] else ""
+        return False, f"yoklama {int(yas)} sn'dir tur atmadı (eşik {esik} sn){son_hata}"
+    return True, None
+
+
 async def nobetci(baglan_fn) -> None:
     """FastAPI'nin kendi döngüsünde çalışır — ayrı scheduler paketi yok."""
     while True:
@@ -141,8 +179,13 @@ async def nobetci(baglan_fn) -> None:
             conn = baglan_fn()
             try:
                 for servis, kontrol in (("whatsapp", _whatsapp_kontrol),
-                                        ("composio", _composio_kontrol)):
-                    basarili, hata = await asyncio.to_thread(kontrol)
+                                        ("composio", _composio_kontrol),
+                                        ("instagram", _instagram_yoklama_kontrol)):
+                    # instagram kontrolü veritabanını okur, diğerleri ağa çıkar
+                    if servis == "instagram":
+                        basarili, hata = await asyncio.to_thread(kontrol, conn)
+                    else:
+                        basarili, hata = await asyncio.to_thread(kontrol)
                     aksiyon = kontrol_sonucu_isle(conn, servis, basarili, hata)
 
                     if aksiyon == "uyari":

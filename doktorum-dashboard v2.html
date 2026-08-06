@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nova Dental · Klinik Paneli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ===== Supabase design tokens ===== */
+  :root{
+    --canvas:#ffffff;
+    --canvas-soft:#fafafa;
+    --canvas-night:#1c1c1c;
+    --canvas-night-soft:#202020;
+
+    --hairline:#dfdfdf;
+    --hairline-strong:#c7c7c7;
+    --hairline-cool:#ededed;
+    --hairline-cool-2:#efefef;
+    --hairline-cool-3:#d4d4d4;
+
+    --ink:#171717;
+    --ink-secondary:#212121;
+    --ink-mute:#707070;
+    --ink-mute-2:#9a9a9a;
+    --ink-faint:#b2b2b2;
+
+    --primary:#3ecf8e;          /* emerald */
+    --primary-deep:#24b47e;
+    --primary-soft:#4ade80;
+    --on-primary:#171717;       /* near-black on green */
+
+    --warn:#ffdb13;             /* status indicator */
+    --on-warn:#171717;
+    --danger:#e5484d;           /* connection lost only */
+
+    --r-sm:6px;  --r-md:8px;  --r-lg:12px;  --r-xl:16px;
+    --sh-1:0 1px 3px rgba(0,0,0,.06);
+    --sh-2:0 8px 24px rgba(0,0,0,.08);
+
+    --font-display:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --font-body:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,Menlo,Monaco,Consolas,monospace;
+
+    --sidebar-w:248px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font-body);
+    background:var(--canvas);
+    color:var(--ink);
+    font-size:16px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* ===== App shell ===== */
+  .app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+
+  /* mobile topbar + drawer (desktop'ta gizli) */
+  .m-topbar{display:none}
+  .scrim{display:none}
+  .ham{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--hairline);border-radius:var(--r-sm);background:var(--canvas);color:var(--ink);cursor:pointer;flex:none}
+  .ham:hover{background:var(--canvas-soft)}
+
+  /* ===== Sidebar ===== */
+  .sidebar{
+    background:var(--canvas);
+    border-right:1px solid var(--hairline-cool);
+    padding:16px;
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;
+  }
+  .brand{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 4px 24px}
+  .brand-mark{display:flex;align-items:center;gap:6px}
+  .brand-mark svg{display:block}
+  .brand-name{
+    font-weight:600;font-size:17px;letter-spacing:-.01em;color:var(--ink);
+  }
+  .brand-accent{color:var(--primary)}
+
+  .theme-toggle{
+    display:flex;align-items:center;justify-content:center;
+    width:32px;height:32px;border:1px solid var(--hairline);border-radius:var(--r-sm);
+    background:var(--canvas);color:var(--ink-mute);cursor:pointer;flex:none;
+    transition:background .12s,color .12s;
+  }
+  .theme-toggle:hover{background:var(--canvas-soft);color:var(--ink)}
+
+  .nav-group{margin-bottom:20px}
+  .nav-label{
+    font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-mute-2);padding:0 8px;margin-bottom:8px;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;border-radius:var(--r-sm);
+    color:var(--ink-secondary);font-size:14px;font-weight:500;
+    cursor:pointer;border:1px solid transparent;
+    transition:background .12s,border-color .12s;
+  }
+  .nav-item:hover{background:var(--canvas-soft)}
+  .nav-item .ico{color:var(--ink-mute);display:flex}
+  .nav-item.active{background:var(--canvas-soft);border-color:var(--hairline-cool)}
+  .nav-item.active .ico{color:var(--primary)}
+  .nav-item .chev{margin-left:auto;color:var(--ink-faint)}
+
+  .conn{margin-top:auto;padding:16px 8px 0;border-top:1px solid var(--hairline-cool)}
+  .conn-label{
+    font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-mute-2);margin-bottom:10px;
+  }
+  .conn-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-secondary);margin-bottom:8px}
+  .dot{width:8px;height:8px;border-radius:9999px;flex:none}
+  .dot.ok{background:var(--primary)}
+  .dot.bad{background:var(--danger)}
+  .dot.idle{background:var(--ink-faint)}
+
+  .user-card{
+    margin-top:14px;display:flex;align-items:center;gap:10px;width:100%;
+    padding:10px;border:1px solid var(--hairline-cool);border-radius:var(--r-md);background:var(--canvas);
+    cursor:pointer;text-align:left;font:inherit;color:inherit;
+  }
+  .user-card:hover{background:var(--canvas-soft);border-color:var(--hairline)}
+  .user-card .uc-chev{margin-left:auto;color:var(--ink-faint)}
+  .avatar{
+    width:32px;height:32px;border-radius:9999px;background:var(--canvas-night);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:500;flex:none;
+  }
+  .user-meta{line-height:1.25;min-width:0}
+  .user-meta b{display:block;font-size:13px;font-weight:500;color:var(--ink)}
+  .user-meta span{font-size:12px;color:var(--ink-mute)}
+  .btn-logout{
+    margin-top:10px;width:100%;text-align:left;
+    display:flex;align-items:center;gap:8px;
+    padding:9px 10px;border:1px solid var(--hairline);border-radius:var(--r-sm);
+    background:var(--canvas);color:var(--ink-secondary);font:inherit;font-size:14px;cursor:pointer;
+  }
+  .btn-logout:hover{background:var(--canvas-soft)}
+
+  /* ===== Main ===== */
+  .main{display:flex;flex-direction:column;min-width:0}
+
+  /* alert bar */
+  .alert{
+    display:flex;align-items:center;gap:10px;
+    background:#fffbea;border-bottom:1px solid #f4e4a1;
+    padding:10px 32px;font-size:13px;color:var(--ink-secondary);
+  }
+  .alert svg{flex:none;color:#b5860b}
+  .alert b{color:var(--ink)}
+
+  .content{padding:32px 40px 64px;max-width:1280px;width:100%}
+
+  .page-head{margin-bottom:28px}
+  .page-title{font-weight:500;font-size:32px;letter-spacing:-.02em;line-height:1.1;color:var(--ink)}
+  .page-sub{margin-top:6px;font-size:15px;color:var(--ink-mute)}
+
+  /* KPI row */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+  .kpi{
+    background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-lg);
+    padding:20px 22px;
+  }
+  .kpi-key{font-size:13px;color:var(--ink-mute);font-weight:500}
+  .kpi-val{
+    font-family:var(--font-display);font-weight:500;font-size:40px;letter-spacing:-.02em;
+    line-height:1.1;margin-top:8px;color:var(--ink);
+  }
+  .kpi-foot{margin-top:6px;font-size:12px;color:var(--ink-mute-2)}
+
+  /* generic card */
+  .card{
+    background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-lg);
+    padding:24px;
+  }
+  .card-h{margin-bottom:4px}
+  .card-title{font-weight:500;font-size:17px;letter-spacing:-.01em;color:var(--ink)}
+  .card-sub{font-size:13px;color:var(--ink-mute);margin-top:2px;line-height:1.45}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+
+  /* charts */
+  .chart{margin-top:18px}
+  .bars{display:flex;align-items:flex-end;gap:14px;height:150px;padding-bottom:28px;position:relative;border-bottom:1px solid var(--hairline-cool)}
+  .bar-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;position:relative;min-width:0}
+  .bar{
+    width:100%;max-width:34px;border-radius:3px 3px 0 0;
+    background:var(--hairline-cool-3);transition:background .15s;
+  }
+  .bar.peak{background:var(--primary)}
+  .bar.closed{background:transparent;border-top:1px dashed var(--hairline-strong);height:6px}
+  .bar-val{
+    position:absolute;top:-20px;font-size:12px;font-weight:500;color:var(--ink-mute);
+    font-variant-numeric:tabular-nums;
+  }
+  .bar.peak ~ .bar-val,.bar-wrap.peak .bar-val{color:var(--ink);font-weight:600}
+  .bar-label{
+    position:absolute;bottom:-22px;font-size:12px;color:var(--ink-mute-2);font-weight:500;
+  }
+  .bar-wrap.closed .bar-label{color:var(--ink-faint)}
+
+  /* service list */
+  .svc{display:flex;align-items:center;gap:12px;padding:9px 0}
+  .svc + .svc{border-top:1px solid var(--hairline-cool)}
+  .svc-name{width:178px;font-size:14px;color:var(--ink-secondary);font-weight:500;flex:none}
+  .svc-track{flex:1;height:8px;background:var(--hairline-cool);border-radius:4px;overflow:hidden}
+  .svc-fill{height:100%;background:var(--hairline-strong);border-radius:4px}
+  .svc-fill.peak{background:var(--primary)}
+  .svc-count{
+    width:34px;text-align:right;font-variant-numeric:tabular-nums;
+    font-size:14px;font-weight:600;color:var(--ink);flex:none;
+  }
+
+  /* table */
+  .table-card{margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  thead th{
+    text-align:left;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-mute-2);padding:0 16px 12px;
+  }
+  tbody td{padding:14px 16px;border-top:1px solid var(--hairline-cool);color:var(--ink-secondary);vertical-align:middle}
+  tbody tr:first-child td{border-top:none}
+  .t-name{color:var(--ink);font-weight:500}
+  .t-doc{color:var(--ink-secondary);font-weight:500}
+  .mono{font-family:var(--font-mono);font-size:13px;color:var(--ink-secondary)}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:500;padding:3px 10px;border-radius:9999px;
+  }
+  .pill.ok{background:rgba(62,207,142,.14);color:#15824f}
+  .pill.wait{background:#fff4cf;color:#8a6d00}
+
+  /* buttons */
+  .btn-green{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--primary);color:var(--on-primary);
+    font:inherit;font-size:14px;font-weight:500;
+    padding:8px 16px;border:none;border-radius:var(--r-sm);cursor:pointer;
+    box-shadow:0 1px 2px rgba(16,122,82,.16);
+    transition:background .12s,transform .05s;
+  }
+  .btn-green:hover{background:var(--primary-deep)}
+  .btn-green:active{transform:translateY(1px)}
+
+  /* views */
+  .view{display:none}
+  .view.active{display:block}
+
+  /* ===== Takvim (haftalık) ===== */
+  .cal-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:16px}
+  .cal-legend{display:flex;flex-wrap:wrap;gap:16px}
+  .legend-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-secondary);font-weight:500}
+  .legend-dot{width:10px;height:10px;border-radius:3px;flex:none}
+
+  .btn-outline{
+    display:inline-flex;align-items:center;gap:8px;background:var(--canvas);color:var(--ink);
+    border:1px solid var(--hairline-strong);border-radius:var(--r-sm);
+    padding:8px 14px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;
+  }
+  .btn-outline:hover{background:var(--canvas-soft)}
+  .btn-outline:disabled{opacity:.55;cursor:default}
+  .gcal-chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-mute);font-weight:500}
+
+  .cal-grid{
+    display:grid;
+    grid-template-columns:60px repeat(6,minmax(0,1fr));
+    grid-auto-rows:34px;
+    border:1px solid var(--hairline);border-radius:var(--r-lg);overflow:hidden;
+    background:var(--canvas);
+  }
+  .cal-head{
+    font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-mute-2);padding:10px 6px;background:var(--canvas);
+    border-bottom:1px solid var(--hairline);text-align:center;
+  }
+  .cal-head .dnum{display:block;font-size:15px;color:var(--ink);font-weight:600;letter-spacing:-.01em;text-transform:none;margin-top:2px}
+  .cal-head.today{color:var(--primary)}
+  .cal-head.today .dnum{color:var(--primary)}
+  .cal-time{
+    font-size:11px;color:var(--ink-mute-2);text-align:right;padding:2px 10px 0 0;
+    border-right:1px solid var(--hairline-cool);border-bottom:1px dashed var(--hairline-cool);
+    font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  }
+  .cal-cell{border-right:1px solid var(--hairline-cool);border-bottom:1px dashed var(--hairline-cool)}
+  .cal-cell:last-child{border-right:none}
+  .cal-apt{
+    margin:2px 3px;border-radius:5px;padding:4px 7px;font-size:11px;line-height:1.2;
+    overflow:hidden;cursor:default;border-left:3px solid rgba(0,0,0,.18);
+    transition:transform .08s,box-shadow .12s;
+  }
+  .cal-apt:hover{transform:translateY(-1px);box-shadow:var(--sh-1)}
+  .cal-apt b{display:block;font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cal-apt span{opacity:.85;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .cal-note{font-size:12px;color:var(--ink-mute);margin-top:14px;line-height:1.5}
+
+  /* ===== Doktorlar ===== */
+  .doc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .doc-card{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:20px}
+  .doc-top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .doc-av{width:42px;height:42px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;flex:none}
+  .doc-name{font-weight:500;font-size:16px;color:var(--ink);letter-spacing:-.01em;line-height:1.2}
+  .doc-spec{font-size:13px;color:var(--ink-mute);margin-top:2px}
+  .doc-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .doc-stat{background:var(--canvas-soft);border:1px solid var(--hairline-cool);border-radius:var(--r-md);padding:10px 12px}
+  .doc-stat .k{font-size:12px;color:var(--ink-mute)}
+  .doc-stat .v{font-size:18px;font-weight:600;color:var(--ink);letter-spacing:-.01em;margin-top:2px;font-variant-numeric:tabular-nums}
+  .doc-load{height:6px;background:var(--hairline-cool);border-radius:4px;overflow:hidden}
+  .doc-load i{display:block;height:100%;border-radius:4px}
+  .doc-foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--ink-mute)}
+
+  .pill.s-ok{background:rgba(62,207,142,.14);color:#15824f}
+  .pill.s-busy{background:#fff4cf;color:#8a6d00}
+  .pill.s-off{background:var(--hairline-cool);color:var(--ink-mute)}
+
+  /* ===== Yönetici ===== */
+  .scroll-x{overflow-x:auto}
+  .rows{min-width:560px}
+  .adm-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  .adm-sub{font-size:13px;color:var(--ink-mute);margin-top:2px}
+
+  .price-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 80px 120px;gap:12px;align-items:center;padding:12px 0}
+  .price-row + .price-row{border-top:1px solid var(--hairline-cool)}
+  .price-head{display:grid;grid-template-columns:minmax(0,1fr) 120px 80px 120px;gap:12px;padding:0 0 10px}
+  .price-srv{font-size:14px;color:var(--ink);font-weight:500}
+  .price-input{text-align:right;font-family:var(--font-mono);font-size:14px;color:var(--ink);background:var(--canvas-soft);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:7px 10px;width:100%;font-variant-numeric:tabular-nums}
+  .price-input:focus{outline:none;border-color:var(--primary);background:var(--canvas)}
+  .price-delta{font-size:12px;font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+  .price-delta.up{color:#b5530b}
+  .price-delta.flat{color:var(--ink-mute-2)}
+  .price-when{font-size:12px;color:var(--ink-mute-2);font-family:var(--font-mono);text-align:right}
+
+  .camp-row{display:grid;grid-template-columns:minmax(0,1.4fr) 70px minmax(0,1fr) 100px 46px;gap:12px;align-items:center;padding:13px 0}
+  .camp-row + .camp-row{border-top:1px solid var(--hairline-cool)}
+  .camp-head{display:grid;grid-template-columns:minmax(0,1.4fr) 70px minmax(0,1fr) 100px 46px;gap:12px;padding:0 0 10px}
+  .camp-name{font-size:14px;color:var(--ink);font-weight:500}
+  .camp-disc{font-family:var(--font-mono);font-size:13px;color:var(--ink);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .camp-scope{font-size:13px;color:var(--ink-mute)}
+  .camp-until{font-size:12px;color:var(--ink-mute-2);font-family:var(--font-mono)}
+
+  .col-h{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-mute-2)}
+  .col-h.r{text-align:right}
+
+  .switch{position:relative;width:38px;height:22px;flex:none;cursor:pointer}
+  .switch i{position:absolute;inset:0;background:var(--hairline-strong);border-radius:9999px;transition:background .15s}
+  .switch i::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:9999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+  .switch.on i{background:var(--primary)}
+  .switch.on i::after{transform:translateX(16px)}
+
+  .adm-foot{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}
+  .save-note{font-size:12px;color:var(--ink-mute)}
+
+  /* responsive */
+  @media (max-width:1080px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .grid-2{grid-template-columns:1fr}
+  }
+  @media (max-width:760px){
+    .app{grid-template-columns:1fr}
+    /* sabit üst bar + çekmece: yatay sarma yok, tek sütun temiz */
+    .m-topbar{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:56px;z-index:60;background:var(--canvas);border-bottom:1px solid var(--hairline-cool);padding:0 14px}
+    .m-topbar .brand-mark{font-size:15px}
+    .main{padding-top:56px}
+    .sidebar{position:fixed;top:56px;left:0;bottom:0;height:auto;width:264px;z-index:50;flex-direction:column;flex-wrap:nowrap;gap:0;border-right:1px solid var(--hairline-cool);transform:translateX(-100%);transition:transform .22s ease}
+    .sidebar.open{transform:translateX(0);box-shadow:var(--sh-2,0 8px 30px rgba(0,0,0,.18))}
+    .sidebar .theme-toggle{display:none}               /* tema anahtarı üst barda */
+    .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:45;opacity:0;pointer-events:none;transition:opacity .2s}
+    .scrim.show{opacity:1;pointer-events:auto}
+    .content{padding:20px}
+    .page-title{font-size:24px}
+    .alert{padding:10px 14px}
+    .svc-name{width:130px}
+    .doc-grid{grid-template-columns:1fr}
+  }
+
+  /* ===== dark mode (markanın koyu token'ları) ===== */
+  [data-theme="dark"]{
+    --canvas:#1c1c1c;
+    --canvas-soft:#202020;
+    --hairline:rgba(255,255,255,.10);
+    --hairline-strong:rgba(255,255,255,.16);
+    --hairline-cool:rgba(255,255,255,.08);
+    --hairline-cool-2:rgba(255,255,255,.06);
+    --hairline-cool-3:rgba(255,255,255,.16);
+    --ink:#f0f0f0;
+    --ink-secondary:#e6e6e6;
+    --ink-mute:#a0a0a0;
+    --ink-mute-2:#7a7a7a;
+    --ink-faint:#5f5f5f;
+  }
+  [data-theme="dark"] .avatar{background:#2e2e2e;border:1px solid rgba(255,255,255,.14)}
+  [data-theme="dark"] .theme-toggle{background:transparent}
+  [data-theme="dark"] .pill.ok{background:rgba(62,207,142,.18);color:#7ef0b6}
+  [data-theme="dark"] .pill.wait{background:rgba(255,219,19,.16);color:#ffe97a}
+  [data-theme="dark"] .alert{background:rgba(255,219,19,.10);border-color:rgba(255,219,19,.28);color:#f0e6c0}
+  [data-theme="dark"] .alert svg{color:#ffd24a}
+  [data-theme="dark"] .alert b{color:#fff}
+  [data-theme="dark"] .cal-apt{border-left-color:rgba(0,0,0,.28)}
+  [data-theme="dark"] .btn-outline{background:transparent}
+</style>
+</head>
+<body>
+<!-- mobil üst bar + çekmece perdesi -->
+<div class="scrim" id="scrim"></div>
+<header class="m-topbar">
+  <button class="ham" id="ham" aria-label="Menü"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+  <div class="brand-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="color:var(--ink)"><path d="M12 2.2c-2.5 0-3.6 1.4-5 1.4S4.6 2.4 3.4 2.4C2 2.4 1 3.7 1 6c0 3.4 1.7 7 2.6 8.8.7 1.5 1.4 3 2.3 3 .8 0 1.1-.6 2-1.4.9-.8 1.6-1 2.1-1h1.9c.5 0 1.2.2 2.1 1 .9.8 1.2 1.4 2 1 .9 0 1.6-1.5 2.3-3C21.3 13 23 9.4 23 6c0-2.3-1-3.6-2.4-3.6-1.2 0-1.6 1.2-3.6 1.2S14.5 2.2 12 2.2Z" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9" r="1.1" fill="currentColor"/><circle cx="15.5" cy="9" r="1.1" fill="currentColor"/></svg><span class="brand-name">Nova <span class="brand-accent">Dental</span></span></div>
+  <button class="theme-toggle" data-od-id="theme-toggle-m" aria-label="Tema değiştir" style="margin-left:auto"></button>
+</header>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" data-od-id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:var(--ink)"><path d="M12 2.2c-2.5 0-3.6 1.4-5 1.4S4.6 2.4 3.4 2.4C2 2.4 1 3.7 1 6c0 3.4 1.7 7 2.6 8.8.7 1.5 1.4 3 2.3 3 .8 0 1.1-.6 2-1.4.9-.8 1.6-1 2.1-1h1.9c.5 0 1.2.2 2.1 1 .9.8 1.2 1.4 2 1 .9 0 1.6-1.5 2.3-3C21.3 13 23 9.4 23 6c0-2.3-1-3.6-2.4-3.6-1.2 0-1.6 1.2-3.6 1.2S14.5 2.2 12 2.2Z" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9" r="1.1" fill="currentColor"/><circle cx="15.5" cy="9" r="1.1" fill="currentColor"/></svg>
+        <span class="brand-name">Nova <span class="brand-accent">Dental</span></span>
+      </div>
+      <button class="theme-toggle" data-od-id="theme-toggle" aria-label="Tema değiştir"></button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Genel</div>
+      <div class="nav-item active" data-nav="ozet" data-od-id="nav-ozet">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg></span>
+        Özet
+      </div>
+      <div class="nav-item" data-nav="takvim" data-od-id="nav-takvim">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        Takvim
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Klinik</div>
+      <div class="nav-item" data-nav="doktorlar" data-od-id="nav-doktorlar">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="17" cy="9.5" r="2.4" stroke="currentColor" stroke-width="1.6"/></svg></span>
+        Doktorlar
+        <span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+      </div>
+      <div class="nav-item" data-nav="hastalar" data-od-id="nav-hastalar">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        Hastalar
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Ajan</div>
+      <div class="nav-item" data-nav="bilgi" data-od-id="nav-bilgi">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        Bilgi Tabanı
+      </div>
+      <div class="nav-item" data-nav="wa" data-od-id="nav-wa">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="6" height="6" stroke="currentColor" stroke-width="1.6"/><rect x="14.5" y="3.5" width="6" height="6" stroke="currentColor" stroke-width="1.6"/><rect x="3.5" y="14.5" width="6" height="6" stroke="currentColor" stroke-width="1.6"/><path d="M14.5 14.5h2v2M20.5 14.5v6h-6" stroke="currentColor" stroke-width="1.6"/></svg></span>
+        WhatsApp (QR)
+      </div>
+    </div>
+
+    <div class="conn" data-od-id="connection">
+      <div class="conn-label">Bağlantı</div>
+      <div class="conn-row"><span class="dot ok"></span> composio — çalışıyor</div>
+      <div class="conn-row"><span class="dot bad"></span> whatsapp — kopuk</div>
+
+      <div class="user-card" data-nav="yonetici" role="button" tabindex="0" data-od-id="user-card" title="Yönetici Paneli">
+        <div class="avatar">Y</div>
+        <div class="user-meta"><b>Yönetici</b><span>Sistem Yöneticisi</span></div>
+        <svg class="uc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <button class="btn-logout" data-od-id="logout">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Çıkış
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="alert" data-od-id="whatsapp-alert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10.3 3.9 1.8 18a1 1 0 0 0 .9 1.5h17a1 1 0 0 0 .9-1.5L12 3.9a1 1 0 0 0-1.7 0Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9v4M12 17h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span><b>whatsapp bağlantısı koptu.</b> oturum durumu: failed — OpenWA panelinden QR okutun</span>
+    </div>
+
+    <div class="content">
+
+      <!-- ===== ÖZET ===== -->
+      <section class="view active" id="view-ozet" data-od-id="view-ozet">
+        <div class="page-head">
+          <h1 class="page-title">Özet</h1>
+          <p class="page-sub">6 Ağustos 2026, Perşembe</p>
+        </div>
+
+        <!-- KPI -->
+        <div class="kpis" data-od-id="kpis">
+          <div class="kpi"><div class="kpi-key">Bugünkü randevu</div><div class="kpi-val">3</div><div class="kpi-foot">iptaller hariç</div></div>
+          <div class="kpi"><div class="kpi-key">Onay bekleyen</div><div class="kpi-val">6</div><div class="kpi-foot">gelecek randevular</div></div>
+          <div class="kpi"><div class="kpi-key">Kayıtlı hasta</div><div class="kpi-val">22</div><div class="kpi-foot">toplam</div></div>
+          <div class="kpi"><div class="kpi-key">Gelen mesaj</div><div class="kpi-val">5</div><div class="kpi-foot">son 7 gün</div></div>
+        </div>
+
+        <!-- charts -->
+        <div class="grid-2">
+          <div class="card" data-od-id="chart-day">
+            <div class="card-h"><div class="card-title">Hangi gün daha dolu</div></div>
+            <div class="card-sub">Son 8 haftanın randevuları. En yoğun gün: Çar (29 randevu).</div>
+            <div class="chart"><div class="bars" id="bars-day"></div></div>
+          </div>
+          <div class="card" data-od-id="chart-hour">
+            <div class="card-h"><div class="card-title">Günün hangi saati</div></div>
+            <div class="card-sub">Son 8 haftanın randevuları, saat başına. En yoğun saat: 14:00.</div>
+            <div class="chart"><div class="bars" id="bars-hour"></div></div>
+          </div>
+        </div>
+
+        <!-- today appointments -->
+        <div class="card table-card" data-od-id="today-appointments">
+          <div class="card-h" style="margin-bottom:18px"><div class="card-title">Bugünün randevuları</div><div class="card-sub">6 Ağustos 2026, Perşembe</div></div>
+          <table>
+            <thead><tr><th>Saat</th><th>Hasta</th><th>Doktor</th><th>Hizmet</th><th>Durum</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">10:00–10:30</td><td class="t-name">Ayşe Yılmaz</td><td class="t-doc">Dt. Zeynep Şahin</td><td>Diş taşı temizliği</td><td><span class="pill ok">onaylı</span></td></tr>
+              <tr><td class="mono">11:00–11:30</td><td class="t-name">Mehmet Demir</td><td class="t-doc">Dt. Murat Kaya</td><td>İmplant kontrolü</td><td><span class="pill wait">bekliyor</span></td></tr>
+              <tr><td class="mono">15:00–15:30</td><td class="t-name">Zeynep Kaya</td><td class="t-doc">Dt. Aylin Demir</td><td>Dolgu</td><td><span class="pill wait">bekliyor</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- services -->
+        <div class="card" data-od-id="top-services">
+          <div class="card-h" style="margin-bottom:14px"><div class="card-title">En çok istenen hizmetler</div><div class="card-sub">Tüm zamanlar, iptaller hariç</div></div>
+          <div id="svc-list"></div>
+        </div>
+      </section>
+
+      <!-- ===== HASTALAR ===== -->
+      <section class="view" id="view-hastalar" data-od-id="view-hastalar">
+        <div class="page-head">
+          <h1 class="page-title">Hasta Takip</h1>
+          <p class="page-sub">Son yazışan hastalar · WhatsApp üzerinden</p>
+        </div>
+        <div class="card" data-od-id="patient-list">
+          <table>
+            <thead><tr><th>Hasta</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th></tr></thead>
+            <tbody id="patient-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== TAKVİM ===== -->
+      <section class="view" id="view-takvim" data-od-id="view-takvim">
+        <div class="page-head">
+          <h1 class="page-title">Haftalık Takvim</h1>
+          <p class="page-sub">4–10 Ağu 2026 · her dişhekimi ayrı renk · Google Takvim ile çift yönlü eşitleme</p>
+        </div>
+
+        <div class="cal-toolbar">
+          <div class="cal-legend" id="cal-legend"></div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span class="gcal-chip" id="gcal-chip"><span class="dot idle"></span> Eşitli değil</span>
+            <button class="btn-outline" id="gcal-btn" data-od-id="gcal-sync">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 13.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 6h5M21 6l-3-3M16 6l3-3M21 6v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="gcal-txt">Google Takvim ile eşitle</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="cal-grid" id="cal-grid"></div>
+        <p class="cal-note">Dolu saatler renkli bloklarla görsel olarak okunur — bloğun doktor rengi, hangi hekime ait olduğunu gösterir. Bugün: Çar 6 Ağu.</p>
+      </section>
+
+      <!-- ===== DOKTORLAR ===== -->
+      <section class="view" id="view-doktorlar" data-od-id="view-doktorlar">
+        <div class="page-head">
+          <h1 class="page-title">Doktorlar</h1>
+          <p class="page-sub">4 hekim · bugünkü yük ve uygunluk durumu</p>
+        </div>
+        <div class="doc-grid" id="doc-grid"></div>
+      </section>
+
+      <!-- ===== YÖNETİCİ ===== -->
+      <section class="view" id="view-yonetici" data-od-id="view-yonetici">
+        <div class="page-head">
+          <h1 class="page-title">Yönetici Paneli</h1>
+          <p class="page-sub">Kampanya ve fiyat yönetimi · değişiklikler anında resepsiyon yüzüne yansır</p>
+        </div>
+
+        <!-- Kampanyalar -->
+        <div class="card" style="margin-bottom:20px" data-od-id="campaigns">
+          <div class="adm-head" style="margin-bottom:14px">
+            <div>
+              <div class="card-title">Kampanyalar</div>
+              <div class="adm-sub">Aktif kampanyalar WhatsApp mesajlarında ve fiyat teklifinde otomatik uygulanır</div>
+            </div>
+            <button class="btn-green" id="camp-add" data-od-id="camp-add">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Kampanya ekle
+            </button>
+          </div>
+          <div class="scroll-x"><div class="rows">
+            <div class="camp-head">
+              <div class="col-h">Kampanya</div>
+              <div class="col-h r">İndirim</div>
+              <div class="col-h">Kapsam</div>
+              <div class="col-h">Geçerlilik</div>
+              <div class="col-h r">Aktif</div>
+            </div>
+            <div id="camp-list"></div>
+          </div></div>
+        </div>
+
+        <!-- Fiyat listesi -->
+        <div class="card" data-od-id="price-list">
+          <div class="adm-head" style="margin-bottom:14px">
+            <div>
+              <div class="card-title">Fiyat listesi</div>
+              <div class="adm-sub">Hizmet bazlı güncel fiyatlar · son değişiklik tarihi gösterilir</div>
+            </div>
+            <span class="pill s-off" id="price-dirty" style="display:none">Kaydedilmemiş değişiklik</span>
+          </div>
+          <div class="scroll-x"><div class="rows">
+            <div class="price-head">
+              <div class="col-h">Hizmet</div>
+              <div class="col-h r">Fiyat (₺)</div>
+              <div class="col-h r">Değişim</div>
+              <div class="col-h r">Son güncelleme</div>
+            </div>
+            <div id="price-list"></div>
+          </div></div>
+          <div class="adm-foot">
+            <button class="btn-green" id="price-save" data-od-id="price-save">Değişiklikleri kaydet</button>
+            <span class="save-note" id="price-saved-note"></span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // ---- bar chart renderer: peak = emerald, rest = grey ladder ----
+  function renderBars(el, data, peakIdx){
+    const max = Math.max(...data.map(d=>d.v));
+    el.innerHTML = data.map((d,i)=>{
+      const isPeak = i===peakIdx;
+      if(d.closed){
+        return `<div class="bar-wrap closed">
+          <div class="bar closed"></div>
+          <div class="bar-label">kapalı</div>
+        </div>`;
+      }
+      const h = Math.round((d.v/max)*100);
+      return `<div class="bar-wrap ${isPeak?'peak':''}">
+        <div class="bar ${isPeak?'peak':''}" style="height:${h}%"></div>
+        <div class="bar-val ${isPeak?'':''}" style="${isPeak?'color:var(--ink);font-weight:600':''}">${d.v}</div>
+        <div class="bar-label">${d.l}</div>
+      </div>`;
+    }).join('');
+  }
+
+  renderBars(document.getElementById('bars-day'),[
+    {l:'Pzt',v:11},{l:'Sal',v:16},{l:'Çar',v:29},{l:'Per',v:21},
+    {l:'Cum',v:21},{l:'Cmt',v:4},{l:'Paz',v:0,closed:true}
+  ],2); // Çar peak
+
+  renderBars(document.getElementById('bars-hour'),[
+    {l:'09',v:6},{l:'10',v:17},{l:'11',v:12},{l:'12',v:6},{l:'13',v:5},
+    {l:'14',v:19},{l:'15',v:14},{l:'16',v:14},{l:'17',v:9}
+  ],5); // 14 peak
+
+  // ---- services ----
+  const svc=[
+    {n:'Diş taşı temizliği',c:22},{n:'Kanal tedavisi',c:16},{n:'Dolgu',c:15},
+    {n:'İmplant',c:14},{n:'Kontrol',c:12},{n:'Diş çekimi',c:11},{n:'Diğer',c:12}
+  ];
+  const smax=Math.max(...svc.map(s=>s.c));
+  document.getElementById('svc-list').innerHTML=svc.map((s,i)=>`
+    <div class="svc">
+      <div class="svc-name">${s.n}</div>
+      <div class="svc-track"><div class="svc-fill ${i===0?'peak':''}" style="width:${Math.round(s.c/smax*100)}%"></div></div>
+      <div class="svc-count">${s.c}</div>
+    </div>`).join('');
+
+  // ---- patients ----
+  const patients=[
+    ['Test Hasta','905329998888','06.08.2026','06.08.2026 00:44'],
+    ['İsimsiz','905320000009','06.08.2026','06.08.2026 00:33'],
+    ['Yeni Hasta 4','905320000004','06.08.2026','06.08.2026 00:33'],
+    ['Yeni Hasta 3','905320000003','06.08.2026','06.08.2026 00:33'],
+    ['Yeni Hasta 2','905320000002','06.08.2026','06.08.2026 00:33'],
+    ['Yeni Hasta 1','905320000001','06.08.2026','06.08.2026 00:33'],
+    ['Onur Taş','905320000011','06.08.2026','06.08.2026 00:20'],
+    ['Pınar Erdem','905320000010','06.08.2026','06.08.2026 00:20']
+  ];
+  document.getElementById('patient-body').innerHTML=patients.map(p=>`
+    <tr>
+      <td class="t-name">${p[0]}</td>
+      <td class="mono">${p[1]}</td>
+      <td class="mono">${p[2]}</td>
+      <td class="mono">${p[3]}</td>
+    </tr>`).join('');
+
+  // ---- nav switching ----
+  const map={ozet:'view-ozet',hastalar:'view-hastalar',takvim:'view-takvim',doktorlar:'view-doktorlar',yonetici:'view-yonetici'};
+  document.querySelectorAll('[data-nav]').forEach(item=>{
+    const go=()=>{
+      const k=item.dataset.nav;
+      const target=map[k];
+      if(!target) return; // doktorlar/bilgi/wa: pasif
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      const mirror=document.querySelector('.nav-item[data-nav="'+k+'"]'); // kart tıklanınca üst düğme vurgulansın
+      if(mirror) mirror.classList.add('active');
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      document.getElementById(target).classList.add('active');
+      if(window.innerWidth<=760) toggleMenu(false); // mobilde menüyü kapat
+    };
+    item.addEventListener('click',go);
+    item.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();go();} });
+  });
+
+  // ---- dark mode toggle (tercih localStorage'da kalır) ----
+  const rootEl=document.documentElement;
+  const tgBtns=[...document.querySelectorAll('.theme-toggle')];
+  const MOON='<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  const SUN ='<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  function syncIcon(){
+    const ic = rootEl.dataset.theme==='dark' ? SUN : MOON;
+    tgBtns.forEach(b=>b.innerHTML=ic);
+  }
+  function setTheme(t){rootEl.dataset.theme=t;try{localStorage.setItem('dk-theme',t);}catch(e){}syncIcon();}
+  (function(){let s=null;try{s=localStorage.getItem('dk-theme');}catch(e){}
+    setTheme(s||'dark');})();
+  tgBtns.forEach(b=>b.addEventListener('click',()=>setTheme(rootEl.dataset.theme==='dark'?'light':'dark')));
+
+  // ---- mobil çekmece (hamburger menü) ----
+  const sidebar=document.querySelector('.sidebar');
+  const scrim=document.getElementById('scrim');
+  const ham=document.getElementById('ham');
+  const MENUI='<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const CLOSEI='<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  function toggleMenu(open){
+    sidebar.classList.toggle('open',open);
+    scrim.classList.toggle('show',open);
+    ham.innerHTML=open?CLOSEI:MENUI;
+  }
+  ham.addEventListener('click',()=>toggleMenu(!sidebar.classList.contains('open')));
+  scrim.addEventListener('click',()=>toggleMenu(false));
+
+  // ---- haftalık takvim (her doktor bir renk, dolu saatler görsel) ----
+  const docs=[
+    {n:'Dt. Aylin Demir',  c:'#3ecf8e', t:'#171717'},
+    {n:'Dt. Murat Kaya',   c:'#644fc1', t:'#ffffff'},
+    {n:'Dt. Zeynep Şahin', c:'#ffdb13', t:'#171717'},
+    {n:'Dt. Can Öztürk',   c:'#6b01c2', t:'#ffffff'}
+  ];
+  const days=['Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const dayNums=[4,5,6,7,8,9];
+  const todayIdx=2; // Çar (6 Ağu)
+  const SLOTS=16; // 09:00 → 16:30, 30 dk'lık dilimler
+  const slotTime=s=>{const h=9+Math.floor(s/2);const m=(s%2)*30;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');};
+
+  const apts=[
+    {d:1,s:0,sp:2,doc:0,p:'Ayşe Y.',sv:'Temizlik'},
+    {d:1,s:4,sp:1,doc:1,p:'Can D.',sv:'Kontrol'},
+    {d:1,s:8,sp:2,doc:2,p:'Mine A.',sv:'Dolgu'},
+    {d:2,s:1,sp:2,doc:3,p:'Berk T.',sv:'Kanal'},
+    {d:2,s:6,sp:1,doc:0,p:'Selin K.',sv:'Temizlik'},
+    {d:2,s:10,sp:2,doc:1,p:'Hakan Ö.',sv:'İmplant'},
+    {d:3,s:0,sp:2,doc:0,p:'Demet R.',sv:'Temizlik'},
+    {d:3,s:2,sp:1,doc:2,p:'Ece N.',sv:'Çocuk kontrol'},
+    {d:3,s:4,sp:2,doc:1,p:'Volkan A.',sv:'İmplant'},
+    {d:3,s:8,sp:2,doc:3,p:'Selen D.',sv:'Estetik'},
+    {d:3,s:10,sp:1,doc:0,p:'Gözde T.',sv:'Dolgu'},
+    {d:3,s:12,sp:2,doc:2,p:'Ali K.',sv:'Temizlik'},
+    {d:4,s:1,sp:2,doc:1,p:'Cem Y.',sv:'İmplant kontrol'},
+    {d:4,s:6,sp:2,doc:0,p:'Deniz Ö.',sv:'Dolgu'},
+    {d:4,s:10,sp:1,doc:3,p:'Pınar E.',sv:'Protez'},
+    {d:5,s:0,sp:2,doc:2,p:'Yağmur S.',sv:'Çocuk dolgu'},
+    {d:5,s:4,sp:2,doc:0,p:'Tuna B.',sv:'Temizlik'},
+    {d:5,s:8,sp:2,doc:1,p:'Kerem U.',sv:'İmplant'},
+    {d:5,s:12,sp:1,doc:3,p:'Rana M.',sv:'Estetik'},
+    {d:6,s:0,sp:2,doc:0,p:'Mert Ç.',sv:'Temizlik'},
+    {d:6,s:6,sp:1,doc:2,p:'Naz V.',sv:'Kontrol'}
+  ];
+
+  (function buildCalendar(){
+    // legend
+    document.getElementById('cal-legend').innerHTML=docs.map(d=>`
+      <div class="legend-item"><span class="legend-dot" style="background:${d.c}"></span>${d.n}</div>`).join('');
+
+    const grid=document.getElementById('cal-grid');
+    let html='';
+    // header row (grid-row 1)
+    html+=`<div class="cal-head" style="grid-column:1;grid-row:1">Saat</div>`;
+    days.forEach((dn,i)=>{
+      html+=`<div class="cal-head ${i===todayIdx?'today':''}" style="grid-column:${i+2};grid-row:1">${dn}<span class="dnum">${dayNums[i]}</span></div>`;
+    });
+    // time labels + cells
+    for(let s=0;s<SLOTS;s++){
+      const row=s+2;
+      html+=`<div class="cal-time" style="grid-column:1;grid-row:${row}">${s%2===0?slotTime(s):''}</div>`;
+      for(let d=1;d<=6;d++){
+        html+=`<div class="cal-cell" style="grid-column:${d+1};grid-row:${row}"></div>`;
+      }
+    }
+    // appointments (üstteki hücrelerin üzerine biner)
+    apts.forEach(a=>{
+      const doc=docs[a.doc];
+      html+=`<div class="cal-apt" style="grid-column:${a.d+1};grid-row:${a.s+2} / span ${a.sp};background:${doc.c};color:${doc.t}" title="${slotTime(a.s)} · ${doc.n} · ${a.p} — ${a.sv}"><b>${slotTime(a.s)} ${a.p}</b><span>${doc.n.replace('Dt. ','')} · ${a.sv}</span></div>`;
+    });
+    grid.innerHTML=html;
+  })();
+
+  // ---- Google Takvim eşitleme (prototip: simüle edilmiş durum) ----
+  const gcalBtn=document.getElementById('gcal-btn');
+  const gcalChip=document.getElementById('gcal-chip');
+  const gcalTxt=gcalBtn.querySelector('.gcal-txt');
+  gcalBtn.addEventListener('click',()=>{
+    gcalChip.innerHTML='<span class="dot" style="background:var(--warn)"></span> Eşitleniyor…';
+    gcalBtn.disabled=true;
+    setTimeout(()=>{
+      gcalChip.innerHTML='<span class="dot ok"></span> Eşitlendi · az önce';
+      gcalBtn.disabled=false;
+      gcalTxt.textContent='Yeniden eşitle';
+    },1000);
+  });
+
+  // ---- Doktorlar ----
+  const doctors=[
+    {n:'Dt. Aylin Demir',spec:'Ortodonti',c:'#3ecf8e',t:'#171717',today:2,week:14,cap:20,status:'ok',phone:'+90 532 111 22 33'},
+    {n:'Dt. Murat Kaya',spec:'İmplant & Cerrahi',c:'#644fc1',t:'#fff',today:3,week:16,cap:18,status:'busy',phone:'+90 532 222 33 44'},
+    {n:'Dt. Zeynep Şahin',spec:'Pedodonti (çocuk)',c:'#ffdb13',t:'#171717',today:2,week:12,cap:16,status:'ok',phone:'+90 532 333 44 55'},
+    {n:'Dt. Can Öztürk',spec:'Estetik & Protez',c:'#6b01c2',t:'#fff',today:0,week:13,cap:18,status:'off',phone:'+90 532 444 55 66'}
+  ];
+  const statusMap={ok:['s-ok','Müsait'],busy:['s-busy','Meşgul'],off:['s-off','İzinli']};
+  document.getElementById('doc-grid').innerHTML=doctors.map(d=>{
+    const [sc,sl]=statusMap[d.status];
+    const initials=d.n.replace('Dt. ','').split(' ').map(w=>w[0]).join('');
+    const loadPct=Math.round(d.week/d.cap*100);
+    return `<div class="doc-card" data-od-id="doctor-${initials}">
+      <div class="doc-top">
+        <div class="doc-av" style="background:${d.c};color:${d.t}">${initials}</div>
+        <div style="min-width:0"><div class="doc-name">${d.n}</div><div class="doc-spec">${d.spec}</div></div>
+        <div class="doc-status"><span class="pill ${sc}">${sl}</span></div>
+      </div>
+      <div class="doc-stats">
+        <div class="doc-stat"><div class="k">Bugün</div><div class="v">${d.today}</div></div>
+        <div class="doc-stat"><div class="k">Bu hafta</div><div class="v">${d.week}/${d.cap}</div></div>
+      </div>
+      <div class="doc-load"><i style="width:${loadPct}%;background:${d.c}"></i></div>
+      <div class="doc-foot"><span>${d.phone}</span><span>%${loadPct} doluluk</span></div>
+    </div>`;
+  }).join('');
+
+  // ---- Kampanyalar ----
+  const campaigns=[
+    {n:'Yaz Kampanyası',disc:20,scope:'Diş taşı temizliği',until:'31 Ağu 2026',on:true},
+    {n:'Öğrenci İndirimi',disc:15,scope:'Ortodonti konsültasyon',until:'30 Eyl 2026',on:true},
+    {n:'Aile Paketi',disc:10,scope:'Kontrol + dolgu',until:'—',on:false},
+    {n:'İlk Muayene Ücretsiz',disc:100,scope:'İlk konsültasyon',until:'—',on:false}
+  ];
+  function renderCampaigns(){
+    document.getElementById('camp-list').innerHTML=campaigns.map((c,i)=>`
+      <div class="camp-row">
+        <div class="camp-name">${c.n}</div>
+        <div class="camp-disc">%${c.disc}</div>
+        <div class="camp-scope">${c.scope}</div>
+        <div class="camp-until">${c.until}</div>
+        <div style="display:flex;justify-content:flex-end"><div class="switch ${c.on?'on':''}" data-camp="${i}"><i></i></div></div>
+      </div>`).join('');
+    document.querySelectorAll('.switch[data-camp]').forEach(sw=>{
+      sw.addEventListener('click',()=>{
+        const i=+sw.dataset.camp;campaigns[i].on=!campaigns[i].on;renderCampaigns();
+      });
+    });
+  }
+  renderCampaigns();
+  document.getElementById('camp-add').addEventListener('click',()=>{
+    const name=prompt('Kampanya adı:');if(!name)return;
+    const disc=parseInt(prompt('İndirim yüzdesi (%):','10'),10)||0;
+    const scope=prompt('Kapsam (hizmet):','')||'—';
+    campaigns.unshift({n:name,disc,scope,until:'—',on:true});renderCampaigns();
+  });
+
+  // ---- Fiyat listesi ----
+  const prices=[
+    {s:'Diş taşı temizliği',p:850,old:750,when:'12.07.2026'},
+    {s:'Dolgu (kompozit)',p:700,old:650,when:'12.07.2026'},
+    {s:'Kanal tedavisi',p:2200,old:2000,when:'01.06.2026'},
+    {s:'İmplant (tek diş)',p:9500,old:9000,when:'01.06.2026'},
+    {s:'Ortodonti konsültasyon',p:500,old:500,when:'15.03.2026'},
+    {s:'Diş çekimi',p:600,old:550,when:'12.07.2026'},
+    {s:'Beyazlatma',p:3500,old:3200,when:'01.06.2026'},
+    {s:'Lamina (veneer)',p:6500,old:6000,when:'15.03.2026'}
+  ];
+  let dirty=false;
+  function priceDelta(p,old){
+    if(p===old)return '<span class="price-delta flat">—</span>';
+    const diff=Math.round(((p-old)/old)*100);
+    return `<span class="price-delta up">+${diff}%</span>`;
+  }
+  function renderPrices(){
+    document.getElementById('price-list').innerHTML=prices.map((it,i)=>`
+      <div class="price-row">
+        <div class="price-srv">${it.s}</div>
+        <input class="price-input" type="number" min="0" step="50" data-p="${i}" value="${it.p}" />
+        ${priceDelta(it.p,it.old)}
+        <div class="price-when">${it.when}</div>
+      </div>`).join('');
+    document.querySelectorAll('.price-input').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        const i=+inp.dataset.p;
+        prices[i].p=Math.max(0,parseInt(inp.value,10)||0);
+        const row=inp.closest('.price-row');
+        row.querySelector('.price-delta').outerHTML=priceDelta(prices[i].p,prices[i].old);
+        markDirty();
+      });
+    });
+  }
+  function markDirty(){
+    dirty=true;
+    document.getElementById('price-dirty').style.display='inline-flex';
+    document.getElementById('price-saved-note').textContent='';
+  }
+  renderPrices();
+  document.getElementById('price-save').addEventListener('click',()=>{
+    const now='06.08.2026';
+    prices.forEach(it=>{it.old=it.p;it.when=now;});
+    dirty=false;renderPrices();
+    document.getElementById('price-dirty').style.display='none';
+    document.getElementById('price-saved-note').textContent='Kaydedildi · '+now;
+  });
+</script>
+</body>
+</html>

@@ -15,8 +15,10 @@ Aşağıdaki bilgiler klinik personeli tarafından girilmiştir ve tek doğru ka
 Burada olmayan hiçbir bilgiyi uydurma; bilmiyorsan personele yönlendir.
 """
 
+# "fiyatlar" bilerek yok: fiyatın tek kaynağı `hizmetler` tablosu (app/hizmet.py).
+# Serbest metin fiyat kaydı da açılabilseydi aynı hizmet iki yerde farklı fiyatla
+# durur, ajan hangisini söyleyeceğini bilemezdi.
 KATEGORI_ADLARI = {
-    "fiyatlar": "Fiyatlar",
     "hizmetler": "Hizmetler",
     "calisma_saatleri": "Çalışma Saatleri",
     "adres": "Adres ve Ulaşım",
@@ -79,9 +81,30 @@ def bilgiler_listele(conn: psycopg.Connection, yalniz_aktif: bool = False) -> li
         return cur.fetchall()
 
 
+def _fiyat_bolumu(conn: psycopg.Connection) -> list[str]:
+    """Fiyatlar bölümü — `hizmetler` tablosundan, geçerli kampanya indirimiyle.
+
+    Panelde fiyat ya da kampanya değiştiğinde bu bölüm yeniden üretilir, yani
+    ajan bir sonraki mesajda yeni fiyatı söyler. Restart gerekmez.
+    """
+    from app.hizmet import fiyat_metni, hizmetler_listele, kampanyalar_listele
+
+    hizmetler = hizmetler_listele(conn, yalniz_aktif=True)
+    if not hizmetler:
+        return []
+
+    kampanyalar = kampanyalar_listele(conn, yalniz_gecerli=True)
+    parcalar = ["\n## fiyatlar  <!-- Fiyatlar -->\n"]
+    for h in hizmetler:
+        parcalar.append(f"### {h['ad']}\n{fiyat_metni(h, kampanyalar)}\n")
+    return parcalar
+
+
 def hermes_md_uret(conn: psycopg.Connection) -> str:
     """Aktif kayıtlardan, kategoriye göre gruplu markdown üretir."""
     parcalar = [BASLIK]
+    fiyatlar = _fiyat_bolumu(conn)
+    parcalar.extend(fiyatlar)
     son_kategori = None
 
     for satir in bilgiler_listele(conn, yalniz_aktif=True):
@@ -90,7 +113,7 @@ def hermes_md_uret(conn: psycopg.Connection) -> str:
             parcalar.append(f"\n## {son_kategori}  <!-- {KATEGORI_ADLARI.get(son_kategori, son_kategori)} -->\n")
         parcalar.append(f"### {satir['baslik']}\n{satir['icerik']}\n")
 
-    if son_kategori is None:
+    if son_kategori is None and not fiyatlar:
         parcalar.append(
             "\n_Bilgi tabanı henüz boş. Hiçbir soruya cevap uydurma; "
             "hastayı klinik personeline yönlendir._\n"

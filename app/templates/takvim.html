@@ -1,0 +1,75 @@
+{% extends "temel.html" %}
+{% block baslik %}Takvim — {{ klinik_adi }}{% endblock %}
+{% block icerik %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>Haftalık Takvim</h1>
+    <div class="alt-baslik">
+      {{ hafta_bas.strftime('%d.%m.%Y') }} – {{ gunler[-1].strftime('%d.%m.%Y') }}
+      · her hekim ayrı renk
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <a class="btn-outline" href="/takvim?hafta={{ onceki }}">← Önceki</a>
+    <a class="btn-outline" href="/takvim">Bu hafta</a>
+    <a class="btn-outline" href="/takvim?hafta={{ sonraki }}">Sonraki →</a>
+  </div>
+</div>
+
+<div class="kart">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+    <div>
+      {% for d in doktorlar %}
+        <span class="legend-item"><span class="legend-dot" style="background:{{ renk[d.id] }}"></span>{{ d.ad }}</span>
+      {% else %}
+        <span class="bos">Hekim tanımlı değil — randevular tek renkte görünür.</span>
+      {% endfor %}
+    </div>
+    {# Composio yokken sahte "eşitlendi" göstermek personeli yanıltır #}
+    {% if takvim_bagli %}
+      <span class="pill s-ok">Google Takvim bağlı</span>
+    {% else %}
+      <span class="pill s-off" title="COMPOSIO_API_KEY tanımlı değil">Google Takvim bağlı değil</span>
+    {% endif %}
+  </div>
+
+  <div class="cal-wrap">
+    <div class="cal-grid">
+      <div class="cal-head" style="grid-column:1;grid-row:1">Saat</div>
+      {% for g in gunler %}
+        <div class="cal-head {% if g == bugun %}today{% endif %}" style="grid-column:{{ loop.index + 1 }};grid-row:1">
+          {{ ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'][g.weekday()] }}
+          <span class="dnum">{{ g.day }}</span>
+        </div>
+      {% endfor %}
+
+      {% for saat in saatler %}
+        <div class="cal-time" style="grid-column:1;grid-row:{{ loop.index + 1 }}">{{ '%02d:00' % saat }}</div>
+        {% for g in gunler %}
+          <div class="cal-cell" style="grid-column:{{ loop.index + 1 }};grid-row:{{ saatler.index(saat) + 2 }}"></div>
+        {% endfor %}
+      {% endfor %}
+
+      {% for r in randevular %}
+        {% set gun_no = (r.baslangic.date() - hafta_bas).days %}
+        {% set satir = r.baslangic.hour - saatler[0] %}
+        {% if 0 <= gun_no < 7 and 0 <= satir < saatler|length %}
+        <div class="cal-apt"
+             style="grid-column:{{ gun_no + 2 }};grid-row:{{ satir + 2 }};background:{{ renk.get(r.doktor_id, '#64748b') }};color:#0b0b0b"
+             title="{{ r.baslangic.strftime('%H:%M') }} · {{ r.doktor_ad or 'hekim atanmadı' }} · {{ r.ad or r.telefon }} — {{ r.hizmet }}">
+          <b>{{ r.baslangic.strftime('%H:%M') }} {{ r.ad or r.telefon }}</b>
+          <span>{{ r.hizmet }}</span>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <p class="cal-note">
+    İptal edilen randevular takvimde görünmez — dolu saat izlenimi vermemesi için.
+    Tam liste ve durum değişikliği için <a href="/randevular">Randevular</a>.
+  </p>
+</div>
+
+{% endblock %}

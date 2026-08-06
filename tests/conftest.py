@@ -68,12 +68,30 @@ def conn():
         # birbirinin verisini görür ve id'ler beklenmedik yerden gelir.
         cur.execute(
             "TRUNCATE gorusmeler, randevular, kisiler, bilgi_tabani, baglanti_saglik, "
-            "doktorlar, kullanicilar, islem_kaydi RESTART IDENTITY CASCADE"
+            "doktorlar, kullanicilar, islem_kaydi, kampanyalar, hizmetler "
+            "RESTART IDENTITY CASCADE"
         )
     c.commit()
     yield c
     c.rollback()
     c.close()
+
+
+@pytest.fixture(autouse=True)
+def hermes_md_korumasi(tmp_path, monkeypatch):
+    """Hiçbir test repodaki gerçek `.hermes.md`'yi ezmesin.
+
+    Panel rotaları her bilgi değişikliğinde `hermes_md_yaz(conn, main.HERMES_MD)`
+    çağırıyor. Testler ayrı veritabanı kullanıyor ama HERMES_MD proje kökünü
+    gösteriyordu: dosyayı patch'lemeyi unutan bir test, test verisini kliniğin
+    gerçek bilgi dosyasının üzerine yazıyor ve ajan o andan sonra yanlış —
+    ya da eksik — bilgi veriyordu. Bir kez oldu, bir daha olmasın.
+
+    Dosyayı okuyan testler kendi yollarını monkeypatch'leyip bunu eziyor.
+    """
+    import app.main as main
+
+    monkeypatch.setattr(main, "HERMES_MD", tmp_path / ".hermes.md")
 
 
 @pytest.fixture

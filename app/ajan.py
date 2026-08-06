@@ -18,7 +18,11 @@ class CevapUretilemedi(Exception):
     """Hermes cevap üretemedi — zaman aşımı, çökme ya da boş çıktı."""
 
 
-def prompt_hazirla(gecmis: list[dict], mesaj: str) -> str:
+def _whatsapp_hatti() -> str:
+    return os.environ.get("KLINIK_WHATSAPP_NUMARASI", "")
+
+
+def prompt_hazirla(gecmis: list[dict], mesaj: str, kanal: str = "whatsapp") -> str:
     satirlar = []
     if gecmis:
         satirlar.append("Bu hastayla önceki yazışman (eskiden yeniye):")
@@ -29,13 +33,64 @@ def prompt_hazirla(gecmis: list[dict], mesaj: str) -> str:
 
     satirlar.append(f"Hastanın yeni mesajı: {mesaj}")
     satirlar.append("")
-    satirlar.append("Hastaya WhatsApp'tan gönderilecek cevabı yaz. Sadece cevabı yaz.")
+
+    if kanal == "instagram":
+        # Instagram bilgilendirme kanalı: randevu açma yetkisi YOK. Bu sınır
+        # burada duruyor çünkü tek fark kanal; ajanın kimliği ve bilgi tabanı aynı.
+        hat = _whatsapp_hatti()
+        nereye = f"WhatsApp hattımıza ({hat})" if hat else "WhatsApp hattımıza"
+        satirlar.append(
+            "Bu mesaj Instagram'dan geldi. Instagram yalnızca bilgilendirme kanalıdır:\n"
+            "- Soruyu bilgi tabanındaki bilgilerle cevapla (hizmet, fiyat, çalışma saatleri, adres).\n"
+            f"- Randevu almak, değiştirmek veya iptal etmek isteyen kişiyi {nereye} yönlendir.\n"
+            "- Randevu KAYDI AÇMA, saat verme, 'ayırdım/kaydettim' deme. Bu kanalda o yetkin yok.\n"
+            "- Randevu araçlarını çağırma."
+        )
+        satirlar.append("")
+        satirlar.append("Instagram'dan gönderilecek cevabı yaz. Sadece cevabı yaz.")
+    else:
+        satirlar.append("Hastaya WhatsApp'tan gönderilecek cevabı yaz. Sadece cevabı yaz.")
+
     return "\n".join(satirlar)
 
 
-def cevap_uret(gecmis: list[dict], mesaj: str) -> tuple[str, float | None]:
+KONUM_ISARETI = "[KONUM]"
+
+
+def konum_ayikla(yanit: str) -> tuple[str, bool]:
+    """Ajanın cevabından `[KONUM]` işaretini ayıklar → (temiz metin, konum_istendi).
+
+    İşaret hastaya da personele de gösterilmez; kaydedilmeden önce burada
+    düşer. Her iki kanal da (WhatsApp, Instagram) bu fonksiyondan geçiyor —
+    yoksa Instagram cevaplarında ham `[KONUM]` yazısı görünürdü.
+    """
+    if KONUM_ISARETI not in yanit:
+        return yanit, False
+    return yanit.replace(KONUM_ISARETI, "").strip(), True
+
+
+def klinik_konumu() -> tuple[float, float] | None:
+    """`.env`'deki `KLINIK_KONUM=enlem,boylam`. Bozuk/eksikse None.
+
+    Koordinat sabit ve elle girilir; ajan koordinat üretmez — uydurulmuş bir
+    enlem/boylam hastayı yanlış adrese gönderir.
+    """
+    ham = os.environ.get("KLINIK_KONUM", "").strip()
+    if not ham:
+        return None
+    try:
+        enlem, boylam = (float(p) for p in ham.split(",", 1))
+    except ValueError:
+        return None
+    if not (-90 <= enlem <= 90 and -180 <= boylam <= 180):
+        return None
+    return enlem, boylam
+
+
+def cevap_uret(gecmis: list[dict], mesaj: str,
+               kanal: str = "whatsapp") -> tuple[str, float | None]:
     """(yanıt, maliyet_usd) döner. Başarısızlıkta CevapUretilemedi."""
-    prompt = prompt_hazirla(gecmis, mesaj)
+    prompt = prompt_hazirla(gecmis, mesaj, kanal)
 
     ortam = os.environ.copy()
     # Ajan bu klasöre özel — global ~/.hermes asla kullanılmaz

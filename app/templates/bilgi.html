@@ -1,6 +1,22 @@
 {% extends "temel.html" %}
 {% block baslik %}Bilgi Tabanı — Klinik Paneli{% endblock %}
+
+{# Kategoriler iki formda da kullanılıyor; tek yerde dursun ki biri eklenip
+   diğeri unutulmasın. kb.KATEGORI_ADLARI ile aynı liste. #}
+{% macro kategori_secim(id, secili='genel') %}
+<select id="{{ id }}" name="kategori">
+  {# Fiyat burada YOK: fiyatın tek yeri Yönetici → Fiyat listesi #}
+  {% for deger, ad in [('hizmetler','Hizmetler'),
+                       ('calisma_saatleri','Çalışma Saatleri'), ('adres','Adres ve Ulaşım'),
+                       ('sss','Sık Sorulan Sorular'), ('genel','Genel')] %}
+  <option value="{{ deger }}" {% if deger == secili %}selected{% endif %}>{{ ad }}</option>
+  {% endfor %}
+</select>
+{% endmacro %}
+
 {% block icerik %}
+
+{% include "yonetici_sekmeler.html" %}
 
 <div class="baslik-satir">
   <div>
@@ -13,7 +29,7 @@
   <h2>Yeni bilgi ekle</h2>
   <p class="bos" style="margin-top:-8px">
     Buraya girdiğiniz bilgiler ajanın hastaya söyleyebileceği tek kaynaktır.
-    Kaydettiğiniz an geçerli olur.
+    Kaydettiğiniz an geçerli olur. Burada yazmayan hiçbir şeyi ajan söyleyemez.
   </p>
   <form method="post" action="/bilgi">
     <div class="satir">
@@ -23,14 +39,7 @@
       </div>
       <div>
         <label for="k">Kategori</label>
-        <select id="k" name="kategori">
-          <option value="fiyatlar">Fiyatlar</option>
-          <option value="hizmetler">Hizmetler</option>
-          <option value="calisma_saatleri">Çalışma Saatleri</option>
-          <option value="adres">Adres ve Ulaşım</option>
-          <option value="sss">Sık Sorulan Sorular</option>
-          <option value="genel">Genel</option>
-        </select>
+        {{ kategori_secim('k') }}
       </div>
     </div>
     <label for="i">İçerik</label>
@@ -56,6 +65,29 @@
         {% else %}
         <form method="post" action="/bilgi/{{ b.id }}/aktiflestir"><button class="sade">Aktifleştir</button></form>
         {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td colspan="5" style="padding-top:0">
+        {# <details>: JS yok, ayrı sayfa yok. Kapalıyken tablo bugünkü haliyle kalıyor. #}
+        <details>
+          <summary style="cursor:pointer;font-size:13px;opacity:.75">Düzenle</summary>
+          <form method="post" action="/bilgi/{{ b.id }}/guncelle" style="margin-top:10px">
+            <div class="satir">
+              <div>
+                <label for="b{{ b.id }}">Başlık</label>
+                <input id="b{{ b.id }}" name="baslik" value="{{ b.baslik }}" required>
+              </div>
+              <div>
+                <label for="k{{ b.id }}">Kategori</label>
+                {{ kategori_secim('k' ~ b.id, b.kategori) }}
+              </div>
+            </div>
+            <label for="i{{ b.id }}">İçerik</label>
+            <textarea id="i{{ b.id }}" name="icerik" required>{{ b.icerik }}</textarea>
+            <div style="margin-top:12px"><button>Güncelle</button></div>
+          </form>
+        </details>
       </td>
     </tr>
     {% endfor %}

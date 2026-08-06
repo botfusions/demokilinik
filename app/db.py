@@ -115,6 +115,33 @@ CREATE TABLE IF NOT EXISTS bilgi_tabani (
     guncelleme timestamptz NOT NULL DEFAULT now()
 );
 
+-- Hizmet fiyatları. Fiyatın TEK kaynağı burasıdır; bilgi_tabani'nda "fiyatlar"
+-- kategorisi yoktur. Aynı hizmetin iki yerde farklı fiyatla durması, ajanın
+-- hangisini söyleyeceğinin belirsiz kalması demekti.
+-- onceki_fiyat: panelde "% değişim" sütunu ve fiyat geçmişi için.
+CREATE TABLE IF NOT EXISTS hizmetler (
+    id           serial PRIMARY KEY,
+    ad           text NOT NULL UNIQUE,
+    fiyat        numeric(10, 2) NOT NULL CHECK (fiyat >= 0),
+    onceki_fiyat numeric(10, 2),
+    aktif        boolean NOT NULL DEFAULT true,
+    guncelleme   timestamptz NOT NULL DEFAULT now()
+);
+
+-- Kampanyalar. DİKKAT: bu bir duyuru/gönderim aracı DEĞİLDİR — hasta fiyat
+-- sorduğunda ajanın söyleyeceği indirimi tanımlar, kimseye kendiliğinden mesaj
+-- göndermez. Toplu mesaj yasağı için bkz. README § Toplu mesaj yasağı.
+-- hizmet_id NULL = tüm hizmetlere geçerli. bitis NULL = süresiz.
+CREATE TABLE IF NOT EXISTS kampanyalar (
+    id             serial PRIMARY KEY,
+    ad             text NOT NULL,
+    indirim_yuzde  integer NOT NULL CHECK (indirim_yuzde > 0 AND indirim_yuzde <= 100),
+    hizmet_id      integer REFERENCES hizmetler(id) ON DELETE CASCADE,
+    bitis          date,
+    aktif          boolean NOT NULL DEFAULT true,
+    olusturma      timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS baglanti_saglik (
     servis           text PRIMARY KEY,
     durum            text NOT NULL DEFAULT 'saglikli',

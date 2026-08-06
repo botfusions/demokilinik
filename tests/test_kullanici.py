@@ -191,13 +191,18 @@ def test_yanlis_parola_iceri_almaz(conn):
     assert c.get("/").status_code in (302, 303, 307)
 
 
-@pytest.mark.parametrize("yol", ["/", "/randevular", "/hastalar", "/bilgi", "/doktorlar"])
+@pytest.mark.parametrize("yol", ["/", "/randevular", "/hastalar", "/doktorlar"])
 def test_personel_gunluk_sayfalari_gorur(personel_istemci, yol):
     assert personel_istemci.get(yol).status_code == 200
 
 
 def test_personel_kullanicilari_goremez(personel_istemci):
     assert personel_istemci.get("/kullanicilar").status_code == 403
+
+
+def test_personel_bilgi_tabanini_goremez(personel_istemci):
+    """Ajanın söyleyeceği fiyat/garanti bilgisini değiştirmek yönetici işi."""
+    assert personel_istemci.get("/bilgi").status_code == 403
 
 
 def test_personel_doktor_ekleyemez(personel_istemci, conn):

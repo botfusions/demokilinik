@@ -84,6 +84,22 @@ def mesaj_gonder(telefon: str, metin: str) -> str:
         return y.json().get("messageId", "")
 
 
+def konum_gonder(telefon: str, enlem: float, boylam: float) -> str:
+    """Klinik konumunu iğne olarak gönderir.
+
+    Bu OpenWA sürümü yalnız enlem/boylam kabul ediyor — `name`/`address`
+    alanları 400 dönüyor, yani iğnenin üstünde etiket görünmez. Adres metni
+    ajanın cevabında ayrıca yazılı olduğu için sorun değil.
+    """
+    with _istemci() as c:
+        y = c.post(
+            f"/api/sessions/{oturum_id(c)}/messages/send-location",
+            json={"chatId": f"{telefon}@c.us", "latitude": enlem, "longitude": boylam},
+        )
+        y.raise_for_status()
+        return y.json().get("messageId", "")
+
+
 def oturum_durumu() -> str:
     """'ready' | 'disconnected' | 'qr_ready' | ... — sağlık nöbetçisi kullanır."""
     with _istemci() as c:

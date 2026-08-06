@@ -57,6 +57,100 @@ AJAN_PROVIDER=openai   AJAN_MODEL=gpt-5.6-luna     # canlı
 ./scripts/composio-ac.sh      # .env'deki anahtarları config.yaml'a işler
 ```
 
+## Fiyatlar ve kampanyalar
+
+Panel → **Fiyat ve Kampanya** (yalnız yönetici).
+
+**Fiyatın tek kaynağı `hizmetler` tablosudur.** Bilgi Tabanı'nda "Fiyatlar"
+kategorisi bilerek yoktur: aynı hizmet iki yerde farklı fiyatla yazılsaydı
+ajanın hangisini söyleyeceği belirsiz kalırdı. Mevcut kurulumda bir kez:
+
+```bash
+.venv/bin/python scripts/fiyat-goc.py --dene   # ne taşınacak, göster
+.venv/bin/python scripts/fiyat-goc.py          # taşı
+```
+
+Sayı ayıklanamayan kayıt silinmez, `genel` kategorisine alınır ve raporlanır.
+
+**Kampanya duyuru göndermez.** Yalnızca hasta fiyat sorduğunda ajanın söyleyeceği
+indirimi belirler; kimseye kendiliğinden mesaj gitmez. Toplu gönderim bu
+projede mimari olarak yasak (bkz. § Toplu mesaj yasağı) ve
+`test_kampanya_gonderim_yapmaz` her koşuda `app/hizmet.py`'de gönderim izi
+olmadığını denetler.
+
+Kampanya seçim kuralları — ajan aynı soruya iki kez farklı fiyat söylemesin diye
+kararlı: pasif ya da süresi geçmiş kampanya uygulanmaz; hizmete özel kampanya
+"tüm hizmetler" kampanyasına baskındır; aynı düzeyde birden çok aday varsa
+indirimi yüksek olan, eşitlikte önce tanımlanan seçilir.
+
+Fiyat ya da kampanya kaydedilince `.hermes.md` anında yeniden üretilir —
+restart gerekmez. Panelde "Ajan ne diyecek" sütunu, kaydetmeden önce hastaya
+gidecek cümleyi gösterir.
+
+## Konum gönderme
+
+Hasta adres veya yol tarifi sorduğunda ajan, yazılı cevabın arkasından WhatsApp
+harita iğnesi gönderir. Açmak için `.env`:
+
+```
+KLINIK_KONUM=40.9812,29.0578     # Google Haritalar'da pine sağ tıkla → iki sayı
+```
+
+Nasıl çalışıyor: ajan cevabının sonuna `[KONUM]` işareti koyar, köprü işareti
+siler (hastaya da panele de gitmez) ve iğneyi arkasından atar. Koordinat
+sabittir — **ajan koordinat üretmez**, uydurulmuş bir enlem/boylam hastayı
+yanlış adrese gönderirdi.
+
+`KLINIK_KONUM` boşsa iğne gitmez, adres yalnız yazıyla verilir; hiçbir şey
+bozulmaz. Instagram'da iğne yok (Composio araç setinde karşılığı yok), orada
+işaret yalnız temizlenir.
+
+Not: bu OpenWA sürümü konum mesajında yalnız enlem/boylam kabul ediyor —
+`name`/`address` alanları 400 dönüyor, yani iğnenin üstünde klinik adı yazmaz.
+
+## Instagram kanalı (yalnız bilgilendirme)
+
+Instagram DM'lerine ajan cevap verir, ama **yalnızca bilgi** verir:
+
+| | Instagram | WhatsApp |
+|---|---|---|
+| SSS, fiyat, çalışma saatleri | ✅ | ✅ |
+| Randevu açma / iptal | ❌ WhatsApp'a yönlendirir | ✅ |
+| Randevu hatırlatması | ❌ hiç gitmez | ✅ |
+
+Bu daraltma keyfi değil, iki teknik zorunluluk:
+
+1. **Composio'nun Instagram araç setinde trigger yok** — gelen DM'i haber veren
+   webhook yok, mesajlar yoklanıyor (varsayılan 30 sn). Bilgilendirme için sorun
+   değil; randevu çakışması için olurdu.
+2. **Instagram'da onaylı şablon yok** — 24 saatlik pencere dışında Meta serbest
+   metni reddeder. Randevudan 24 saat önce gidecek hatırlatma her zaman pencere
+   dışındadır, yani bu kanalda hatırlatma teknik olarak mümkün değil.
+
+Açmak için:
+
+```bash
+# 1. Composio'da Instagram'ı bağla (Business/Creator hesap şart)
+# 2. Araç adlarını doğrula — slug'lar belgelenmiş değil, Composio değiştirebilir
+.venv/bin/python -m app.instagram --kesfet
+# 3. .env: INSTAGRAM_KULLANICI, INSTAGRAM_HESAP_ID, KLINIK_WHATSAPP_NUMARASI
+# 4. Servisi yeniden başlat
+```
+
+Çıktı beklenenden farklıysa `.env`'deki `IG_ARAC_*` satırlarını düzeltin — kod
+değişmez. `INSTAGRAM_KULLANICI` boşken kanal tamamen kapalıdır: nöbetçi hiç
+başlamaz, Composio çağrısı yapılmaz, sağlık uyarısı çıkmaz.
+
+**İki kanalın bütçesi ayrıdır.** Giden mesaj tavanları (`GIDEN_SAATLIK_TAVAN`)
+yalnız WhatsApp mesajlarını sayar — amacı WhatsApp numarasının kapanmasını
+önlemek, ve Instagram cevapları o numaradan çıkmıyor. Yoğun bir Instagram günü
+gerçek randevu hatırlatmalarını durduramaz.
+
+**İki nöbetçi birden var, ikisi de gerekli:** `composio` bağlantının canlılığına
+bakar (OAuth düşerse yakalar), `instagram` yoklama döngüsünün canlılığına bakar.
+İkincisi olmasaydı bağlantı ACTIVE kalıp döngü sessizce ölebilir ve DM'ler
+cevapsız birikirdi. İkisi de panelde **Bağlantı Durumu** altında görünür.
+
 ## Testler
 
 ```bash

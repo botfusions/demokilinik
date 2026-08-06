@@ -117,12 +117,19 @@ def hatirlatmalari_iptal_et(conn: psycopg.Connection, randevu_id: int) -> None:
 # ── tavanlar ────────────────────────────────────────────────
 
 def giden_sayisi(conn: psycopg.Connection, saat: int = 1) -> int:
-    """Son N saatte gönderilen tüm giden mesajlar — hatırlatma + ajan cevapları."""
+    """Son N saatte WhatsApp'tan giden mesajlar — hatırlatma + ajan cevapları.
+
+    Yalnız `kanal='whatsapp'` sayılır. Tavanın amacı WhatsApp numarasının
+    kapanmasını önlemek; Instagram cevapları o numaradan çıkmıyor. Kanal filtresi
+    olmasaydı yoğun bir Instagram günü saatlik tavanı doldurur ve gerçek randevu
+    hatırlatmalarını durdururdu.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT count(*) FROM gorusmeler
-             WHERE yon = 'giden' AND olusturma >= now() - make_interval(hours => %s)
+             WHERE yon = 'giden' AND kanal = 'whatsapp'
+               AND olusturma >= now() - make_interval(hours => %s)
             """,
             (saat,),
         )

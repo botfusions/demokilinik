@@ -1,6 +1,6 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 171 test yeşil, QR bekliyor
+**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 253 test yeşil, QR bekliyor
 
 Yeni bir oturum bu dosyayı okuyarak devam edebilir. Gereksinimler `PRD.md`'de,
 düzeltilen kusurlar `KUSURLAR.md`'de, kullanım `README.md`'de.
@@ -25,6 +25,10 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 | Doktorlar + otomatik dağıtım | ✅ |
 | Kullanıcılar + roller + işlem izi | ✅ |
 | Randevu hatırlatmaları | ✅ kod hazır, canlıda hiç mesaj göndermedi |
+| Instagram (yalnız bilgilendirme) | ✅ kod hazır, ⏳ Composio anahtarı bekliyor |
+| Konum iğnesi | ✅ `.env`'de `KLINIK_KONUM` doldurulunca çalışır |
+| Panel yeni tasarım + Takvim + Fiyat/Kampanya | ✅ |
+| Bilgi tabanı (ekle/düzenle) | ✅ panelde, **yalnız yönetici** |
 | Composio (Takvim + Gmail) | ⏳ **anahtar bekliyor** — bu olmadan takvim/mail adımı çalışmaz |
 | WhatsApp QR | ⏳ **müşteri okutacak** |
 | VPS | ⏳ scriptler hazır, çıkılmadı |
@@ -51,7 +55,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 171 test, hiçbiri LLM çağırmaz
+.venv/bin/python -m pytest        # 253 test, hiçbiri LLM çağırmaz
 ```
 
 ## Bilinmesi gerekenler
@@ -63,6 +67,23 @@ Başka bir makinede ilk koşudan önce:
 
 **Hatırlatma nöbetçisi varsayılan olarak açık.** QR okutulunca gerçek hastalara
 mesaj gitmeye başlar. Test ederken `.env`'e `HATIRLATMA_NOBETCISI=0`.
+
+**Fiyatın tek kaynağı `hizmetler` tablosu.** `bilgi_tabani`'nda "fiyatlar"
+kategorisi yok — iki kaynak olsaydı ajan hangi fiyatı söyleyeceğini bilemezdi.
+Eski kurulumda bir kez `scripts/fiyat-goc.py` çalıştırılmalı.
+
+**Kampanya duyuru göndermez**, yalnız cevaptaki fiyata yansır.
+`test_kampanya_gonderim_yapmaz` bunu denetler — toplu mesaj yasağının kardeşi.
+
+**Ajan konu dışına çıkmaz.** `SOUL.md` § Konu kilidi: klinikle ilgisi olmayan
+soruda sabit ret cümlesi. Konu **içi** listesi de orada yazılı (otopark, ödeme,
+ulaşım dahil) — kapsamı daraltırken hastanın bilmeye hakkı olan şeyleri kesme.
+Bilgi tabanında olmayan klinik sorusu ret değil, "personelimiz size dönecek".
+
+**Instagram randevu açmaz, hatırlatma göndermez.** Kapsam bilinçli dar; nedeni
+`app/instagram.py` başındaki açıklamada ve README § Instagram kanalı'nda.
+`test_bu_kanaldan_randevu_olusmaz` bunu her koşuda denetler. Kanal `.env`'de
+`INSTAGRAM_KULLANICI` boşken tamamen kapalıdır.
 
 **Toplu mesaj mimari olarak yasak.** Detay `README.md` § Toplu mesaj yasağı.
 `test_toplu_gonderim_fonksiyonu_yok` bu kuralı her koşuda denetler — kasıtlıdır,
@@ -115,17 +136,22 @@ app/kb.py         bilgi tabanı → .hermes.md
 app/ajan.py       hermes -z köprüsü
 app/openwa.py     WhatsApp istemcisi + HMAC doğrulama
 app/hatirlatma.py randevu hatırlatmaları + giden mesaj kilitleri
+app/instagram.py  Instagram DM — yalnız bilgilendirme, yoklamalı
+app/hizmet.py     fiyat listesi + kampanyalar (gönderim YOK)
+app/static/       panel.css, panel.js (tema + mobil çekmece)
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
 app/saglik.py     bağlantı nöbetçisi (Composio + WhatsApp)
 hermes-home/      ajanın kimliği (SOUL.md), yapılandırması, 3 skill
-tests/            171 test, LLM'siz
+tests/            253 test, LLM'siz
 scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme, composio
 ```
 
 ## Son doğrulama (2026-08-06)
 
-- 171 test yeşil
-- Panel 6 sayfa 200 dönüyor, rol ayrımı tutuyor (personel → 403)
+- 253 test yeşil
+- Panel 9 sayfa 200 dönüyor, rol ayrımı tutuyor (personel → 403)
+- Fiyat/kampanya panelden kaydedilince ajan yeni fiyatı söylüyor (canlı denendi)
+- Ajan konu dışı soruya sabit ret cümlesi veriyor, konu içi soruyu cevaplıyor
 - Ajan bilgi tabanından cevap veriyor, teşhis/ilaç sorularını reddediyor
 - Aynı saate 3 hasta → 3 farklı hekim; 4. → "müsait doktor yok"
 - Randevu açılınca 24s + 1s hatırlatma planlanıyor; iptalde düşüyor

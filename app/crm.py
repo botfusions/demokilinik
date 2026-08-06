@@ -78,21 +78,24 @@ def gorusme_ekle(
     mesaj: str,
     wa_message_id: str | None = None,
     maliyet_usd: float | None = None,
+    kanal: str = "whatsapp",
 ) -> int | None:
     """Görüşmeyi kaydeder. Aynı wa_message_id ikinci kez gelirse None döner.
 
     OpenWA teslimatı at-least-once; aynı mesaj için iki kez cevap yazmamak
-    tekrar teslimatın burada durdurulmasına bağlı.
+    tekrar teslimatın burada durdurulmasına bağlı. Instagram yoklaması da aynı
+    kilidi kullanıyor: orada her turda aynı mesajlar tekrar okunur, ikinci kez
+    cevap yazılmamasını bu tekil indeks sağlar.
     """
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO gorusmeler (kisi_id, yon, mesaj, wa_message_id, maliyet_usd)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO gorusmeler (kisi_id, yon, mesaj, wa_message_id, maliyet_usd, kanal)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (wa_message_id) DO NOTHING
             RETURNING id
             """,
-            (kisi_id, yon, mesaj, wa_message_id, maliyet_usd),
+            (kisi_id, yon, mesaj, wa_message_id, maliyet_usd, kanal),
         )
         satir = cur.fetchone()
     conn.commit()
@@ -216,6 +219,27 @@ def randevu_durum_yaz(
             (durum, google_event_id, randevu_id),
         )
     conn.commit()
+
+
+def randevular_araliginda(conn: psycopg.Connection, bas, bit) -> list[dict]:
+    """[bas, bit) aralığındaki randevular. Haftalık takvim ızgarası bunu kullanır.
+
+    İptaller dışarıda: takvimde iptal edilmiş bir randevunun blok kaplaması,
+    o saatin dolu olduğu izlenimi verirdi.
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT r.*, k.ad, k.telefon, d.ad AS doktor_ad
+              FROM randevular r
+              JOIN kisiler k ON k.id = r.kisi_id
+              LEFT JOIN doktorlar d ON d.id = r.doktor_id
+             WHERE r.baslangic >= %s AND r.baslangic < %s AND r.durum <> 'iptal'
+             ORDER BY r.baslangic
+            """,
+            (bas, bit),
+        )
+        return cur.fetchall()
 
 
 def randevular_listele(conn: psycopg.Connection, gun=None) -> list[dict]:

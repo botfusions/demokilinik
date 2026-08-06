@@ -1,0 +1,127 @@
+{% extends "temel.html" %}
+{% block baslik %}Fiyat ve Kampanya — {{ klinik_adi }}{% endblock %}
+{% block icerik %}
+
+{% include "yonetici_sekmeler.html" %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>Fiyat ve Kampanya</h1>
+    <div class="alt-baslik">Buradaki değişiklikler ajanın hastaya söylediği fiyata anında yansır</div>
+  </div>
+</div>
+
+{% if hata %}<div class="hata">{{ hata }}</div>{% endif %}
+
+<!-- ── Kampanyalar ── -->
+<div class="kart">
+  <h2>Kampanyalar</h2>
+  <p class="bos" style="margin-top:-4px">
+    Kampanya <b>duyuru göndermez</b>. Yalnızca hasta fiyat sorduğunda ajanın
+    söyleyeceği indirimi belirler — kimseye kendiliğinden mesaj gitmez.
+  </p>
+
+  <form method="post" action="/kampanya" style="margin:16px 0">
+    <div class="satir">
+      <div>
+        <label for="ka">Kampanya adı</label>
+        <input id="ka" name="ad" placeholder="Örn: Yaz Kampanyası" required>
+      </div>
+      <div>
+        <label for="ki">İndirim (%)</label>
+        <input id="ki" name="indirim" type="number" min="1" max="100" value="10" required>
+      </div>
+      <div>
+        <label for="kh">Kapsam</label>
+        <select id="kh" name="hizmet_id">
+          <option value="">Tüm hizmetler</option>
+          {% for h in hizmetler %}<option value="{{ h.id }}">{{ h.ad }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="kb">Bitiş (boş = süresiz)</label>
+        <input id="kb" name="bitis" type="date">
+      </div>
+    </div>
+    <div style="margin-top:12px"><button>Kampanya ekle</button></div>
+  </form>
+
+  {% if kampanyalar %}
+  <div class="kaydir"><table>
+    <thead><tr><th>Kampanya</th><th>İndirim</th><th>Kapsam</th><th>Geçerlilik</th><th>Durum</th><th></th></tr></thead>
+    <tbody>
+    {% for k in kampanyalar %}
+      <tr>
+        <td>{{ k.ad }}</td>
+        <td>%{{ k.indirim_yuzde }}</td>
+        <td>{{ k.hizmet_ad or 'Tüm hizmetler' }}</td>
+        <td>{{ k.bitis.strftime('%d.%m.%Y') if k.bitis else 'süresiz' }}</td>
+        <td>
+          {% if not k.aktif %}<span class="rozet pasif">kapalı</span>
+          {% elif k.bitis and k.bitis < bugun_tarih %}<span class="rozet pasif">süresi doldu</span>
+          {% else %}<span class="rozet aktif">geçerli</span>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="/kampanya/{{ k.id }}/durum">
+            <input type="hidden" name="aktif" value="{{ '0' if k.aktif else '1' }}">
+            <button class="sade">{{ 'Kapat' if k.aktif else 'Aç' }}</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="bos">Kampanya yok — fiyatlar liste fiyatı olarak söylenir.</p>{% endif %}
+</div>
+
+<!-- ── Fiyat listesi ── -->
+<div class="kart">
+  <h2>Fiyat listesi</h2>
+  <p class="bos" style="margin-top:-4px">
+    Fiyatın tek kaynağı burasıdır. "Ajan ne diyecek" sütunu, kaydettiğiniz
+    fiyatın hastaya nasıl gideceğini gösterir.
+  </p>
+
+  <form method="post" action="/hizmet" style="margin:16px 0">
+    <div class="satir">
+      <div>
+        <label for="ha">Hizmet</label>
+        <input id="ha" name="ad" placeholder="Örn: Diş taşı temizliği" required>
+      </div>
+      <div>
+        <label for="hf">Fiyat (₺)</label>
+        <input id="hf" name="fiyat" type="number" min="0" step="50" required>
+      </div>
+    </div>
+    <div style="margin-top:12px"><button>Hizmet ekle</button></div>
+  </form>
+
+  {% if hizmetler %}
+  <form method="post" action="/hizmet/fiyatlar">
+    <div class="kaydir"><table>
+      <thead><tr><th>Hizmet</th><th>Fiyat (₺)</th><th>Değişim</th><th>Son güncelleme</th><th>Ajan ne diyecek</th></tr></thead>
+      <tbody>
+      {% for h in hizmetler %}
+        <tr>
+          <td>{{ h.ad }}</td>
+          <td><input name="fiyat_{{ h.id }}" type="number" min="0" step="50" value="{{ h.fiyat | round | int }}" style="width:120px"></td>
+          <td>
+            {% if h.onceki_fiyat and h.onceki_fiyat != h.fiyat %}
+              {% set fark = ((h.fiyat - h.onceki_fiyat) / h.onceki_fiyat * 100) | round | int %}
+              <span class="rozet">{{ '+' if fark > 0 }}{{ fark }}%</span>
+            {% else %}<span class="bos">—</span>{% endif %}
+          </td>
+          <td class="bos">{{ h.guncelleme.strftime('%d.%m.%Y') }}</td>
+          <td class="bos">{{ onizleme[h.id] }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div style="margin-top:14px"><button>Değişiklikleri kaydet</button></div>
+  </form>
+  {% else %}
+  <p class="bos">Hizmet girilmemiş. Ajan fiyat sorusuna "personelimiz size dönecek" der.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

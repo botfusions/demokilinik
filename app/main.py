@@ -8,19 +8,20 @@ X-Ic-Anahtar (ajanın CRM'e yazması). Biri diğerini açmaz.
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeSerializer
 
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, hatirlatma, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, hatirlatma, instagram, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -47,9 +48,20 @@ from app.crm import (  # noqa: E402
     randevu_iptal,
     randevu_durum_yaz,
     randevu_olustur,
+    randevular_araliginda,
     randevular_listele,
 )
 from app.db import baglan, sema_kur  # noqa: E402
+from app.hizmet import (  # noqa: E402
+    HizmetVar,
+    fiyat_guncelle,
+    fiyat_metni,
+    hizmet_ekle,
+    hizmetler_listele,
+    kampanya_durum_yaz,
+    kampanya_ekle,
+    kampanyalar_listele,
+)
 from app.kullanici import (  # noqa: E402
     KullaniciVar,
     ParolaZayif,
@@ -65,6 +77,7 @@ from app.kullanici import (  # noqa: E402
 )
 from app.kb import (  # noqa: E402
     bilgi_ekle,
+    bilgi_guncelle,
     bilgi_aktiflestir,
     bilgi_pasiflestir,
     bilgiler_listele,
@@ -99,12 +112,23 @@ async def yasam(app: FastAPI):
         gorevler.append(asyncio.create_task(saglik.nobetci(baglan)))
     if os.environ.get("HATIRLATMA_NOBETCISI", "1") == "1":
         gorevler.append(asyncio.create_task(hatirlatma.nobetci(baglan)))
+    # Instagram yapılandırılmamışsa nöbetçi hiç başlamaz — boşa Composio çağrısı
+    # yapmaz, sağlık nöbetçisi de bu kanal için alarm çalmaz.
+    if os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1" and instagram.yapilandirildi_mi():
+        gorevler.append(asyncio.create_task(instagram.nobetci(baglan)))
+        log.info("Instagram bilgilendirme kanalı açık (%d sn aralık)", instagram.ARALIK_SN)
     yield
     for g in gorevler:
         g.cancel()
 
 
 app = FastAPI(title="Klinik Resepsiyonist", lifespan=yasam)
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
+
+# Panel başlığı ve marka. Her kliniğe ayrı kurulum yapıldığı için tek değişken yeter.
+KLINIK_ADI = os.environ.get("KLINIK_ADI", "Klinik Paneli")
+# Jinja global: her şablona ayrı ayrı context'e koymak yerine tek yerden.
+sablonlar.env.globals["klinik_adi"] = KLINIK_ADI
 
 
 def db():
@@ -241,7 +265,7 @@ def ozet(request: Request, conn=Depends(db)):
     })
 
 
-@app.get("/bilgi", response_class=HTMLResponse, dependencies=[Depends(personel)])
+@app.get("/bilgi", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
 def bilgi_sayfasi(request: Request, conn=Depends(db)):
     return sablonlar.TemplateResponse(request, "bilgi.html", {
         "sayfa": "bilgi",
@@ -251,7 +275,7 @@ def bilgi_sayfasi(request: Request, conn=Depends(db)):
     })
 
 
-@app.post("/bilgi", dependencies=[Depends(personel)])
+@app.post("/bilgi", dependencies=[Depends(yonetici)])
 def bilgi_kaydet(
     request: Request, baslik: str = Form(...), icerik: str = Form(...), kategori: str = Form("genel"),
     conn=Depends(db),
@@ -262,7 +286,18 @@ def bilgi_kaydet(
     return RedirectResponse("/bilgi", status_code=303)
 
 
-@app.post("/bilgi/{bilgi_id}/pasiflestir", dependencies=[Depends(personel)])
+@app.post("/bilgi/{bilgi_id}/guncelle", dependencies=[Depends(yonetici)])
+def bilgi_duzenle(
+    request: Request, bilgi_id: int, baslik: str = Form(...), icerik: str = Form(...),
+    kategori: str = Form("genel"), conn=Depends(db),
+):
+    bilgi_guncelle(conn, bilgi_id, baslik, icerik, kategori)
+    hermes_md_yaz(conn, HERMES_MD)
+    islem_yaz(conn, _kim(request), "bilgi düzenledi", f"#{bilgi_id} {baslik}")
+    return RedirectResponse("/bilgi", status_code=303)
+
+
+@app.post("/bilgi/{bilgi_id}/pasiflestir", dependencies=[Depends(yonetici)])
 def bilgi_kapat(request: Request, bilgi_id: int, conn=Depends(db)):
     bilgi_pasiflestir(conn, bilgi_id)
     hermes_md_yaz(conn, HERMES_MD)
@@ -270,12 +305,133 @@ def bilgi_kapat(request: Request, bilgi_id: int, conn=Depends(db)):
     return RedirectResponse("/bilgi", status_code=303)
 
 
-@app.post("/bilgi/{bilgi_id}/aktiflestir", dependencies=[Depends(personel)])
+@app.post("/bilgi/{bilgi_id}/aktiflestir", dependencies=[Depends(yonetici)])
 def bilgi_ac(request: Request, bilgi_id: int, conn=Depends(db)):
     bilgi_aktiflestir(conn, bilgi_id)
     hermes_md_yaz(conn, HERMES_MD)
     islem_yaz(conn, _kim(request), "bilgi aktifleştirdi", f"#{bilgi_id}")
     return RedirectResponse("/bilgi", status_code=303)
+
+
+# ── takvim ──────────────────────────────────────────────────
+
+# Hekim renkleri: listedeki sıraya göre deterministik atanır. Rastgele ya da
+# id'ye göre modüler seçim, doktor eklenince tüm renklerin kaymasına yol açardı;
+# personel takvimi renkten tanıyor.
+DOKTOR_RENKLERI = ["#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4", "#8b5cf6"]
+
+
+def hafta_basi(gun: date) -> date:
+    """O günün içinde bulunduğu haftanın pazartesisi."""
+    return gun - timedelta(days=gun.isoweekday() - 1)
+
+
+@app.get("/takvim", response_class=HTMLResponse, dependencies=[Depends(personel)])
+def takvim_sayfasi(request: Request, hafta: str = "", conn=Depends(db)):
+    bas = hafta_basi(date.fromisoformat(hafta) if hafta else date.today())
+    bit = bas + timedelta(days=7)
+
+    doktorlar = doktorlar_listele(conn, yalniz_aktif=True)
+    renk = {d["id"]: DOKTOR_RENKLERI[i % len(DOKTOR_RENKLERI)]
+            for i, d in enumerate(doktorlar)}
+
+    return sablonlar.TemplateResponse(request, "takvim.html", {
+        "sayfa": "takvim",
+        "kullanici": _kim(request),
+        "randevular": randevular_araliginda(conn, bas, bit),
+        "doktorlar": doktorlar,
+        "renk": renk,
+        "gunler": [bas + timedelta(days=i) for i in range(7)],
+        "saatler": list(range(9, 19)),
+        "bugun": date.today(),
+        "hafta_bas": bas,
+        "onceki": (bas - timedelta(days=7)).isoformat(),
+        "sonraki": bit.isoformat(),
+        # Composio anahtarı yokken eşitleme düğmesi pasif kalır; sahte
+        # "eşitlendi" göstermek personeli yanıltırdı.
+        "takvim_bagli": bool(os.environ.get("COMPOSIO_API_KEY")),
+        "saglik": saglik.saglik_ozeti(conn),
+    })
+
+
+# ── yönetici: fiyat ve kampanya ─────────────────────────────
+
+@app.get("/yonetici", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
+def yonetici_sayfasi(request: Request, hata: str = "", conn=Depends(db)):
+    hizmetler = hizmetler_listele(conn)
+    gecerli = kampanyalar_listele(conn, yalniz_gecerli=True)
+    return sablonlar.TemplateResponse(request, "yonetici.html", {
+        "sayfa": "yonetici",
+        "kullanici": _kim(request),
+        "hizmetler": hizmetler,
+        "kampanyalar": kampanyalar_listele(conn),
+        # Panelde "ajan bunu şöyle söyleyecek" satırı — fiyatın hastaya nasıl
+        # gideceğini kaydetmeden önce görmek, yanlış kampanyayı yakalatır.
+        "onizleme": {h["id"]: fiyat_metni(h, gecerli) for h in hizmetler},
+        "bugun_tarih": date.today(),
+        "hata": hata,
+        "saglik": saglik.saglik_ozeti(conn),
+    })
+
+
+@app.post("/hizmet", dependencies=[Depends(yonetici)])
+def hizmet_kaydet(request: Request, ad: str = Form(...), fiyat: float = Form(...),
+                  conn=Depends(db)):
+    try:
+        hid = hizmet_ekle(conn, ad, fiyat)
+    except HizmetVar as e:
+        return RedirectResponse(f"/yonetici?hata={e}", status_code=303)
+    hermes_md_yaz(conn, HERMES_MD)
+    islem_yaz(conn, _kim(request), "hizmet ekledi", f"#{hid} {ad} {fiyat}")
+    return RedirectResponse("/yonetici", status_code=303)
+
+
+@app.post("/hizmet/fiyatlar", dependencies=[Depends(yonetici)])
+async def fiyatlari_kaydet(request: Request, conn=Depends(db)):
+    """Fiyat listesinin toplu kaydı — form `fiyat_<id>` alanlarıyla gelir."""
+    form = await request.form()
+    degisen = []
+    for anahtar, deger in form.items():
+        if not anahtar.startswith("fiyat_"):
+            continue
+        try:
+            hid, yeni = int(anahtar[6:]), float(deger)
+        except ValueError:
+            continue
+        if fiyat_guncelle(conn, hid, yeni):
+            degisen.append(f"#{hid}={yeni:g}")
+
+    if degisen:
+        hermes_md_yaz(conn, HERMES_MD)
+        islem_yaz(conn, _kim(request), "fiyat güncelledi", ", ".join(degisen))
+    return RedirectResponse("/yonetici", status_code=303)
+
+
+@app.post("/kampanya", dependencies=[Depends(yonetici)])
+def kampanya_kaydet(request: Request, ad: str = Form(...), indirim: int = Form(...),
+                    hizmet_id: str = Form(""), bitis: str = Form(""), conn=Depends(db)):
+    if not 1 <= indirim <= 100:
+        return RedirectResponse("/yonetici?hata=İndirim 1-100 arası olmalı", status_code=303)
+
+    kid = kampanya_ekle(
+        conn, ad, indirim,
+        hizmet_id=int(hizmet_id) if hizmet_id else None,
+        bitis=date.fromisoformat(bitis) if bitis else None,
+    )
+    hermes_md_yaz(conn, HERMES_MD)
+    islem_yaz(conn, _kim(request), "kampanya ekledi", f"#{kid} {ad} %{indirim}")
+    return RedirectResponse("/yonetici", status_code=303)
+
+
+@app.post("/kampanya/{kampanya_id}/durum", dependencies=[Depends(yonetici)])
+def kampanya_durum(request: Request, kampanya_id: int, aktif: str = Form(""),
+                   conn=Depends(db)):
+    acik = aktif == "1"
+    kampanya_durum_yaz(conn, kampanya_id, acik)
+    hermes_md_yaz(conn, HERMES_MD)
+    islem_yaz(conn, _kim(request), "kampanya " + ("açtı" if acik else "kapattı"),
+              f"#{kampanya_id}")
+    return RedirectResponse("/yonetici", status_code=303)
 
 
 @app.get("/randevular", response_class=HTMLResponse, dependencies=[Depends(personel)])
@@ -690,10 +846,21 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
             log.error("Ajan cevap üretemedi (%s): %s", telefon, e)
             yanit, maliyet = HATA_MESAJI, None
 
+        yanit, konum_istendi = ajan.konum_ayikla(yanit)
+
         # Önce kaydet, sonra gönder: WhatsApp'a ulaşılamazsa bile personel
         # panelde ajanın ne dediğini görebilmeli.
         gorusme_ekle(conn, kid, "giden", yanit, maliyet_usd=maliyet)
         openwa.mesaj_gonder(telefon, yanit)
+
+        # Konum iğnesi metinden SONRA gider: hasta önce adresi okur, sonra
+        # haritayı görür. Konum tanımlı değilse sessizce atlanır — adres zaten
+        # cevabın içinde yazılı.
+        if konum_istendi and (koordinat := ajan.klinik_konumu()):
+            try:
+                openwa.konum_gonder(telefon, *koordinat)
+            except Exception as e:
+                log.warning("Konum gönderilemedi (%s): %s", telefon, e)
     except Exception as e:
         log.exception("Mesaj işlenemedi (%s): %s", telefon, e)
     finally:
