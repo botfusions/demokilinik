@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from app import hafif
+
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 ZAMAN_ASIMI = int(os.environ.get("AJAN_ZAMAN_ASIMI", "120"))
 
@@ -89,7 +91,16 @@ def klinik_konumu() -> tuple[float, float] | None:
 
 def cevap_uret(gecmis: list[dict], mesaj: str,
                kanal: str = "whatsapp") -> tuple[str, float | None]:
-    """(yanıt, maliyet_usd) döner. Başarısızlıkta CevapUretilemedi."""
+    """(yanıt, maliyet_usd) döner. Başarısızlıkta CevapUretilemedi.
+
+    Bilgi soruları Hermes'e hiç uğramaz — `hafif.py` aynı kimlik ve bilgi
+    tabanıyla doğrudan cevap üretir, prompt'un %78'ini oluşturan araç
+    çerçevesini ödemeden. Kapı buraya konuldu ki WhatsApp ve Instagram
+    yollarının ikisi de kapsansın; çağıranlarda tekrar kontrol yok.
+    """
+    if (hafif_yanit := hafif.cevap_dene(gecmis, mesaj, kanal)) is not None:
+        return hafif_yanit
+
     prompt = prompt_hazirla(gecmis, mesaj, kanal)
 
     ortam = os.environ.copy()

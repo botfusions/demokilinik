@@ -1,6 +1,6 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 269 test yeşil, QR bekliyor
+**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 291 test yeşil, QR bekliyor
 
 Yeni bir oturum bu dosyayı okuyarak devam edebilir. Gereksinimler `PRD.md`'de,
 düzeltilen kusurlar `KUSURLAR.md`'de, kullanım `README.md`'de.
@@ -22,6 +22,7 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 | Panel (dark, grafikli) | ✅ |
 | Hermes ajanı (klasöre özel) | ✅ bilgi tabanından cevap veriyor, sınırları tutuyor |
 | Klinik MCP araçları (kabuksuz) | ✅ 7 araç, `terminal` kapalı |
+| Hafif yol (bilgi soruları) | ✅ Hermes'siz, %68 daha az token |
 | Köprü (webhook ↔ ajan ↔ WhatsApp) | ✅ OpenWA'nın gerçek HMAC imzası doğrulandı |
 | Doktorlar + otomatik dağıtım | ✅ |
 | Kullanıcılar + roller + işlem izi | ✅ |
@@ -56,7 +57,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 269 test, hiçbiri LLM çağırmaz
+.venv/bin/python -m pytest        # 291 test, hiçbiri LLM çağırmaz
 ```
 
 ## Bilinmesi gerekenler
@@ -99,6 +100,19 @@ kullanılmayan 16 tool şemasıydı, hastanın mesajı %0,09. `config.yaml`'daki
 Bir toolset'i geri açmadan önce `hermes prompt-size` ile ölç — `computer_use`
 tek başına 9,7 KB. Kalan `skill_manage` 4,4 KB Hermes'in granülerlik sınırı,
 tek tool kapatılamıyor.
+
+**Bilgi soruları Hermes'e uğramaz.** `app/hafif.py` aynı `SOUL.md` ve aynı
+bilgi tabanıyla doğrudan API'ye gider: 6.915 → 2.210 token (%68 az). Randevu
+işi Hermes'te kalır çünkü araçlar orada. Üç kapı da "şüphede Hermes'e" yönünde
+— yanlış yönün bedeli asimetrik: bilgi sorusu Hermes'e giderse yalnız pahalı
+olur, randevu isteği hafif yola düşerse hasta boşa çevrilir. Kapılar:
+mesajdaki randevu sinyali, geçmişte randevu konuşulmuş olması, modelin kendi
+`[RANDEVU]` işareti. API hatası olursa sessizce Hermes'e düşer, hasta farkı
+görmez. `.env`'de `HAFIF_YOL=0` ile tamamen kapatılır.
+
+**Sinyal listesinde `saat` ve `gün` bilerek yok.** "Çalışma saatleriniz nedir"
+tam da hafif yolda kalmasını istediğimiz soru. Randevu bağlamı kelime
+listesiyle değil, geçmiş kapısıyla yakalanıyor. Listeyi genişletirken bunu boz.
 
 **Ajanın kabuk yetkisi yok.** Randevu işlemleri `scripts/klinik-mcp.py`'deki 7
 araçla sınırlı (`mcp_servers.klinik`); skill'ler eskiden `curl` yazıyordu ve bu
@@ -157,7 +171,8 @@ yazması). Biri diğerini açmaz — yönetici oturumu bile iç API'yi açmıyor
 app/main.py       webhook + panel + iç API
 app/crm.py        kişi, görüşme, randevu, doktor (çakışma kuralları burada)
 app/kb.py         bilgi tabanı → .hermes.md
-app/ajan.py       hermes -z köprüsü
+app/ajan.py       hermes -z köprüsü + hafif yol kapısı
+app/hafif.py      bilgi soruları için Hermes'siz cevap
 app/openwa.py     WhatsApp istemcisi + HMAC doğrulama
 app/hatirlatma.py randevu hatırlatmaları + giden mesaj kilitleri
 app/instagram.py  Instagram DM — yalnız bilgilendirme, yoklamalı
@@ -166,16 +181,19 @@ app/static/       panel.css, panel.js (tema + mobil çekmece)
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
 app/saglik.py     bağlantı nöbetçisi (Composio + WhatsApp)
 hermes-home/      ajanın kimliği (SOUL.md), yapılandırması, 3 skill
-tests/            269 test, LLM'siz
+tests/            291 test, LLM'siz
 scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme, composio
 scripts/klinik-mcp.py  ajanın 7 randevu aracı (kabuk yerine)
 ```
 
 ## Son doğrulama (2026-08-06)
 
-- 269 test yeşil
+- 291 test yeşil
 - Ajan kabuksuz çalışıyor: doktor seçimi, uygunluk, randevu yazma ve iptal
   `terminal` kapalıyken MCP araçlarıyla yürüdü (canlı denendi)
+- Hafif yol canlı denendi: çalışma saati, implant süresi ve otopark soruları
+  2.210 token'da doğru cevaplandı; konu dışı soru orada da reddedildi,
+  "randevu almak istiyorum" Hermes'e devredildi
 - Panel 9 sayfa 200 dönüyor, rol ayrımı tutuyor (personel → 403)
 - Fiyat/kampanya panelden kaydedilince ajan yeni fiyatı söylüyor (canlı denendi)
 - Ajan konu dışı soruya sabit ret cümlesi veriyor, konu içi soruyu cevaplıyor
