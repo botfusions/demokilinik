@@ -1,6 +1,6 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 253 test yeşil, QR bekliyor
+**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 269 test yeşil, QR bekliyor
 
 Yeni bir oturum bu dosyayı okuyarak devam edebilir. Gereksinimler `PRD.md`'de,
 düzeltilen kusurlar `KUSURLAR.md`'de, kullanım `README.md`'de.
@@ -21,6 +21,7 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 | CRM + bilgi tabanı | ✅ |
 | Panel (dark, grafikli) | ✅ |
 | Hermes ajanı (klasöre özel) | ✅ bilgi tabanından cevap veriyor, sınırları tutuyor |
+| Klinik MCP araçları (kabuksuz) | ✅ 7 araç, `terminal` kapalı |
 | Köprü (webhook ↔ ajan ↔ WhatsApp) | ✅ OpenWA'nın gerçek HMAC imzası doğrulandı |
 | Doktorlar + otomatik dağıtım | ✅ |
 | Kullanıcılar + roller + işlem izi | ✅ |
@@ -55,7 +56,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 253 test, hiçbiri LLM çağırmaz
+.venv/bin/python -m pytest        # 269 test, hiçbiri LLM çağırmaz
 ```
 
 ## Bilinmesi gerekenler
@@ -94,11 +95,26 @@ kullanılmıyor ve kullanılmamalı.
 
 **Tool şemaları maliyetin en büyük kalemiydi.** Ölçümde toplam prompt'un %69'u
 kullanılmayan 16 tool şemasıydı, hastanın mesajı %0,09. `config.yaml`'daki
-`disabled_toolsets` bunu 5 tool'a indirdi: mesaj başına 16.445 → 6.915 input
-token. Yalnız `terminal` (skill'ler CRM API'sini curl ile çağırıyor) ve `skills`
-açık. Bir toolset'i geri açmadan önce `hermes prompt-size` ile ölç — `computer_use`
+`disabled_toolsets` bunu 3'e indirdi: mesaj başına 16.445 → 6.915 input token.
+Bir toolset'i geri açmadan önce `hermes prompt-size` ile ölç — `computer_use`
 tek başına 9,7 KB. Kalan `skill_manage` 4,4 KB Hermes'in granülerlik sınırı,
 tek tool kapatılamıyor.
+
+**Ajanın kabuk yetkisi yok.** Randevu işlemleri `scripts/klinik-mcp.py`'deki 7
+araçla sınırlı (`mcp_servers.klinik`); skill'ler eskiden `curl` yazıyordu ve bu
+`terminal` toolset'ini zorunlu kılıyordu — prompt'a sızacak bir talimat kabuk
+komutu çalıştırabilirdi. Araçlar mevcut `/api/*` uçlarını çağırıyor, iş mantığı
+orada; MCP katmanı yalnız aktarıyor. `test_mcp.py` liste genişlemesini ve
+`terminal`'in geri açılmasını denetliyor.
+
+**MCP alt süreci ortam değişkeni miras almıyor.** `klinik-mcp.py` `IC_API_ANAHTARI`'nı
+`.env`'den kendisi okuyor; `config.yaml` git'te takip edildiği için sır oraya
+yazılamaz. Anahtar okunmazsa ajan "Geçersiz iç anahtar" alır ve hastaya sistem
+hatası der.
+
+**`hermes mcp add` kullanma.** `config.yaml`'ı yeniden yazıyor: bütün yorumlar
+siliniyor, `--env` bayrağı `args` listesine yutuluyor (Hermes CLI hatası).
+MCP sunucusu eklerken `config.yaml`'ı elle düzenle.
 
 **Postgres 5434'te.** 5432/5433 makinede başka projelerde dolu.
 
@@ -150,8 +166,9 @@ app/static/       panel.css, panel.js (tema + mobil çekmece)
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
 app/saglik.py     bağlantı nöbetçisi (Composio + WhatsApp)
 hermes-home/      ajanın kimliği (SOUL.md), yapılandırması, 3 skill
-tests/            253 test, LLM'siz
+tests/            269 test, LLM'siz
 scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme, composio
+scripts/klinik-mcp.py  ajanın 7 randevu aracı (kabuk yerine)
 ```
 
 ## Son doğrulama (2026-08-06)

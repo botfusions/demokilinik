@@ -29,10 +29,7 @@ Hasta randevu istediğinde, tarih/saat/doktor sorduğunda, "gelebilir miyim",
 
 İlk iş: hastanın daha önce hangi doktora gittiğine bak.
 
-```
-curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  "http://localhost:8000/api/doktorlar?telefon=905321112233"
-```
+`doktorlari_getir` aracını çağır (`telefon`: hastanın numarası).
 
 Dönen cevap:
 - `doktorlar` → klinikte çalışan aktif hekimler (ad + uzmanlık)
@@ -67,25 +64,19 @@ yoksa (ayrılmış ya da pasif) nazikçe söyle ve alternatif sun.
 Hasta ağrı, şişlik, kırık diş, düşen dolgu gibi bir şikayet anlatıyorsa bu **acil**
 sayılır. Teşhis koyma, ama en erken slotu ara:
 
-```
-curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  "http://localhost:8000/api/en-erken?sure_dk=30"
-```
+`en_erken_musait` aracını çağır (`sure_dk`: 30).
 
 `bulundu: true` ise dönen `baslangic`, `bitis` ve `doktor_id`'yi kullan:
 > En erken bugün 15:30'da Dr. Nihal Erdoğan'a alabiliriz. Uygun mu?
 
-Belirli bir doktor isteniyorsa `&doktor_id=2` ekle. Acil randevuyu yazarken
-gövdeye `"acil": true` koy — personel panelde acil vakaları ayırt eder.
+Belirli bir doktor isteniyorsa `doktor_id` ver. Acil randevuyu yazarken
+`acil: true` gönder — personel panelde acil vakaları ayırt eder.
 
 ### 4. Uygunluğu sorgula
 
 Hasta belirli bir gün istiyorsa:
 
-```
-curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  "http://localhost:8000/api/uygunluk?gun=2026-08-07&doktor_id=1"
-```
+`gun_uygunlugu` aracını çağır (`gun`: 2026-08-07, istersen `doktor_id`).
 
 `doktor_id` verirsen yalnız o hekimin doluluğu, vermezsen kliniğin tamamı gelir.
 
@@ -106,13 +97,14 @@ Yazmadan önce tek cümleyle teyit ettir:
 
 Onay gelince:
 
+`randevu_olustur` aracını çağır:
+
 ```
-curl -s -X POST -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  -H "Content-Type: application/json" \
-  -d '{"telefon":"905321112233","ad":"Ayşe Yılmaz","hizmet":"Diş taşı temizliği",
-       "baslangic":"2026-08-07T14:00:00","bitis":"2026-08-07T14:30:00",
-       "doktor_id":1,"acil":false}' \
-  http://localhost:8000/api/randevu
+telefon: 905321112233        ad: Ayşe Yılmaz
+hizmet: Diş taşı temizliği   acil: false
+baslangic: 2026-08-07T14:00:00
+bitis:     2026-08-07T14:30:00
+doktor_id: 1
 ```
 
 `doktor_id`'yi **atlarsan** sistem o saatte en boş hekimi seçer ve cevapta
@@ -122,10 +114,10 @@ adını bildir.
 Telefon numarası konuştuğun hastanınkidir; hastaya sorma.
 
 Cevaplar:
-- `200/201` → randevu açıldı. `doktor_ad` alanını hastaya söyle.
-- `409` → **o saat bu arada dolmuş.** 4. adıma dön, alternatif öner. Asla "yazdım" deme.
-- `422` → çalışma saati dışı, geçmiş tarih ya da geçersiz doktor. Sebebi söyle.
-- Cevapta `hata` alanı varsa işlem başarısızdır.
+- `randevu_id` döndüyse randevu açıldı. `doktor_ad` alanını hastaya söyle.
+- `HATA 409` → **o saat bu arada dolmuş.** 4. adıma dön, alternatif öner. Asla "yazdım" deme.
+- `HATA 422` → çalışma saati dışı, geçmiş tarih ya da geçersiz doktor. Sebebi söyle.
+- Araç `HATA` ile başlayan bir metin döndüyse işlem başarısızdır.
 
 ### 6. Google Takvim'e ekle
 

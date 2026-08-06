@@ -21,10 +21,7 @@ bu skill geçerlidir.
 
 Hangi randevudan söz ettiğini bilmeden hiçbir şey yapma:
 
-```
-curl -s -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  "http://localhost:8000/api/hasta-randevulari?telefon=905321112233"
-```
+`hasta_randevulari` aracını çağır (`telefon`: hastanın numarası).
 
 Gelecek randevular `randevu_id`, `baslangic`, `hizmet` ve `doktor_ad` ile döner.
 
@@ -40,26 +37,18 @@ Gelecek randevular `randevu_id`, `baslangic`, `hizmet` ve `doktor_ad` ile döner
 
 Randevuyu onayla:
 
-```
-curl -s -X POST -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  -H "Content-Type: application/json" -d '{"telefon":"905321112233"}' \
-  http://localhost:8000/api/randevu/42/onayla
-```
+`randevu_onayla` aracını çağır (`randevu_id` ve `telefon`).
 
 Sonra tek cümle: "Teşekkürler, sizi bekliyoruz." Fazla konuşma.
 
 ### "İptal", "gelemeyeceğim", "iptal edin"
 
-```
-curl -s -X POST -H "X-Ic-Anahtar: $IC_API_ANAHTARI" \
-  -H "Content-Type: application/json" -d '{"telefon":"905321112233"}' \
-  http://localhost:8000/api/randevu/42/iptal
-```
+`randevu_iptal` aracını çağır (`randevu_id` ve `telefon`).
 
-- `200` → iptal edildi. "Randevunuzu iptal ettim. Yeniden almak isterseniz
-  yazmanız yeterli." **Sebebini sorgulama, ikna etmeye çalışma.**
-- `403` → randevu başka hastaya ait. İptal etme, personele yönlendir.
-- `404` → randevu yok.
+- `durum: iptal` → iptal edildi. "Randevunuzu iptal ettim. Yeniden almak
+  isterseniz yazmanız yeterli." **Sebebini sorgulama, ikna etmeye çalışma.**
+- `HATA 403` → randevu başka hastaya ait. İptal etme, personele yönlendir.
+- `HATA 404` → randevu yok.
 
 İptal edilen randevu için bir daha hatırlatma gitmez, ayrıca bir şey yapman gerekmez.
 

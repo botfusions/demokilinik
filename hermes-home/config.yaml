@@ -3,23 +3,30 @@ model:
   provider: openai
   reasoning_effort: medium
 agent:
+  # Resepsiyon işi kısa: bilgi oku, uygunluk sor, randevu yaz. 30 tur fazlasıyla
+  # yeter ve kaçak bir döngünün maliyeti burada duruyor.
   max_turns: 30
+  # Tool şemaları her istekte input maliyetine giriyor — ölçümde toplam prompt'un
+  # %69'uydu (44,4 KB / 16 tool), hastanın mesajı ise %0,09. Randevu araçları
+  # artık mcp_servers.klinik'ten geliyor, kabuk gerekmiyor.
+  # Ölçmek için: hermes prompt-size
   disabled_toolsets:
-    - memory
+    - memory          # konuşma geçmişinin tek kaynağı Postgres
     - browser
     - vision
-    - computer_use
-    - session_search
-    - file
-    - delegation
-    - clarify
+    - computer_use    # 9,7 KB — en pahalı şema, resepsiyonistin ekranı yok
+    - session_search  # 6,5 KB — Hermes oturumu kullanılmıyor
+    - file            # 6,1 KB — bilgi tabanı prompt'a zaten enjekte ediliyor
+    - terminal        # 4,8 KB — klinik MCP araçları geldi, kabuk yetkisi kalktı
+    - delegation      # 3,9 KB — alt ajan zinciri yok, olmayacak
+    - clarify         # 2,4 KB — `-z` tek atış, soru soracak kimse yok
     - code_execution
     - tts
     - todo
-    - web
+    - web             # anahtarsız şema üretmiyor ama ileride sızmasın
     - image_gen
     - bfl
-    - cronjob
+    - cronjob         # hatırlatmaları app/hatirlatma.py planlıyor, ajan değil
 terminal:
   backend: local
 compression:
@@ -31,6 +38,22 @@ skills:
   guard_agent_created: true
   write_approval: true
 _config_version: 33
+# Ajanın randevu araçları. Eskiden skill'ler `curl` yazıyordu ve bu `terminal`
+# toolset'ini zorunlu kılıyordu — yani prompt'a sızacak bir talimat kabuk
+# komutu çalıştırabilirdi. Artık ajanın yapabilecekleri klinik-mcp.py'deki
+# 7 araçla sınırlı. Yan fayda: şemaları terminal'inkinden küçük (2,6 KB / 4,8 KB).
+#
+# Yollar göreli: ajan.py `cwd=PROJE_KOKU` ile çağırıyor, VPS'te yol değişince
+# burada düzeltme gerekmesin.
+#
+# IC_API_ANAHTARI bilerek yazılmadı — bu dosya git'te takip ediliyor. Alt süreç
+# ortamı Hermes'ten miras alıyor, anahtar .env'den geliyor.
+mcp_servers:
+  klinik:
+    command: .venv/bin/python
+    args:
+      - scripts/klinik-mcp.py
+    enabled: true
 
 # ── Security ──────────────────────────────────────────────────────────
 # Secret redaction is ON by default — strings that look like API keys,
