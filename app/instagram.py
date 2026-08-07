@@ -213,7 +213,7 @@ def yeni_mesajlar() -> list[dict]:
 
 def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
     """Bir yoklama turu. Cevaplanan mesaj sayısını döner."""
-    from app import ajan
+    from app import ajan, kural
     from app.crm import gorusme_ekle, gorusme_gecmisi, kisi_upsert
 
     gonder_fn = gonder_fn or mesaj_gonder
@@ -232,12 +232,16 @@ def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
             continue
 
         gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]
-        try:
-            yanit, maliyet = ajan.cevap_uret(gecmis, m["metin"], kanal="instagram")
-        except ajan.CevapUretilemedi as e:
-            log.error("Ajan cevap üretemedi (%s): %s", m["igsid"], e)
-            continue     # WhatsApp'taki gibi hazır metin göndermiyoruz: bu kanalda
-                         # sessiz kalmak, yanlış beklenti yaratmaktan iyi
+
+        if (yanit := kural.cevap_dene(conn, m["metin"])) is not None:
+            maliyet = None
+        else:
+            try:
+                yanit, maliyet = ajan.cevap_uret(gecmis, m["metin"], kanal="instagram")
+            except ajan.CevapUretilemedi as e:
+                log.error("Ajan cevap üretemedi (%s): %s", m["igsid"], e)
+                continue     # WhatsApp'taki gibi hazır metin göndermiyoruz: bu kanalda
+                             # sessiz kalmak, yanlış beklenti yaratmaktan iyi
 
         # Instagram'da konum iğnesi yok (Composio araç setinde karşılığı yok);
         # işaret yine de ayıklanmalı, yoksa hastaya ham "[KONUM]" yazısı gider.

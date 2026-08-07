@@ -10,6 +10,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Request
@@ -21,7 +22,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, hatirlatma, instagram, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, hatirlatma, instagram, iyilestirme, kural, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -83,6 +84,7 @@ from app.kb import (  # noqa: E402
     bilgiler_listele,
     hermes_md_yaz,
 )
+from egitim import metni_ayristir  # noqa: E402  (URL tarama vendor konsolunda: egitim.sunucu)
 
 log = logging.getLogger("klinik")
 
@@ -94,6 +96,12 @@ HATA_MESAJI = (
 
 imzalayici = URLSafeSerializer(os.environ.get("COOKIE_SECRET", "gelistirme"), salt="panel")
 sablonlar = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# Panelde görünen isimler — DB'deki 3 durum (bekliyor/onayli/iptal) değişmiyor,
+# yalnız daha açıklayıcı görünsün diye eşleniyor. CSS sınıfı hâlâ ham değeri
+# kullanıyor (rozet.aktif/pasif gibi renk sınıfları bundan etkilenmez).
+DURUM_ETIKETLERI = {"bekliyor": "Planlandı", "onayli": "Teyit Edildi", "iptal": "İptal Edildi"}
+sablonlar.env.filters["durum_etiketi"] = lambda d: DURUM_ETIKETLERI.get(d, d)
 
 
 @asynccontextmanager
@@ -313,6 +321,59 @@ def bilgi_ac(request: Request, bilgi_id: int, conn=Depends(db)):
     return RedirectResponse("/bilgi", status_code=303)
 
 
+# ── ajan eğitim merkezi ──────────────────────────────────────
+# İki girdi: sohbetle eğit (personel yazar, AKTİF iner) ve site tarama
+# (makine kazır, PASİF/taslak iner — onay Bilgi Tabanı'nda, yukarıdaki rotalarla).
+
+@app.get("/egitim", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
+def egitim_sayfasi(request: Request, conn=Depends(db)):
+    # beklemede taslak sayısı: pasif KB kayıtları (onay bekleyen kazınan içerik)
+    taslak_adedi = sum(1 for b in bilgiler_listele(conn) if not b["aktif"])
+    return sablonlar.TemplateResponse(request, "egitim.html", {
+        "sayfa": "egitim",
+        "kullanici": _kim(request),
+        "taslak_adedi": taslak_adedi,
+        "saglik": saglik.saglik_ozeti(conn),
+    })
+
+
+@app.post("/egitim/egit", dependencies=[Depends(yonetici)])
+def egitim_egit(request: Request, metin: str = Form(...), conn=Depends(db)):
+    try:
+        kayitlar, uyarilar = metni_ayristir(metin)
+    except Exception as e:  # sağlayıcı/LLM hatası — panele kullanıcı dostu düşer
+        log.warning("Eğitim başarısız: %s", e)
+        return RedirectResponse(f"/egitim?hata={quote(str(e))}", status_code=303)
+    mevcut = {b["baslik"] for b in bilgiler_listele(conn)}  # dedup: aktif + pasif
+    eklendi = 0
+    for k in kayitlar:
+        if k["baslik"] in mevcut:
+            continue
+        bid = bilgi_ekle(conn, k["baslik"], k["icerik"], k["kategori"], aktif=True)
+        mevcut.add(k["baslik"])
+        islem_yaz(conn, _kim(request), "eğitimle bilgi ekledi", f"#{bid} {k['baslik']}")
+        eklendi += 1
+    if eklendi:
+        hermes_md_yaz(conn, HERMES_MD)
+    qs = f"eklendi={eklendi}"
+    if uyarilar:
+        qs += "&uyari=" + quote("; ".join(uyarilar))
+    return RedirectResponse(f"/egitim?{qs}", status_code=303)
+
+
+@app.get("/iyilestirme", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
+def iyilestirme_sayfasi(request: Request, conn=Depends(db)):
+    """Ajan hiçbir şeyi otomatik değiştirmez — burası salt-okunur bir öneri
+    listesi. Kararı ve yazımı (bilgi tabanı/SOUL.md) hep personel verir."""
+    return sablonlar.TemplateResponse(request, "iyilestirme.html", {
+        "sayfa": "iyilestirme",
+        "kullanici": _kim(request),
+        "bosluklar": iyilestirme.kb_bosluklari(conn),
+        "tekrarlar": iyilestirme.tekrarlanan_sorular(conn),
+        "saglik": saglik.saglik_ozeti(conn),
+    })
+
+
 # ── takvim ──────────────────────────────────────────────────
 
 # Hekim renkleri: listedeki sıraya göre deterministik atanır. Rastgele ya da
@@ -468,6 +529,7 @@ def randevu_ekle_elle(
         return RedirectResponse(f"/randevular?hata={e}", status_code=303)
 
     hatirlatma.hatirlatma_planla(conn, rid)
+    bildirim.yeni_randevu_bildir(conn, rid)
     islem_yaz(conn, _kim(request), "randevu açtı", f"#{rid} {telefon} {baslangic}")
     return RedirectResponse("/randevular", status_code=303)
 
@@ -533,8 +595,9 @@ def doktor_sayfasi(request: Request, hata: str = "", conn=Depends(db)):
 
 @app.post("/doktorlar", dependencies=[Depends(yonetici)])
 def doktor_kaydet(request: Request, ad: str = Form(...), uzmanlik: str = Form(""),
-                  notlar: str = Form(""), conn=Depends(db)):
-    did = doktor_ekle(conn, ad.strip(), uzmanlik.strip() or None, notlar.strip() or None)
+                  notlar: str = Form(""), telefon: str = Form(""), conn=Depends(db)):
+    did = doktor_ekle(conn, ad.strip(), uzmanlik.strip() or None, notlar.strip() or None,
+                      telefon.strip() or None)
     islem_yaz(conn, _kim(request), "doktor ekledi", f"#{did} {ad}")
     return RedirectResponse("/doktorlar", status_code=303)
 
@@ -699,6 +762,7 @@ def randevu_api(govde: dict, conn=Depends(db)):
         raise HTTPException(400, f"Eksik alan: {e}")
 
     hatirlatma.hatirlatma_planla(conn, rid)
+    bildirim.yeni_randevu_bildir(conn, rid)
 
     doktor = kullanilan = None
     if doktor_id:
@@ -840,11 +904,19 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
             return
 
         gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]  # yeni mesajı prompt ayrıca ekler
-        try:
-            yanit, maliyet = ajan.cevap_uret(gecmis, mesaj)
-        except ajan.CevapUretilemedi as e:
-            log.error("Ajan cevap üretemedi (%s): %s", telefon, e)
-            yanit, maliyet = HATA_MESAJI, None
+
+        # Kural katmanı (LLM'siz) → hatırlatma kısayolu (LLM'siz) → tam ajan (LLM).
+        # Sıralama en ucuzdan en pahalıya: "100 mesajın 100'ü LLM'ye" olmasın.
+        if (yanit := kural.cevap_dene(conn, mesaj)) is not None:
+            maliyet = None
+        elif (yanit := kural.hatirlatma_cevabi_dene(telefon, mesaj)) is not None:
+            maliyet = None
+        else:
+            try:
+                yanit, maliyet = ajan.cevap_uret(gecmis, mesaj)
+            except ajan.CevapUretilemedi as e:
+                log.error("Ajan cevap üretemedi (%s): %s", telefon, e)
+                yanit, maliyet = HATA_MESAJI, None
 
         yanit, konum_istendi = ajan.konum_ayikla(yanit)
 

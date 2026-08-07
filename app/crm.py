@@ -379,11 +379,11 @@ def ozet_sayilar(conn: psycopg.Connection) -> dict:
 # ── doktorlar ───────────────────────────────────────────────
 
 def doktor_ekle(conn: psycopg.Connection, ad: str, uzmanlik: str | None = None,
-                notlar: str | None = None) -> int:
+                notlar: str | None = None, telefon: str | None = None) -> int:
     with conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO doktorlar (ad, uzmanlik, notlar) VALUES (%s, %s, %s) RETURNING id",
-            (ad, uzmanlik, notlar),
+            "INSERT INTO doktorlar (ad, uzmanlik, notlar, telefon) VALUES (%s, %s, %s, %s) RETURNING id",
+            (ad, uzmanlik, notlar, telefon),
         )
         did = cur.fetchone()[0]
     conn.commit()

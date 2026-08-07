@@ -20,6 +20,8 @@
       <div><label for="a">Ad</label><input id="a" name="ad" placeholder="Dr. Ayla Tuncer" required></div>
       <div><label for="u">Uzmanlık</label><input id="u" name="uzmanlik" placeholder="Ortodonti"></div>
     </div>
+    <label for="t">Telefon (yeni randevu bildirimi buraya gider, boş bırakılabilir)</label>
+    <input id="t" name="telefon" placeholder="905321112233">
     <label for="n">Not (hastaya söylenmez)</label>
     <input id="n" name="notlar" placeholder="Salı günleri gelmiyor">
     <div style="margin-top:12px"><button>Kaydet</button></div>
@@ -37,12 +39,13 @@
     {% if doktorlar %}
     <div class="kaydir">
       <table>
-        <tr><th>Ad</th><th>Uzmanlık</th><th>Gelecek randevu</th><th>Durum</th>
+        <tr><th>Ad</th><th>Uzmanlık</th><th>Telefon</th><th>Gelecek randevu</th><th>Durum</th>
           {% if kullanici and kullanici.rol == 'admin' %}<th></th>{% endif %}</tr>
         {% for d in doktorlar %}
         <tr>
           <td style="color:var(--murekkep)">{{ d.ad }}</td>
           <td>{{ d.uzmanlik or '—' }}</td>
+          <td>{{ d.telefon or '—' }}</td>
           <td style="font-variant-numeric:tabular-nums">{{ d.gelecek_randevu }}</td>
           <td><span class="rozet {{ 'aktif' if d.aktif else 'pasif' }}">{{ 'aktif' if d.aktif else 'pasif' }}</span></td>
           {% if kullanici and kullanici.rol == 'admin' %}

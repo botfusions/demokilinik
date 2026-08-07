@@ -1,59 +1,73 @@
-"""Hermes köprüsü — `hermes -z` ile tek atış cevap üretimi.
+"""Ajan — kimlik + randevu araçlarıyla tam yetkili tur.
 
-Oturum yönetimi yok: konuşma geçmişinin tek kaynağı Postgres, her çağrıda
-prompt'a konur. İki yerde state tutmak senkron sorunu demek.
+Hermes CLI'ye bağımlılık yok: burası doğrudan `/chat/completions`'a
+`tools=` ile giden, elle yazılmış bir tool-calling döngüsü. Oturum yönetimi
+yok — konuşma geçmişinin tek kaynağı Postgres, her çağrıda mesaj listesine
+konur. İki yerde state tutmak senkron sorunu demek.
 """
 
 import json
+import logging
 import os
-import subprocess
-import tempfile
-from pathlib import Path
 
-from app import hafif
+import httpx
 
-PROJE_KOKU = Path(__file__).resolve().parent.parent
-ZAMAN_ASIMI = int(os.environ.get("AJAN_ZAMAN_ASIMI", "120"))
+from app import araclar, hafif
+
+log = logging.getLogger(__name__)
+
+# Artık bir subprocess'in tek seferlik tavanı değil, her `/chat/completions`
+# çağrısı için ayrı ayrı uygulanan zaman aşımı.
+ZAMAN_ASIMI = float(os.environ.get("AJAN_ZAMAN_ASIMI", "60"))
+
+# Tool-calling döngüsünün tavanı. Modelin aynı aracı sonsuz çağırmasına karşı
+# koruma; dar araç şeması ve basit resepsiyon işiyle 2-4 turda biter, 8 güvenli.
+# (her çağrıda `os.environ`'dan okunur, testte ortam değişkeniyle ezilebilsin)
+def _max_tur() -> int:
+    return int(os.environ.get("AJAN_MAX_TUR", "8"))
 
 
 class CevapUretilemedi(Exception):
-    """Hermes cevap üretemedi — zaman aşımı, çökme ya da boş çıktı."""
+    """Ajan cevap üretemedi — API hatası, zaman aşımı ya da boş çıktı."""
 
 
 def _whatsapp_hatti() -> str:
     return os.environ.get("KLINIK_WHATSAPP_NUMARASI", "")
 
 
-def prompt_hazirla(gecmis: list[dict], mesaj: str, kanal: str = "whatsapp") -> str:
-    satirlar = []
-    if gecmis:
-        satirlar.append("Bu hastayla önceki yazışman (eskiden yeniye):")
-        for g in gecmis:
-            kim = "Hasta" if g["yon"] == "gelen" else "Sen"
-            satirlar.append(f"{kim}: {g['mesaj']}")
-        satirlar.append("")
+def _sistem_promptu(kanal: str) -> str:
+    """Kimlik + bilgi tabanı, kanala özel talimatla. Okunamıyorsa `CevapUretilemedi`
+    — eksik kimlikle cevap üretmektense hastaya "sistem hatası" demek doğru."""
+    temel = hafif.kimlik_ve_bilgi()
+    if temel is None:
+        raise CevapUretilemedi("SOUL.md ya da .hermes.md okunamadı")
 
-    satirlar.append(f"Hastanın yeni mesajı: {mesaj}")
-    satirlar.append("")
+    if kanal != "instagram":
+        return temel
 
-    if kanal == "instagram":
-        # Instagram bilgilendirme kanalı: randevu açma yetkisi YOK. Bu sınır
-        # burada duruyor çünkü tek fark kanal; ajanın kimliği ve bilgi tabanı aynı.
-        hat = _whatsapp_hatti()
-        nereye = f"WhatsApp hattımıza ({hat})" if hat else "WhatsApp hattımıza"
-        satirlar.append(
-            "Bu mesaj Instagram'dan geldi. Instagram yalnızca bilgilendirme kanalıdır:\n"
-            "- Soruyu bilgi tabanındaki bilgilerle cevapla (hizmet, fiyat, çalışma saatleri, adres).\n"
-            f"- Randevu almak, değiştirmek veya iptal etmek isteyen kişiyi {nereye} yönlendir.\n"
-            "- Randevu KAYDI AÇMA, saat verme, 'ayırdım/kaydettim' deme. Bu kanalda o yetkin yok.\n"
-            "- Randevu araçlarını çağırma."
-        )
-        satirlar.append("")
-        satirlar.append("Instagram'dan gönderilecek cevabı yaz. Sadece cevabı yaz.")
-    else:
-        satirlar.append("Hastaya WhatsApp'tan gönderilecek cevabı yaz. Sadece cevabı yaz.")
+    # Instagram bilgilendirme kanalı: randevu açma yetkisi YOK. Bu sınır burada
+    # duruyor çünkü tek fark kanal; ajanın kimliği ve bilgi tabanı aynı. Ayrıca
+    # bu kanalda `tools=[]` gider — model tool çağırmayı deneyip reddedilmekten
+    # daha kesin bir sınır.
+    hat = _whatsapp_hatti()
+    nereye = f"WhatsApp hattımıza ({hat})" if hat else "WhatsApp hattımıza"
+    return temel + (
+        "\n\n# Bu kanalda\n\n"
+        "Bu mesaj Instagram'dan geldi. Instagram yalnızca bilgilendirme kanalıdır:\n"
+        "- Soruyu bilgi tabanındaki bilgilerle cevapla (hizmet, fiyat, çalışma saatleri, adres).\n"
+        f"- Randevu almak, değiştirmek veya iptal etmek isteyen kişiyi {nereye} yönlendir.\n"
+        "- Randevu KAYDI AÇMA, saat verme, 'ayırdım/kaydettim' deme. Bu kanalda o yetkin yok.\n"
+        "- Randevu araçlarını çağırma (zaten sende yok)."
+    )
 
-    return "\n".join(satirlar)
+
+def _saglayici_ayarlari() -> tuple[str, str]:
+    saglayici = os.environ.get("AJAN_PROVIDER", "")
+    taban = os.environ.get("AJAN_TABAN_URL") or hafif.TABAN_URL.get(saglayici)
+    anahtar = os.environ.get(hafif.ANAHTAR_ADI.get(saglayici, ""), "")
+    if not taban or not anahtar:
+        raise CevapUretilemedi(f"'{saglayici}' için taban URL/anahtar tanımsız")
+    return taban, anahtar
 
 
 KONUM_ISARETI = "[KONUM]"
@@ -93,58 +107,66 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
                kanal: str = "whatsapp") -> tuple[str, float | None]:
     """(yanıt, maliyet_usd) döner. Başarısızlıkta CevapUretilemedi.
 
-    Bilgi soruları Hermes'e hiç uğramaz — `hafif.py` aynı kimlik ve bilgi
-    tabanıyla doğrudan cevap üretir, prompt'un %78'ini oluşturan araç
-    çerçevesini ödemeden. Kapı buraya konuldu ki WhatsApp ve Instagram
-    yollarının ikisi de kapsansın; çağıranlarda tekrar kontrol yok.
+    Bilgi soruları ve tek kelimelik hatırlatma cevapları buraya hiç uğramaz —
+    `app/kural.py` ve `app/hafif.py` daha ucuz katmanlarda cevap üretir. Kapı
+    çağıranda (`app/main.py`) sırayla denenir; burası son ve en pahalı adım.
     """
-    if (hafif_yanit := hafif.cevap_dene(gecmis, mesaj, kanal)) is not None:
-        return hafif_yanit
+    sistem = _sistem_promptu(kanal)
+    taban, anahtar = _saglayici_ayarlari()
 
-    prompt = prompt_hazirla(gecmis, mesaj, kanal)
+    messages = [{"role": "system", "content": sistem}]
+    for g in gecmis:
+        messages.append({
+            "role": "user" if g["yon"] == "gelen" else "assistant",
+            "content": g["mesaj"],
+        })
+    messages.append({"role": "user", "content": mesaj})
 
-    ortam = os.environ.copy()
-    # Ajan bu klasöre özel — global ~/.hermes asla kullanılmaz
-    ortam["HERMES_HOME"] = str(PROJE_KOKU / "hermes-home")
+    tools = araclar.arac_listesi_openai() if kanal == "whatsapp" else []
+    model = os.environ.get("AJAN_MODEL")
+    toplam_kullanim = {"prompt_tokens": 0, "completion_tokens": 0}
 
-    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
-        rapor = Path(tf.name)
+    for _ in range(_max_tur()):
+        try:
+            yanit = httpx.post(
+                f"{taban}/chat/completions",
+                headers={"Authorization": f"Bearer {anahtar}"},
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "tools": tools or None,
+                    "temperature": 0.3,
+                },
+                timeout=ZAMAN_ASIMI,
+            )
+            yanit.raise_for_status()
+            govde = yanit.json()
+            msg = govde["choices"][0]["message"]
+        except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
+            raise CevapUretilemedi(f"LLM çağrısı başarısız: {e}") from e
 
-    # Test ortamında ZAI/GLM, VPS'te OpenAI — .env'de iki satır değişir,
-    # config.yaml'a dokunmadan. Boş bırakılırsa config.yaml'daki model geçerli.
-    komut = ["hermes", "-z", prompt, "--usage-file", str(rapor)]
-    if os.environ.get("AJAN_PROVIDER"):
-        komut += ["--provider", os.environ["AJAN_PROVIDER"]]
-    if os.environ.get("AJAN_MODEL"):
-        komut += ["--model", os.environ["AJAN_MODEL"]]
+        for k, v in (govde.get("usage") or {}).items():
+            if k in toplam_kullanim:
+                toplam_kullanim[k] += v
 
-    try:
-        sonuc = subprocess.run(
-            komut,
-            cwd=PROJE_KOKU,          # .hermes.md buradan okunur
-            env=ortam,
-            capture_output=True,
-            text=True,
-            timeout=ZAMAN_ASIMI,
-        )
-    except subprocess.TimeoutExpired as e:
-        raise CevapUretilemedi(f"hermes {ZAMAN_ASIMI}s içinde cevap vermedi") from e
-    except FileNotFoundError as e:
-        raise CevapUretilemedi("hermes komutu bulunamadı — kurulum yapıldı mı?") from e
-    finally:
-        maliyet = None
-        if rapor.exists():
+        tool_calls = msg.get("tool_calls")
+        if not tool_calls:
+            metin = (msg.get("content") or "").strip()
+            if not metin:
+                raise CevapUretilemedi("LLM boş cevap döndü")
+            return metin, hafif._maliyet(toplam_kullanim)
+
+        messages.append(msg)
+        for tc in tool_calls:
             try:
-                maliyet = json.loads(rapor.read_text()).get("estimated_cost_usd")
-            except (json.JSONDecodeError, OSError):
-                pass
-            rapor.unlink(missing_ok=True)
+                argumanlar = json.loads(tc["function"]["arguments"] or "{}")
+            except json.JSONDecodeError:
+                argumanlar = {}
+            metin, _hata = araclar.arac_calistir(tc["function"]["name"], argumanlar)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc["id"],
+                "content": metin,
+            })
 
-    if sonuc.returncode != 0:
-        raise CevapUretilemedi(f"hermes exit {sonuc.returncode}: {sonuc.stderr[:500]}")
-
-    yanit = sonuc.stdout.strip()
-    if not yanit:
-        raise CevapUretilemedi("hermes boş cevap döndü")
-
-    return yanit, maliyet
+    raise CevapUretilemedi(f"{_max_tur()} turda cevap üretilemedi")

@@ -7,14 +7,12 @@ __pycache__/
 # OpenWA oturum verisi ve medya — asla repoya girmez
 openwa-data/
 
-# Hermes çalışma verisi. Yalnız config.yaml, SOUL.md ve skills/ takip edilir —
-# logs/ içinde hasta mesajları geçebilir, repoya asla girmemeli (KVKK).
+# Hermes CLI kaldırıldı (kendi in-process ajanımız var, bkz. app/ajan.py).
+# hermes-home/ klasörü artık yalnız SOUL.md'yi (ajanın kimliği) barındırıyor,
+# gerisi eski CLI'nin çalışma verisi — logs/ içinde hasta mesajları geçebilir,
+# repoya asla girmemeli (KVKK).
 hermes-home/*
-!hermes-home/config.yaml
 !hermes-home/SOUL.md
-!hermes-home/skills/
-hermes-home/skills/.hub/
 
 # Referans zip'ler (inşada kullanılmıyor)
 referans/
-hermes-home/skills/.usage.json*

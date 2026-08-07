@@ -1,37 +1,21 @@
-#!/usr/bin/env python3
-"""Klinik MCP sunucusu — ajana yalnız 7 randevu aracı verir, kabuk vermez.
+"""Ajanın randevu araçları — 7 araçla sınırlı, kabuk yetkisi yok.
 
-Neden var: skill'ler eskiden `curl` yazıyordu, o da `terminal` toolset'ini
-zorunlu kılıyordu. Terminal açıkken ajan prompt'una sızacak bir talimat
-`rm`, `psql` ya da `curl https://baska-yer` çalıştırabilirdi. Burada ajanın
-yapabileceği şeyler bu dosyadaki tabloyla sınırlı.
-
-stdio üzerinden satır satır JSON-RPC konuşur (MCP). Her araç mevcut
-`/api/*` uçlarını çağırır — iş mantığı orada, burada değil; iki yerde
-çakışma kuralı olsaydı biri diğerinden sapardı.
-
-Elle deneme:
-    echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | scripts/klinik-mcp.py
+Eskiden `scripts/klinik-mcp.py` bu tabloyu bir stdio/JSON-RPC (MCP) sunucusu
+olarak Hermes CLI'ye servis ediyordu. Hermes çıkınca protokole gerek kalmadı:
+ajan (`app/ajan.py`) artık bu modülü doğrudan Python fonksiyonu olarak
+çağırıyor. İş mantığı hâlâ burada değil — her araç mevcut `/api/*` uçlarını
+çağırır, iki yerde çakışma kuralı olsaydı biri diğerinden saparıdı.
 """
 
-import json
 import os
-import sys
-from pathlib import Path
 
 import httpx
-from dotenv import load_dotenv
-
-# Hermes MCP alt sürecini temiz ortamla başlatıyor — anahtar miras alınmıyor.
-# .env'i buradan okuyoruz; config.yaml git'te takip edildiği için sır oraya
-# yazılamaz. Yol script konumundan türetiliyor, cwd'ye bağlı değil.
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 TABAN = os.environ.get("KLINIK_API_URL", "http://localhost:8000")
 ANAHTAR = os.environ.get("IC_API_ANAHTARI", "")
 ZAMAN_ASIMI = float(os.environ.get("MCP_ZAMAN_ASIMI", "20"))
 
-# Araç tablosu: ad → (metot, yol, açıklama, parametre şeması).
+# Araç tablosu: ad → (metot, yol, açıklama, parametre şeması, zorunlu alanlar).
 # Yol içindeki {randevu_id} çağrı argümanından doldurulur; GET'te kalan
 # argümanlar query string, POST'ta gövde olur.
 #
@@ -96,12 +80,16 @@ ARACLAR = {
 }
 
 
-def arac_listesi() -> list[dict]:
+def arac_listesi_openai() -> list[dict]:
+    """OpenAI function-calling şeması — `tools=` parametresine doğrudan verilir."""
     return [
         {
-            "name": ad,
-            "description": aciklama,
-            "inputSchema": {"type": "object", "properties": ozellikler, "required": zorunlu},
+            "type": "function",
+            "function": {
+                "name": ad,
+                "description": aciklama,
+                "parameters": {"type": "object", "properties": ozellikler, "required": zorunlu},
+            },
         }
         for ad, (_, _, aciklama, ozellikler, zorunlu) in ARACLAR.items()
     ]
@@ -144,56 +132,3 @@ def arac_calistir(ad: str, argumanlar: dict) -> tuple[str, bool]:
         return f"HATA {yanit.status_code}: {ayrinti}", True
 
     return yanit.text, False
-
-
-def istek_isle(istek: dict) -> dict | None:
-    """Cevap gövdesi, ya da bildirim ise None."""
-    metot = istek.get("method")
-    kimlik = istek.get("id")
-
-    if metot == "initialize":
-        return {
-            # İstemcinin sürümünü yansıt: Hermes hangi sürümü konuşuyorsa o
-            "protocolVersion": istek.get("params", {}).get("protocolVersion", "2025-06-18"),
-            "capabilities": {"tools": {}},
-            "serverInfo": {"name": "klinik", "version": "1.0.0"},
-        }
-    if metot == "tools/list":
-        return {"tools": arac_listesi()}
-    if metot == "tools/call":
-        parametre = istek.get("params", {})
-        metin, hata = arac_calistir(parametre.get("name", ""), parametre.get("arguments", {}))
-        return {"content": [{"type": "text", "text": metin}], "isError": hata}
-    if kimlik is None:
-        return None  # bildirim (notifications/initialized gibi) — cevap yok
-
-    raise LookupError(metot)
-
-
-def main() -> None:
-    for satir in sys.stdin:
-        satir = satir.strip()
-        if not satir:
-            continue
-        try:
-            istek = json.loads(satir)
-        except json.JSONDecodeError:
-            continue
-
-        kimlik = istek.get("id")
-        try:
-            sonuc = istek_isle(istek)
-        except LookupError as e:
-            cevap = {"jsonrpc": "2.0", "id": kimlik,
-                     "error": {"code": -32601, "message": f"Bilinmeyen metot: {e}"}}
-        else:
-            if sonuc is None:
-                continue
-            cevap = {"jsonrpc": "2.0", "id": kimlik, "result": sonuc}
-
-        sys.stdout.write(json.dumps(cevap, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
-
-
-if __name__ == "__main__":
-    main()

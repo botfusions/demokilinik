@@ -35,7 +35,8 @@
     <div class="satir">
       <div>
         <label for="b">Başlık</label>
-        <input id="b" name="baslik" placeholder="Örn: İmplant" required>
+        <input id="b" name="baslik" placeholder="Örn: İmplant"
+               value="{{ request.query_params.get('baslik', '') }}" required>
       </div>
       <div>
         <label for="k">Kategori</label>

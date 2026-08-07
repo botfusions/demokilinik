@@ -58,7 +58,7 @@
       <td><a href="/hastalar/{{ r.kisi_id }}">{{ r.ad or r.telefon }}</a></td>
       <td>{{ r.doktor_ad or '—' }}</td>
       <td>{{ r.hizmet }}{% if r.acil %} <span class="rozet acil">acil</span>{% endif %}</td>
-      <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
+      <td><span class="rozet {{ r.durum }}">{{ r.durum | durum_etiketi }}</span></td>
       <td>
         {% if r.google_event_id %}
         <a href="https://calendar.google.com/calendar/r/eventedit/{{ r.google_event_id }}" target="_blank">aç</a>

@@ -1,11 +1,37 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-06 · **Durum:** çalışır, 291 test yeşil, QR bekliyor
+**Son güncelleme:** 2026-08-07 · **Durum:** çalışır, 334 test yeşil, QR bekliyor + demo hazır
+
+**Bu güncellemede:** Hermes CLI bağımlılığı tamamen kaldırıldı — ajan artık
+`app/ajan.py`'de elle yazılmış, framework'süz bir in-process tool-calling
+döngüsü (doğrudan `/chat/completions`, MCP/JSON-RPC yok). Ekonomik hedef için
+yeni bir LLM'siz kural katmanı (`app/kural.py`) eklendi: bilgi tabanı
+eşleşmeleri ve hatırlatma "evet"/"iptal" cevapları artık hiç LLM çağırmadan
+karşılanıyor. Ayrıca bir **iyileştirme öneri paneli** eklendi (`app/iyilestirme.py`,
+panelde `/iyilestirme`): ajanın "personelimiz size dönecek" dediği sorular
+(bilgi tabanı boşluğu) ve aynı hastanın art arda tekrarladığı sorular
+(muhtemel tatminsizlik) salt-okunur listelenir — ajan hiçbir şeyi otomatik
+değiştirmez, karar ve yazım hep personelde. Ayrıca **satış demosu** hazırlığı:
+doktora yeni randevu bildirimi (`app/bildirim.py`, WhatsApp, KVKK'ya uygun
+asgari içerik), panelde durum etiketleri (Planlandı/Teyit Edildi/İptal Edildi),
+ve `scripts/demo-veri.py` (DemoDent kliniği + 4 doktor + fiyat listesi). Detay
+aşağıdaki ilgili maddelerde.
 
 Yeni bir oturum bu dosyayı okuyarak devam edebilir. Gereksinimler `PRD.md`'de,
-düzeltilen kusurlar `KUSURLAR.md`'de, kullanım `README.md`'de.
+düzeltilen kusurlar `KUSURLAR.md`'de, kullanım `README.md`'de. **Eğitim
+alt-sisteminin devir notu ayrı:** `egitim/HANDOFF.md`.
 
 ---
+
+## 2026-08-07: Eğitim merkezi ayrıldı + Ajana sor demosu
+
+Eğitim alt-sistemi klinik panelinden **ayrıldı**, kendi `egitim/` paketine
+taşındı: vendor (kurulumcu) konsolu (`egitim/sunucu.py`, port 8001) site tarama
++ KB düzenleme + yazarak-eğit yapar; müşteri panelinin `/egitim`'i yalnız
+yazarak-eğit çağırır (URL/tarama müşteriden kalktı). Ayrıca vendor konsoluna
+**"Ajana sor" demosu** eklendi: WhatsApp mockup'ta gerçek pipeline (kural →
+hafif → ajan) yan etkisiz çalışır — eğitim doğrulama = satış demosu. Detay ve
+sınırlar `egitim/HANDOFF.md`'de.
 
 ## Bir cümlede
 
@@ -20,9 +46,10 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 | Postgres + OpenWA (Docker) | ✅ çalışıyor |
 | CRM + bilgi tabanı | ✅ |
 | Panel (dark, grafikli) | ✅ |
-| Hermes ajanı (klasöre özel) | ✅ bilgi tabanından cevap veriyor, sınırları tutuyor |
-| Klinik MCP araçları (kabuksuz) | ✅ 7 araç, `terminal` kapalı |
-| Hafif yol (bilgi soruları) | ✅ Hermes'siz, %68 daha az token |
+| Kendi ajanımız (Hermes yok, klasöre özel) | ✅ tool-calling döngüsü, sınırları tutuyor |
+| Klinik araçları (kabuksuz) | ✅ 7 araç, in-process (`app/araclar.py`), kabuk/dosya erişimi yok |
+| Kural katmanı (LLM'siz) | ✅ bilgi tabanı eşleşmesi + hatırlatma evet/iptal, hiç LLM çağırmaz |
+| Hafif yol (bilgi soruları) | ✅ araçsız ucuz LLM, %68 daha az token |
 | Köprü (webhook ↔ ajan ↔ WhatsApp) | ✅ OpenWA'nın gerçek HMAC imzası doğrulandı |
 | Doktorlar + otomatik dağıtım | ✅ |
 | Kullanıcılar + roller + işlem izi | ✅ |
@@ -31,6 +58,9 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 | Konum iğnesi | ✅ `.env`'de `KLINIK_KONUM` doldurulunca çalışır |
 | Panel yeni tasarım + Takvim + Fiyat/Kampanya | ✅ |
 | Bilgi tabanı (ekle/düzenle) | ✅ panelde, **yalnız yönetici** |
+| Doktora yeni randevu bildirimi | ✅ WhatsApp, `.env`'de `DOKTORA_BILDIRIM=0` ile kapatılır |
+| İyileştirme öneri paneli | ✅ panelde `/iyilestirme`, salt-okunur, yalnız yönetici |
+| Demo verisi (DemoDent) | ✅ `scripts/demo-veri.py`, tekrar çalıştırılabilir |
 | Composio (Takvim + Gmail) | ⏳ **anahtar bekliyor** — bu olmadan takvim/mail adımı çalışmaz |
 | WhatsApp QR | ⏳ **müşteri okutacak** |
 | VPS | ⏳ scriptler hazır, çıkılmadı |
@@ -40,10 +70,21 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 1. **QR okutmak.** `http://localhost:2785` → `klinik` oturumu. Klinik için **ayrı
    bir numara** — OpenWA resmi olmayan istemci, ban geri alınamıyor.
 2. **Composio.** Hesap aç, Google Takvim + Gmail bağla, `.env`'e `COMPOSIO_API_KEY`
-   ve `COMPOSIO_MCP_URL` yaz, `./scripts/composio-ac.sh` çalıştır.
+   ve `COMPOSIO_MCP_URL` yaz. **Bağlama betiği artık yok** — eski
+   `scripts/composio-ac.sh` Hermes'in `config.yaml`'ına MCP sunucusu ekliyordu,
+   Hermes kalkınca anlamsızlaştı ve silindi. Yeni ajana bağlamak ayrı bir iş:
+   `app/araclar.py`'ye yeni bir araç olarak eklenebilir (Instagram'ın Composio
+   REST çağrısına benzer, bkz. `app/instagram.py`) ya da genel bir MCP istemcisi
+   yazılabilir. Bkz. README § Composio.
 3. **VPS.** `README.md` § VPS'e çıkış. `.env`'de `AJAN_PROVIDER=openai`,
    `AJAN_MODEL=gpt-5.6-luna`, `OPENAI_API_KEY` doldur. En az 2GB RAM.
-4. *(sonraya)* Meta reklam modülü — PRD Faz 8.
+4. **Demo günü.** `scripts/demo-veri.py <telefon>` çalıştır (telefon = demoda
+   cihazı tutan kişinin numarası, tüm demo doktorlarına bildirim oraya gider).
+   QR okutulmuş olmalı. Senaryo: "İmplant için randevu almak istiyorum" →
+   ajan Dr. Deniz Kaya'yı önerir, uygunluk gösterir, randevu açar → doktor
+   telefonuna WhatsApp bildirimi gider → dashboard'da (`/randevular`) "Planlandı"
+   durumunda görünür.
+5. *(sonraya)* Meta reklam modülü — PRD Faz 8.
 
 ## Çalıştırma
 
@@ -57,7 +98,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 291 test, hiçbiri LLM çağırmaz
+.venv/bin/python -m pytest        # 323 test, hiçbiri LLM çağırmaz
 ```
 
 ## Bilinmesi gerekenler
@@ -91,44 +132,57 @@ Bilgi tabanında olmayan klinik sorusu ret değil, "personelimiz size dönecek".
 `test_toplu_gonderim_fonksiyonu_yok` bu kuralı her koşuda denetler — kasıtlıdır,
 "gereksiz" diye silinmemeli.
 
-**Ajan bu klasöre özel.** `HERMES_HOME=./hermes-home`; global `~/.hermes` hiç
-kullanılmıyor ve kullanılmamalı.
+**Hermes CLI tamamen kaldırıldı.** `app/ajan.py` artık `hermes -z` subprocess'i
+çağırmıyor — kendi yazdığımız, framework'süz bir tool-calling döngüsü
+doğrudan `/chat/completions`'a `tools=[...]` ile gidiyor (bkz. aşağıdaki iki
+madde). `hermes-home/` klasöründe yalnız `SOUL.md` kaldı (ajanın kimliği);
+`config.yaml` ve `skills/` silindi, artık gerekmiyorlar. `HERMES_HOME` env
+değişkeni de kalktı.
 
-**Tool şemaları maliyetin en büyük kalemiydi.** Ölçümde toplam prompt'un %69'u
-kullanılmayan 16 tool şemasıydı, hastanın mesajı %0,09. `config.yaml`'daki
-`disabled_toolsets` bunu 3'e indirdi: mesaj başına 16.445 → 6.915 input token.
-Bir toolset'i geri açmadan önce `hermes prompt-size` ile ölç — `computer_use`
-tek başına 9,7 KB. Kalan `skill_manage` 4,4 KB Hermes'in granülerlik sınırı,
-tek tool kapatılamıyor.
+**Ekonomik hedef: "100 mesajın 100'ü LLM'ye" değil.** `app/kural.py` hafif
+yoldan da önce çalışan, tamamen LLM'siz bir katman: (1) bilgi tabanındaki bir
+başlıkla `difflib.SequenceMatcher` ile net eşleşen soru (fiyat, çalışma saati,
+adres) doğrudan cevaplanır, eşik `KURAL_BENZERLIK_ESIGI` (varsayılan 0.72);
+(2) hatırlatmaya tek kelimelik "evet"/"iptal" cevabı, hastanın **tam bir**
+bekleyen randevusu varsa, `araclar.arac_calistir` üzerinden aynı `/api/*`
+uçlarını çağırarak LLM'siz onaylanır/iptal edilir. Belirsiz her durum (0 ya
+da 2+ randevu, tanınmayan kelime, randevu sinyali taşıyan mesaj) `None`
+döner ve sıradaki katmana (hafif yol, sonra tam ajan) düşer — üç katman da
+"şüphede LLM'e" yönünde.
 
-**Bilgi soruları Hermes'e uğramaz.** `app/hafif.py` aynı `SOUL.md` ve aynı
-bilgi tabanıyla doğrudan API'ye gider: 6.915 → 2.210 token (%68 az). Randevu
-işi Hermes'te kalır çünkü araçlar orada. Üç kapı da "şüphede Hermes'e" yönünde
-— yanlış yönün bedeli asimetrik: bilgi sorusu Hermes'e giderse yalnız pahalı
-olur, randevu isteği hafif yola düşerse hasta boşa çevrilir. Kapılar:
-mesajdaki randevu sinyali, geçmişte randevu konuşulmuş olması, modelin kendi
-`[RANDEVU]` işareti. API hatası olursa sessizce Hermes'e düşer, hasta farkı
-görmez. `.env`'de `HAFIF_YOL=0` ile tamamen kapatılır.
+**Bilgi soruları için üç katman, en ucuzdan en pahalıya.** Sıralama
+`app/main.py`'de: kural katmanı (LLM'siz) → hafif yol (araçsız ucuz LLM,
+`app/hafif.py`) → tam ajan (tool-calling, `app/ajan.py`). Hafif yolun üç
+kapısı (mesajdaki randevu sinyali, geçmişte randevu konuşulmuş olması,
+modelin kendi `[RANDEVU]` işareti) değişmedi — hâlâ "şüphede tam ajana" yönünde.
+API hatası olursa sessizce bir sonraki katmana düşer, hasta farkı görmez.
+`.env`'de `HAFIF_YOL=0` ile hafif yol tamamen kapatılır.
 
 **Sinyal listesinde `saat` ve `gün` bilerek yok.** "Çalışma saatleriniz nedir"
-tam da hafif yolda kalmasını istediğimiz soru. Randevu bağlamı kelime
-listesiyle değil, geçmiş kapısıyla yakalanıyor. Listeyi genişletirken bunu boz.
+tam da hafif yolda (ya da artık kural katmanında) kalmasını istediğimiz soru.
+Randevu bağlamı kelime listesiyle değil, geçmiş kapısıyla yakalanıyor.
+Listeyi genişletirken bunu boz.
 
-**Ajanın kabuk yetkisi yok.** Randevu işlemleri `scripts/klinik-mcp.py`'deki 7
-araçla sınırlı (`mcp_servers.klinik`); skill'ler eskiden `curl` yazıyordu ve bu
-`terminal` toolset'ini zorunlu kılıyordu — prompt'a sızacak bir talimat kabuk
-komutu çalıştırabilirdi. Araçlar mevcut `/api/*` uçlarını çağırıyor, iş mantığı
-orada; MCP katmanı yalnız aktarıyor. `test_mcp.py` liste genişlemesini ve
-`terminal`'in geri açılmasını denetliyor.
+**Ajanın kabuk yetkisi yok.** Randevu işlemleri `app/araclar.py`'deki 7 araçla
+sınırlı, tam ajan (`app/ajan.py`) bunları in-process Python fonksiyonu olarak
+çağırıyor — MCP/JSON-RPC protokolü yok, ayrı bir subprocess/sunucu yok.
+Araçlar mevcut `/api/*` uçlarını çağırıyor, iş mantığı orada; araç katmanı
+yalnız aktarıyor. `tests/test_araclar.py` liste genişlemesini ve modülde
+`subprocess`/`os.system`/`open(` gibi kabuk/dosya erişimi izlerinin olmadığını
+denetliyor.
 
-**MCP alt süreci ortam değişkeni miras almıyor.** `klinik-mcp.py` `IC_API_ANAHTARI`'nı
-`.env`'den kendisi okuyor; `config.yaml` git'te takip edildiği için sır oraya
-yazılamaz. Anahtar okunmazsa ajan "Geçersiz iç anahtar" alır ve hastaya sistem
-hatası der.
+**Doktora bildirim tek alıcı, panelden ayarlanmaz.** `app/bildirim.py` sabit
+kural: yeni randevu → doktorun (telefonu kayıtlıysa) WhatsApp'ına haber gider.
+Mesaj metninde hastanın serbest metin notu (`randevular.notlar`) hiç yok —
+kilit ekranında görünebileceği için KVKK gereği çıkarıldı. `test_bildirim.py`
+bunu ve tek-alıcı kısıtını denetliyor. `doktorlar.telefon` kolonu bu iş için
+sonradan eklendi (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
 
-**`hermes mcp add` kullanma.** `config.yaml`'ı yeniden yazıyor: bütün yorumlar
-siliniyor, `--env` bayrağı `args` listesine yutuluyor (Hermes CLI hatası).
-MCP sunucusu eklerken `config.yaml`'ı elle düzenle.
+**Durum etiketleri panelde relabel, DB'de değil.** `bekliyor/onayli/iptal`
+DB'de aynı kalıyor; panelde "Planlandı/Teyit Edildi/İptal Edildi" görünüyor
+(`durum_etiketi` Jinja filtresi, `app/main.py`). Daha ince durum (Teyit
+Bekliyor, Geldi, Gelmedi) istenirse gerçek bir migration gerekir — kullanıcı
+demo için bunu bilinçli olarak ertelendi dedi.
 
 **Postgres 5434'te.** 5432/5433 makinede başka projelerde dolu.
 
@@ -141,7 +195,7 @@ MCP sunucusu eklerken `config.yaml`'ı elle düzenle.
 | `referans/crm-main.zip` (trycompai/crm) **kullanılmıyor** | B2B satış CRM'i; deal/pipeline domaini randevuya uymuyor, içinde ikinci bir ajan (Vercel eve) var, Vercel'e bağımlı. Kullanıcı onayladı. |
 | WhatsApp = OpenWA + whatsapp-web.js | Baileys'ten düşük ban riski; webhook mimarisi her mesajı deterministik kaydediyor |
 | Test ZAI/GLM, canlı OpenAI gpt-5.6-luna | Kullanıcının kararı; `.env`'de iki satır |
-| Panel = FastAPI + HTMX tek servis | Hermes zaten Python; tek venv, tek systemd birimi |
+| Panel = FastAPI + HTMX tek servis | Ajan zaten Python (kendi in-process döngümüz); tek venv, tek systemd birimi |
 | Hasta verisi kendi Postgres'imizde | KVKK; Composio'ya yalnız takvim/mail verisi gider |
 | Grafiklerde tek hue (mavi) | Hepsi büyüklük gösteriyor, kimlik değil |
 
@@ -155,9 +209,9 @@ hekimli klinik gibi çalışır — bu geriye uyumluluk kasıtlı.
 o saatte en az yüklü hekime dağıtır. Seçim kararlıdır (eşitlikte ada göre), ajan
 iki kez sorunca fikir değiştirmez.
 
-**Konuşma geçmişinin tek kaynağı Postgres.** `hermes -z` her çağrıda son 10
-görüşmeyi prompt'ta alır; Hermes session/memory kullanılmıyor. İki yerde state
-tutmamak için.
+**Konuşma geçmişinin tek kaynağı Postgres.** Ajan her çağrıda son 10 görüşmeyi
+mesaj geçmişine (`role: user/assistant`) koyar; kendi bir oturum/hafıza
+mekanizması yok. İki yerde state tutmamak için.
 
 **Ajanın söyleyebileceği her şey `.hermes.md`'de.** `bilgi_tabani` tablosundan
 üretilir, panelden kaydedilince anında geçerli olur (restart gerekmez).
@@ -171,8 +225,13 @@ yazması). Biri diğerini açmaz — yönetici oturumu bile iç API'yi açmıyor
 app/main.py       webhook + panel + iç API
 app/crm.py        kişi, görüşme, randevu, doktor (çakışma kuralları burada)
 app/kb.py         bilgi tabanı → .hermes.md
-app/ajan.py       hermes -z köprüsü + hafif yol kapısı
-app/hafif.py      bilgi soruları için Hermes'siz cevap
+egitim/           ajan eğitim merkezi — vendor konsolu (yazarak-eğit + site kazıma + KB düzenle)
+                  `uvicorn egitim.sunucu:app --port 8001`; müşteri paneli yalnız yazarak-eğit'i
+                  çağırır (app/main.py `/egitim`). URL/tarama + KB düzenleme vendor'da.
+app/kural.py      LLM'siz kural katmanı (bilgi tabanı eşleşmesi + hatırlatma cevabı)
+app/hafif.py      bilgi soruları için araçsız, ucuz LLM çağrısı
+app/ajan.py       tam ajan — tool-calling döngüsü (Hermes yok)
+app/araclar.py    ajanın 7 randevu aracı, in-process (eski scripts/klinik-mcp.py)
 app/openwa.py     WhatsApp istemcisi + HMAC doğrulama
 app/hatirlatma.py randevu hatırlatmaları + giden mesaj kilitleri
 app/instagram.py  Instagram DM — yalnız bilgilendirme, yoklamalı
@@ -180,22 +239,48 @@ app/hizmet.py     fiyat listesi + kampanyalar (gönderim YOK)
 app/static/       panel.css, panel.js (tema + mobil çekmece)
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
 app/saglik.py     bağlantı nöbetçisi (Composio + WhatsApp)
-hermes-home/      ajanın kimliği (SOUL.md), yapılandırması, 3 skill
-tests/            291 test, LLM'siz
-scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme, composio
-scripts/klinik-mcp.py  ajanın 7 randevu aracı (kabuk yerine)
+app/iyilestirme.py  salt-okunur öneri taraması (bkz. aşağı) — panelde /iyilestirme
+app/bildirim.py   doktora yeni randevu bildirimi (WhatsApp, tek alıcı)
+hermes-home/SOUL.md  ajanın kimliği (bu klasöre özel)
+tests/            334 test, LLM'siz
+scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme
+scripts/demo-veri.py  satış demosu için DemoDent verisi (idempotent)
 ```
 
-## Son doğrulama (2026-08-06)
+## Son doğrulama — Hermes kaldırma + kural katmanı (2026-08-06)
 
-- 291 test yeşil
+Bu doğrulama pytest üzerinden yapıldı, canlı WhatsApp turu **denenmedi** —
+bir sonraki oturum QR okutulduktan sonra en az bir gerçek mesajla üç katmanı
+(kural → hafif → tam ajan) canlıda doğrulamalı.
+
+- 323 test yeşil (291 eskisi + `test_araclar.py`, `test_kural.py`, `test_ajan.py`,
+  `test_iyilestirme.py`, `test_bildirim.py`, `test_panel.py`'ye eklenen 2 rota testi)
+- `scripts/demo-veri.py` gerçek test DB'sinde iki kez çalıştırıldı: ilk seferde
+  4 doktor + 4 hizmet + 3 bilgi kaydı eklendi, ikinci seferde hepsi "zaten var"
+  diyerek atlandı (idempotent doğrulandı)
+- `app.main` gerçek env değişkenleriyle sorunsuz import ediliyor
+- `test_bu_kanaldan_randevu_olusmaz`, `test_toplu_gonderim_fonksiyonu_yok`,
+  `test_kampanya_gonderim_yapmaz` gibi mimari kısıt testleri hâlâ geçiyor —
+  Hermes kaldırma bu sınırları bozmadı
+- Tool-calling döngüsü sahte `httpx.post` ile test edildi: tool_call → tool
+  sonucu → düz metin akışı doğru, `AJAN_MAX_TUR` aşılınca `CevapUretilemedi`
+  fırlatıyor (sonsuz döngü koruması)
+- Kural katmanı testleri: tam/yazım-hatalı eşleşme LLM'siz cevaplanıyor,
+  alakasız/uzun/randevu-sinyalli mesaj `None` dönüp bir sonraki katmana düşüyor;
+  hatırlatma evet/iptal yalnız tam bir bekleyen randevu varken LLM'siz işleniyor
+- İyileştirme paneli: gerçek veriyle `/iyilestirme` render edildi (TestClient),
+  bilgi tabanı boşluğu ve tekrarlanan soru satırları doğru göründü; sayfa
+  yönetici → 200, personel → 403
+
+## Önceki doğrulama — Hermes'li dönem (2026-08-06, canlı denendi)
+
 - Ajan kabuksuz çalışıyor: doktor seçimi, uygunluk, randevu yazma ve iptal
-  `terminal` kapalıyken MCP araçlarıyla yürüdü (canlı denendi)
-- Hafif yol canlı denendi: çalışma saati, implant süresi ve otopark soruları
-  2.210 token'da doğru cevaplandı; konu dışı soru orada da reddedildi,
-  "randevu almak istiyorum" Hermes'e devredildi
+  `terminal` kapalıyken MCP araçlarıyla yürüdü
+- Hafif yol: çalışma saati, implant süresi ve otopark soruları 2.210 token'da
+  doğru cevaplandı; konu dışı soru orada da reddedildi, "randevu almak
+  istiyorum" tam ajana devredildi
 - Panel 9 sayfa 200 dönüyor, rol ayrımı tutuyor (personel → 403)
-- Fiyat/kampanya panelden kaydedilince ajan yeni fiyatı söylüyor (canlı denendi)
+- Fiyat/kampanya panelden kaydedilince ajan yeni fiyatı söylüyor
 - Ajan konu dışı soruya sabit ret cümlesi veriyor, konu içi soruyu cevaplıyor
 - Ajan bilgi tabanından cevap veriyor, teşhis/ilaç sorularını reddediyor
 - Aynı saate 3 hasta → 3 farklı hekim; 4. → "müsait doktor yok"

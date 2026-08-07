@@ -39,10 +39,13 @@ CREATE TABLE IF NOT EXISTS doktorlar (
     id        serial PRIMARY KEY,
     ad        text NOT NULL,
     uzmanlik  text,
+    telefon   text,
     aktif     boolean NOT NULL DEFAULT true,
     notlar    text,
     olusturma timestamptz NOT NULL DEFAULT now()
 );
+-- Doktora yeni randevu bildirimi göndermek için sonradan eklendi.
+ALTER TABLE doktorlar ADD COLUMN IF NOT EXISTS telefon text;
 
 CREATE TABLE IF NOT EXISTS randevular (
     id              serial PRIMARY KEY,

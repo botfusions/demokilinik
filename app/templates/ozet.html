@@ -120,7 +120,7 @@
             {{ r.baslangic.strftime('%H:%M') }}–{{ r.bitis.strftime('%H:%M') }}</td>
           <td><a href="/hastalar/{{ r.kisi_id }}">{{ r.ad or r.telefon }}</a></td>
           <td>{{ r.hizmet }}</td>
-          <td><span class="rozet {{ r.durum }}">{{ r.durum }}</span></td>
+          <td><span class="rozet {{ r.durum }}">{{ r.durum | durum_etiketi }}</span></td>
         </tr>
         {% endfor %}
       </table>

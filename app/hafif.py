@@ -81,19 +81,30 @@ def _gecmiste_randevu_var(gecmis: list[dict]) -> bool:
     return any(_randevu_sinyali(g["mesaj"]) for g in gecmis)
 
 
-def _sistem_promptu() -> str | None:
-    """SOUL + bilgi tabanı. Biri okunamıyorsa hafif yol devre dışı — eksik
-    kimlikle cevap üretmektense Hermes'e düşmek doğru."""
+def kimlik_ve_bilgi() -> str | None:
+    """SOUL + bilgi tabanı — ajanın kimliğinin tek üretim yeri.
+
+    `app/ajan.py`'nin tam-araçlı tur da bunu kullanır; iki ayrı yerde kimlik
+    metni üretilmesin diye ortak burada tutuluyor."""
     try:
         soul = SOUL.read_text()
         bilgi = HERMES_MD.read_text()
     except OSError as e:
-        log.warning("Hafif yol devre dışı, dosya okunamadı: %s", e)
+        log.warning("Kimlik okunamadı: %s", e)
+        return None
+    return f"{soul}\n\n# Klinik bilgileri\n\n{bilgi}"
+
+
+def _sistem_promptu() -> str | None:
+    """Hafif yolun sistem promptu: kimlik + "araçların yok, devret" talimatı.
+
+    Biri okunamıyorsa hafif yol devre dışı — eksik kimlikle cevap üretmektense
+    tam ajana düşmek doğru."""
+    if (temel := kimlik_ve_bilgi()) is None:
         return None
 
     return (
-        f"{soul}\n\n"
-        f"# Klinik bilgileri\n\n{bilgi}\n\n"
+        f"{temel}\n\n"
         f"# Bu kanalda\n\n"
         f"Randevu araçların yok. Hasta randevu almak, değiştirmek, iptal etmek "
         f"ya da bir saat/gün teyit etmek istiyorsa tek başına {DEVRET} yaz, "
@@ -118,6 +129,19 @@ def _maliyet(kullanim: dict) -> float | None:
     )
 
 
+def saglayici() -> tuple[str | None, str, str | None]:
+    """Sağlayıcı yapılandırması: (taban_url, anahtar, model).
+
+    Eğitim merkezi (egitim paketi) de bunu kullanır — çözümleme tek yerde dursun.
+    taban None = sağlayıcı ayarlanmamış, çağrı yapılmamalı.
+    """
+    s = os.environ.get("AJAN_PROVIDER", "")
+    taban = os.environ.get("AJAN_TABAN_URL") or TABAN_URL.get(s)
+    anahtar = os.environ.get(ANAHTAR_ADI.get(s, ""), "")
+    model = os.environ.get("AJAN_HAFIF_MODEL") or os.environ.get("AJAN_MODEL")
+    return taban, anahtar, model
+
+
 def cevap_dene(gecmis: list[dict], mesaj: str,
                kanal: str = "whatsapp") -> tuple[str, float | None] | None:
     """(yanıt, maliyet) ya da None. None = Hermes'e devret.
@@ -135,9 +159,7 @@ def cevap_dene(gecmis: list[dict], mesaj: str,
     if _randevu_sinyali(mesaj) or _gecmiste_randevu_var(gecmis):
         return None
 
-    saglayici = os.environ.get("AJAN_PROVIDER", "")
-    taban = os.environ.get("AJAN_TABAN_URL") or TABAN_URL.get(saglayici)
-    anahtar = os.environ.get(ANAHTAR_ADI.get(saglayici, ""), "")
+    taban, anahtar, model = saglayici()
     if not taban or not anahtar:
         return None
 
@@ -157,9 +179,7 @@ def cevap_dene(gecmis: list[dict], mesaj: str,
             f"{taban}/chat/completions",
             headers={"Authorization": f"Bearer {anahtar}"},
             json={
-                # Hafif yol için ayrı (ucuz) model verilebilir; verilmezse
-                # ana modelin kendisi kullanılır.
-                "model": os.environ.get("AJAN_HAFIF_MODEL") or os.environ.get("AJAN_MODEL"),
+                "model": model,
                 "messages": mesajlar,
                 "temperature": 0.3,
             },

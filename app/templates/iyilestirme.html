@@ -1,0 +1,61 @@
+{% extends "temel.html" %}
+{% block baslik %}İyileştirme Önerileri — Klinik Paneli{% endblock %}
+
+{% block icerik %}
+
+{% include "yonetici_sekmeler.html" %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>İyileştirme Önerileri</h1>
+    <div class="alt-baslik">
+      Ajan hiçbir şeyi kendiliğinden değiştirmez. Burası son 30 günün
+      konuşmalarından çıkan, sizin karar verip elle uygulayacağınız bir öneri
+      listesi.
+    </div>
+  </div>
+</div>
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Bilgi tabanı boşlukları</h2>
+  <p class="bos" style="margin-top:-8px">
+    Ajanın "personelimiz size dönecek" dediği sorular — bilgi tabanında
+    cevabı yok demektir. En çok tekrar eden önce görünür.
+  </p>
+  {% if bosluklar %}
+  <div class="kaydir"><table>
+    <tr><th>Soru</th><th>Kaç kez</th><th>Son soruluş</th><th></th></tr>
+    {% for b in bosluklar %}
+    <tr>
+      <td>{{ b.soru }}</td>
+      <td>{{ b.adet }}</td>
+      <td>{{ b.son_tarih.strftime('%d.%m.%Y %H:%M') }}</td>
+      <td><a class="sade" href="/bilgi?baslik={{ b.soru | urlencode }}">Bilgi ekle</a></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="bos">Son 30 günde bilgi tabanı boşluğu görünmüyor.</p>{% endif %}
+</div>
+
+<div class="kart">
+  <h2>Tekrarlanan sorular</h2>
+  <p class="bos" style="margin-top:-8px">
+    Aynı hasta art arda birbirine çok benzer iki soru sormuş — önceki cevap
+    muhtemelen tatmin etmemiştir. Hastanın kaydına bakıp cevabı gözden geçirin.
+  </p>
+  {% if tekrarlar %}
+  <div class="kaydir"><table>
+    <tr><th>İlk soru</th><th>Tekrar</th><th>Tarih</th><th></th></tr>
+    {% for t in tekrarlar %}
+    <tr>
+      <td>{{ t.ilk_soru }}</td>
+      <td>{{ t.tekrar_soru }}</td>
+      <td>{{ t.tarih.strftime('%d.%m.%Y %H:%M') }}</td>
+      <td><a class="sade" href="/hastalar/{{ t.kisi_id }}">Konuşmayı gör</a></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="bos">Son 30 günde tekrarlanan soru görünmüyor.</p>{% endif %}
+</div>
+
+{% endblock %}

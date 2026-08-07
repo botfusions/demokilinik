@@ -27,11 +27,15 @@ KATEGORI_ADLARI = {
 }
 
 
-def bilgi_ekle(conn: psycopg.Connection, baslik: str, icerik: str, kategori: str = "genel") -> int:
+def bilgi_ekle(conn: psycopg.Connection, baslik: str, icerik: str,
+               kategori: str = "genel", aktif: bool = True) -> int:
+    # `aktif=False` eğitim merkezinde makine-kazınan içeriğin taslak olarak
+    # inmesi için (app/egitim.py). Varsayılan True — elle eklenen anında yayında.
     with conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO bilgi_tabani (baslik, icerik, kategori) VALUES (%s, %s, %s) RETURNING id",
-            (baslik, icerik, kategori),
+            "INSERT INTO bilgi_tabani (baslik, icerik, kategori, aktif) "
+            "VALUES (%s, %s, %s, %s) RETURNING id",
+            (baslik, icerik, kategori, aktif),
         )
         bid = cur.fetchone()[0]
     conn.commit()

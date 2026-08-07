@@ -3,8 +3,9 @@
 Hasta WhatsApp'tan yazar; ajan klinik bilgi tabanından cevap verir, randevu ayarlar,
 Google Takvim'e yazar. Her mesaj CRM'e kaydedilir. Personel Türkçe panelden yönetir.
 
-**Yığın:** Hermes Agent (ajan) · OpenWA (WhatsApp) · FastAPI + HTMX (köprü + panel) ·
-Postgres · Composio MCP (Google Takvim + Gmail)
+**Yığın:** Kendi in-process ajanımız (tool-calling döngüsü, `app/ajan.py`) ·
+OpenWA (WhatsApp) · FastAPI + HTMX (köprü + panel) · Postgres ·
+Composio MCP (Google Takvim + Gmail)
 
 **Devir notu: [HANDOFF.md](HANDOFF.md)** — durum, sıradaki adımlar, verilmiş kararlar.
 Gereksinimler: [PRD.md](PRD.md) · Kusurlar: [KUSURLAR.md](KUSURLAR.md) · Testler: [tests/README.md](tests/README.md)
@@ -43,8 +44,7 @@ Köprüyü başlat:
 
 ## Model seçimi
 
-`.env` içindeki iki satır belirler. Boş bırakılırsa `hermes-home/config.yaml`
-geçerli olur (`gpt-5.6-luna`).
+`.env` içindeki iki satır belirler:
 
 ```bash
 AJAN_PROVIDER=zai      AJAN_MODEL=glm-4.6          # test
@@ -53,9 +53,13 @@ AJAN_PROVIDER=openai   AJAN_MODEL=gpt-5.6-luna     # canlı
 
 ## Composio (Google Takvim + Gmail)
 
-```bash
-./scripts/composio-ac.sh      # .env'deki anahtarları config.yaml'a işler
-```
+⏳ **Henüz yeniden bağlanmadı.** Eski `scripts/composio-ac.sh` Hermes'in
+`config.yaml`'ına MCP sunucusu ekliyordu; Hermes kalkınca bu betik de kalktı.
+Composio'yu yeni ajana bağlamak ayrı bir iş: ya `app/araclar.py`'ye yeni bir
+araç olarak eklenir (Instagram'ın Composio REST çağrısına benzer şekilde,
+bkz. `app/instagram.py`), ya da genel bir MCP istemcisi yazılır. `.env`'de
+`COMPOSIO_API_KEY`/`COMPOSIO_MCP_URL` doldurulsa bile şu an hiçbir kod bunları
+okumuyor.
 
 ## Fiyatlar ve kampanyalar
 
@@ -198,7 +202,7 @@ Klinik iki otomatik mesaj gönderir: randevudan **24 saat önce** teyit isteği,
 | Sessiz saat | 21:00–09:00 arası mesaj gitmez, sabaha ertelenir |
 | Tur başına iş sınırı | Bir turda en çok 10 hatırlatma |
 
-Ajanın skill'i de bunu biliyor: personel toplu mesaj isterse "Bu panelden
+Ajanın kimliği de bunu biliyor: personel toplu mesaj isterse "Bu panelden
 yapılamıyor" der.
 
 ## Ajanın sınırları
@@ -209,6 +213,21 @@ yapmaz. Acil belirtilerde 112'ye yönlendirir.
 
 Ajanın söyleyebileceği her şeyin kaynağı `.hermes.md` — panelden doldurulur,
 anında geçerli olur.
+
+## Mimari — üç katman, en ucuzdan en pahalıya
+
+Her gelen mesaj otomatik olarak LLM'e gitmez. Sıralama (`app/main.py`):
+
+1. **Kural katmanı** (`app/kural.py`, LLM'siz) — bilgi tabanındaki bir başlıkla
+   net eşleşen soru (fiyat, çalışma saati, adres) doğrudan cevaplanır; hatırlatmaya
+   tek kelimelik "evet"/"iptal" cevabı da burada LLM'siz işlenir.
+2. **Hafif yol** (`app/hafif.py`, ucuz LLM) — kural katmanı eşleşmezse, bilgi
+   soruları için araç şeması olmadan doğrudan `/chat/completions` çağrılır.
+3. **Tam ajan** (`app/ajan.py`, tool-calling) — randevu açma/değiştirme/iptal gibi
+   araç gerektiren işler burada; 7 aracı (`app/araclar.py`) çağırabilen elle
+   yazılmış bir tool-calling döngüsü, framework yok.
+
+Hedef: "100 mesajın 100'ü LLM'ye" değil, çoğu kural/API katmanında LLM'siz biter.
 
 ## Bilinmesi gerekenler
 
@@ -221,16 +240,55 @@ anında geçerli olur.
   Cloud API'ye geçerken yalnız `app/openwa.py` değişir.
 - **Yedek:** `scripts/yedekle.sh` günlük `pg_dump` alır, 30 gün saklar.
 
+## Doktora yeni randevu bildirimi
+
+Randevu oluşunca, doktorun telefonu `Doktorlar` sayfasında kayıtlıysa, kendisine
+WhatsApp'tan bir bildirim gider (`app/bildirim.py`). Kural sabit ve tek: yeni
+randevu → bildir; panelden ayarlanan bir "bildirim tercihleri" ekranı yok,
+kapatmak için `.env`'de `DOKTORA_BILDIRIM=0` yeterli.
+
+**KVKK — veri minimizasyonu.** Bildirim metni yalnız hizmet adı, tarih/saat ve
+hastanın adı/telefonunu içerir; hastanın serbest metin notu (şikayet/semptom)
+hiç girmez — bu metin doktorun telefonunun kilit ekranında görünebilir.
+
+## Demo verisi
+
+Satış demosu için `DemoDent Ağız ve Diş Sağlığı Kliniği`: 4 doktor (İmplant,
+Ortodonti, Estetik, Çocuk diş), ilgili fiyat listesi, birkaç genel bilgi kaydı.
+
+```bash
+.venv/bin/python scripts/demo-veri.py 905321112233   # demoda telefonu tutan kişinin numarası
+```
+
+Tekrar çalıştırılabilir (aynı isim varsa atlanır). Doktorların hepsine aynı
+telefon yazılır — hangi doktor seçilirse seçilsin bildirim aynı telefona gider.
+
+## Panelde durum etiketleri
+
+Randevu durumu DB'de hâlâ 3 değer (`bekliyor`/`onayli`/`iptal`); panelde
+"Planlandı"/"Teyit Edildi"/"İptal Edildi" olarak gösterilir (`durum_etiketi`
+Jinja filtresi, `app/main.py`). Daha ince ayrım (Teyit Bekliyor, Geldi,
+Gelmedi gibi) istenirse DB migration gerekir — bilinçli olarak ertelendi.
+
 ## Dosya haritası
 
 ```
 app/main.py      webhook + panel + iç API
 app/crm.py       kişi, görüşme, randevu (çakışma kuralları burada)
 app/kb.py        bilgi tabanı → .hermes.md
-app/ajan.py      hermes -z köprüsü
+egitim/          ajan eğitim merkezi — vendor konsolu (yazarak-eğit + site kazıma + KB düzenle)
+                 `uvicorn egitim.sunucu:app --port 8001`; müşteri panelinin `/egitim`'i
+                 yalnız yazarak-eğit'i çağırır (URL/tarama vendor'da)
+app/kural.py     LLM'siz kural katmanı (bilgi tabanı eşleşmesi + hatırlatma cevabı)
+app/hafif.py     bilgi soruları için araçsız, ucuz LLM çağrısı
+app/ajan.py      tam ajan — tool-calling döngüsü
+app/araclar.py   ajanın 7 randevu aracı (/api/* uçlarına ince katman)
+app/bildirim.py  doktora yeni randevu bildirimi (WhatsApp, tek alıcı)
+app/iyilestirme.py  salt-okunur öneri taraması (bilgi tabanı boşluğu, tekrar soru)
 app/openwa.py    WhatsApp istemcisi + HMAC doğrulama
 app/saglik.py    bağlantı nöbetçisi
 app/hatirlatma.py randevu hatırlatmaları + giden mesaj kilitleri
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
-hermes-home/     ajanın kimliği, yapılandırması, skill'leri (bu klasöre özel)
+hermes-home/SOUL.md  ajanın kimliği (bu klasöre özel)
+scripts/demo-veri.py  satış demosu için DemoDent verisi
 ```

@@ -16,27 +16,26 @@ from app.crm import gorusme_ekle, gorusme_gecmisi, kisi_bul, kisi_upsert
 # ── kanal sınırı: prompt ────────────────────────────────────
 
 def test_instagram_promptu_randevu_yasagini_soyler():
-    from app.ajan import prompt_hazirla
+    from app.ajan import _sistem_promptu
 
-    p = prompt_hazirla([], "yarın 14:00'e randevu alabilir miyim", kanal="instagram")
+    p = _sistem_promptu("instagram")
     assert "Randevu KAYDI AÇMA" in p
     assert "Randevu araçlarını çağırma" in p
     assert "WhatsApp" in p
 
 
 def test_whatsapp_promptu_degismedi():
-    from app.ajan import prompt_hazirla
+    from app.ajan import _sistem_promptu
 
-    p = prompt_hazirla([], "merhaba")
-    assert "WhatsApp'tan gönderilecek" in p
+    p = _sistem_promptu("whatsapp")
     assert "Randevu KAYDI AÇMA" not in p     # WhatsApp'ta randevu açılabilir
 
 
 def test_promptta_whatsapp_numarasi_gecer(monkeypatch):
-    from app.ajan import prompt_hazirla
+    from app.ajan import _sistem_promptu
 
     monkeypatch.setenv("KLINIK_WHATSAPP_NUMARASI", "0555 111 22 33")
-    assert "0555 111 22 33" in prompt_hazirla([], "randevu", kanal="instagram")
+    assert "0555 111 22 33" in _sistem_promptu("instagram")
 
 
 # ── tavan sızıntısı: Instagram WhatsApp'ın bütçesini yemez ──

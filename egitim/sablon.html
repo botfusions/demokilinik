@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block baslik %}Ajan Eğitim Merkezi{% endblock %}</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d10;
+    --panel: #15181d;
+    --panel2: #1b1f25;
+    --border: #272c34;
+    --text: #e8eaed;
+    --muted: #8b93a1;
+    --green: #25d366;
+    --green-d: #128c7e;
+    --wa-head: #075e54;
+    --wa-chat: #0b141a;
+    --b-agent: #202c33;
+    --b-user: #005c4b;
+    --amber: #f59e0b;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body { font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
+         margin: 0; background: var(--bg); color: var(--text);
+         max-width: 1040px; margin: 0 auto; padding: 20px; }
+  a { color: var(--green); }
+
+  /* üst başlık */
+  .ust { display: flex; justify-content: space-between; align-items: center;
+         margin-bottom: 18px; }
+  .marka { display: flex; align-items: center; gap: 10px; }
+  .marka .logo { width: 34px; height: 34px; border-radius: 9px;
+         background: linear-gradient(135deg, var(--green-d), var(--green));
+         display: grid; place-items: center; font-size: 17px; }
+  .marka h1 { font-size: 18px; margin: 0; line-height: 1.1; }
+  .marka .alt { color: var(--muted); font-size: 12px; }
+  .ust-sag { text-align: right; }
+  .ust-sag .kim { color: var(--muted); font-size: 12px; }
+  .cikis { background: none; border: 1px solid var(--border); color: var(--muted);
+           border-radius: 7px; padding: 4px 12px; font: inherit; cursor: pointer; margin-top: 4px; }
+
+  /* genel kart */
+  .kart { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  .alt { color: var(--muted); font-size: 13px; }
+  .alt strong { color: var(--text); }
+
+  label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 13px; }
+  input, textarea, select { width: 100%; padding: 9px 11px; background: var(--panel2);
+         border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+         font: inherit; }
+  input::placeholder, textarea::placeholder { color: #5b636f; }
+  textarea { resize: vertical; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--green-d); }
+  select option { background: var(--panel2); }
+
+  button { background: var(--green-d); color: #fff; border: 0; border-radius: 8px;
+           padding: 9px 16px; font: inherit; cursor: pointer; }
+  button:hover { background: var(--green); }
+  button.ikinci { background: #3a414b; }
+  button.ikinci:hover { background: #4a525d; }
+  button.yanlis { background: var(--red); }
+  button.tamam { background: var(--green-d); }
+
+  /* bildirimler */
+  .hata { background: #2a1416; border: 1px solid #5b2226; color: #fca5a5;
+          padding: 10px 14px; border-radius: 9px; margin-bottom: 14px; }
+  .ok { background: #0f241a; border: 1px solid #1e4d36; color: #86efac;
+        padding: 10px 14px; border-radius: 9px; margin-bottom: 14px; }
+  .uyari-cubuk { background: #2a2114; border: 1px solid #5b4622; color: #fcd34d;
+        padding: 10px 14px; border-radius: 9px; margin-bottom: 14px; }
+
+  /* ===== Ajana sor — WhatsApp mockup ===== */
+  .demo { display: grid; gap: 0; max-width: 460px; margin: 0 auto 22px;
+          border-radius: 20px; overflow: hidden;
+          border: 7px solid #050709; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+  .demo-bas { background: var(--wa-head); display: flex; align-items: center;
+          gap: 10px; padding: 11px 14px; color: #fff; }
+  .demo-bas .av { width: 34px; height: 34px; border-radius: 50%;
+          background: #e8d8c4; color: #4a3526; display: grid; place-items: center;
+          font-weight: 700; font-size: 13px; }
+  .demo-bas .ad { font-size: 14px; font-weight: 600; line-height: 1.1; }
+  .demo-bas .cevrimiçi { font-size: 11px; color: #b9e2d4; }
+  .demo-alan { background: var(--wa-chat); padding: 18px 14px; min-height: 320px;
+          display: flex; flex-direction: column; gap: 10px;
+          background-image: radial-gradient(rgba(255,255,255,.015) 1px, transparent 1px);
+          background-size: 14px 14px; }
+  .bos-mesaj { margin: auto; text-align: center; color: #6b7d77; font-size: 13px; }
+  .balon { max-width: 78%; padding: 8px 11px; border-radius: 10px; font-size: 13.5px;
+          white-space: pre-wrap; word-break: break-word; line-height: 1.45;
+          animation: yz .18s ease; }
+  @keyframes yz { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  .gelen { background: var(--b-agent); color: #e9edec; align-self: flex-start;
+          border-top-left-radius: 3px; }
+  .giden { background: var(--b-user); color: #e9edec; align-self: flex-end;
+          border-top-right-radius: 3px; }
+  .hata-bal { background: #3b1717; color: #fca5a5; align-self: flex-end;
+          border-top-right-radius: 3px; border: 1px solid #5b2226; }
+  .oneri { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 12px;
+          background: #0e1a14; border-top: 1px solid #11241b; }
+  .oneri form { margin: 0; }
+  .oneri button { background: rgba(37,211,102,.14); color: #6ee7a8; border: 1px solid #1e4d36;
+          font-size: 12.5px; padding: 6px 11px; border-radius: 18px; }
+  .oneri button:hover { background: rgba(37,211,102,.24); }
+  .demo-alt { background: var(--wa-chat); border-top: 1px solid #11241b; padding: 10px 12px; }
+  .demo-alt form { display: flex; gap: 8px; }
+  .demo-alt input { background: var(--b-agent); border-color: #2a3942; }
+  .demo-gonder { width: 42px; flex: 0 0 42px; padding: 0; border-radius: 50%;
+          display: grid; place-items: center; font-size: 16px; }
+  .demo-uyari { text-align: center; color: var(--muted); font-size: 12px;
+          margin: 10px auto 0; max-width: 460px; }
+
+  /* ızgara: iki kart yan yana */
+  .ikili { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .ikili { grid-template-columns: 1fr; } }
+
+  /* tablo */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+          vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .3px; }
+  .rozet { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 20px; }
+  .aktif { background: #0f241a; color: #6ee7a8; }
+  .pasif { background: #2a2114; color: #fcd34d; }
+  .govde { white-space: pre-wrap; background: var(--panel2); }
+  .giris-kutu { max-width: 340px; margin: 70px auto; }
+</style>
+</head>
+<body>
+
+{% if sayfa == 'giris' %}
+  <div class="giris-kutu">
+    <div class="marka" style="margin-bottom:14px">
+      <div class="logo">🦷</div>
+      <div>
+        <h1>Ajan Eğitim Merkezi</h1>
+        <div class="alt">Klinik admin hesabıyla giriş</div>
+      </div>
+    </div>
+    {% if hata %}<div class="hata">{% if hata == '1' %}Kullanıcı adı veya parola yanlış.{% else %}Oturum açılmadı.{% endif %}</div>{% endif %}
+    <form method="post" action="/giris">
+      <label>Kullanıcı adı</label>
+      <input name="kullanici_adi" required autofocus>
+      <label>Parola</label>
+      <input name="parola" type="password" required>
+      <div style="margin-top:14px"><button style="width:100%">Giriş</button></div>
+    </form>
+  </div>
+{% else %}
+
+<div class="ust">
+  <div class="marka">
+    <div class="logo">🦷</div>
+    <div>
+      <h1>Ajan Eğitim Merkezi</h1>
+      <div class="alt">Ajanı eğit · siteden besle · tek tıkla dene</div>
+    </div>
+  </div>
+  <div class="ust-sag">
+    <div class="kim">{{ kullanici.ad or kullanici.kullanici_adi }}</div>
+    <form method="post" action="/cikis"><button class="cikis">Çıkış</button></form>
+  </div>
+</div>
+
+{% set hata = request.query_params.get('hata') %}
+{% set eklendi = request.query_params.get('eklendi') %}
+{% set taslak = request.query_params.get('taslak') %}
+{% set uyari = request.query_params.get('uyari') %}
+{% if hata %}<div class="hata">{{ hata }}</div>{% endif %}
+{% if eklendi %}<div class="ok"><strong>{{ eklendi }}</strong> kayıt eklendi (aktif). Ajan bir sonraki mesajda kullanır.</div>{% endif %}
+{% if taslak %}<div class="ok"><strong>{{ taslak }}</strong> taslak eklendi (pasif) — Bilgi Tabanı'nda <em>Aktifleştir</em>.</div>{% endif %}
+{% if uyari %}<div class="uyari-cubuk">⚠ {{ uyari }}<div class="alt" style="margin-top:4px;color:#a78b5a">Fiyat bilgi tabanına girmez; fiyatı klinik panelinde Fiyat ve Kampanya sayfasından ekleyin.</div></div>{% endif %}
+
+{# ── Ajana sor (demo / eğitim doğrulama) ── #}
+<div class="kart" style="padding-bottom:8px">
+  <h2>Ajana sor</h2>
+  <div class="alt" style="margin-bottom:14px">Eğitimin tutup tutmadığını buradan doğrula. Aynı satış demosu — gerçek ajan beyni, gerçek bilgi tabanı.</div>
+  <div class="demo">
+    <div class="demo-bas">
+      <div class="av">KA</div>
+      <div>
+        <div class="ad">Klinik Ajanı</div>
+        <div class="cevrimiçi">çevrimiçi</div>
+      </div>
+    </div>
+    <div class="demo-alan">
+      {% if not sohbet and not soru %}
+        <div class="bos-mesaj">Aşağıdaki önerilerden birine dokun ya da yaz —<br>gerçek ajan gerçek zamanlı cevap verecek.</div>
+      {% endif %}
+      {% for m in sohbet %}
+        <div class="balon {{ 'giden' if m.yon == 'gelen' else 'gelen' }}">{{ m.mesaj }}</div>
+      {% endfor %}
+      {% if soru %}<div class="balon giden">{{ soru }}</div>{% endif %}
+      {% if soru_hata %}<div class="balon hata-bal">⚠ Ajan cevap üretemedi: {{ soru_hata }}</div>{% endif %}
+    </div>
+    <div class="oneri">
+      <form method="post" action="/sor"><button type="submit" name="mesaj" value="Çalışma saatleriniz nedir?">Saatler nedir?</button></form>
+      <form method="post" action="/sor"><button type="submit" name="mesaj" value="Neyi biliyorsun?">Neyi biliyorsun?</button></form>
+      <form method="post" action="/sor"><button type="submit" name="mesaj" value="Adresiniz neresi?">Adres?</button></form>
+      <form method="post" action="/sor"><button type="submit" name="mesaj" value="Yarın 14:00 müsait misiniz?">Randevu dene</button></form>
+    </div>
+    <div class="demo-alt">
+      <form method="post" action="/sor">
+        <input name="mesaj" placeholder="Mesaj yaz" required autofocus>
+        <button class="demo-gonder" type="submit">➤</button>
+      </form>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;gap:18px;align-items:center;margin-top:10px;flex-wrap:wrap">
+    <form method="post" action="/sohbet/sifirla"><button class="ikinci">↻ Sohbeti sıfırla</button></form>
+    <span class="alt" style="margin:0">Bu bir simülasyon değil — her mesaj gerçek ajanın beynine gider. Sadece WhatsApp yerine bu ekran.</span>
+  </div>
+</div>
+
+<div class="ikili">
+  <div class="kart">
+    <h2>Sohbetle eğit</h2>
+    <div class="alt" style="margin-top:-4px">Bilgiyi serbest cümlelerle yaz; yapısal kayıtlara ayrılır ve <strong>aktif</strong> iner. Fiyat yazma — uyarı döner.</div>
+    <form method="post" action="/egit">
+      <textarea name="metin" rows="3" placeholder='Örn: Cumartesi 10:00-16:00 arası açığız. Otopark ücretsizdir.' required></textarea>
+      <div style="margin-top:10px"><button>Eğit</button></div>
+    </form>
+  </div>
+
+  <div class="kart">
+    <h2>Web sitesinden içe aktar</h2>
+    <div class="alt" style="margin-top:-4px">Ana + alt sayfalar (iletişim, SSS) kazınır; <strong>pasif taslak</strong> iner, aşağıda onaylanır.</div>
+    <form method="post" action="/tara">
+      <input name="url" type="url" placeholder="https://klinikadi.com" required>
+      <div style="margin-top:10px"><button>Siteden içe aktar</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="kart">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h2 style="margin:0">Bilgi Tabanı</h2>
+    <span class="alt">{{ bilgiler|length }} kayıt · {{ taslak_adedi }} taslak bekliyor</span>
+  </div>
+  {% if not bilgiler %}
+    <div class="alt">Henüz kayıt yok.</div>
+  {% else %}
+  <table>
+    <thead><tr><th>Başlık</th><th>İçerik</th><th>Kategori / Durum</th><th>İşlem</th></tr></thead>
+    <tbody>
+    {% for b in bilgiler %}
+      <tr>
+        <td>
+          <form method="post" action="/kayit/{{ b.id }}/guncelle">
+            <input name="baslik" value="{{ b.baslik }}" style="font-weight:600">
+            <input type="hidden" name="icerik" value="{{ b.icerik }}">
+            <input type="hidden" name="kategori" value="{{ b.kategori }}">
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/kayit/{{ b.id }}/guncelle">
+            <textarea name="icerik" rows="2" class="govde">{{ b.icerik }}</textarea>
+            <input type="hidden" name="baslik" value="{{ b.baslik }}">
+            <input type="hidden" name="kategori" value="{{ b.kategori }}">
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/kayit/{{ b.id }}/guncelle">
+            <select name="kategori">
+              {% for kod, ad in kategoriler.items() %}
+              <option value="{{ kod }}" {% if kod == b.kategori %}selected{% endif %}>{{ ad }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="baslik" value="{{ b.baslik }}">
+            <input type="hidden" name="icerik" value="{{ b.icerik }}">
+            <div style="margin-top:6px">
+              <span class="rozet {{ 'aktif' if b.aktif else 'pasif' }}">{{ 'aktif' if b.aktif else 'pasif' }}</span>
+            </div>
+          </form>
+        </td>
+        <td style="white-space:nowrap">
+          {% if b.aktif %}
+          <form method="post" action="/kayit/{{ b.id }}/pasiflestir" style="display:inline">
+            <button class="ikinci">Pasifleştir</button>
+          </form>
+          {% else %}
+          <form method="post" action="/kayit/{{ b.id }}/aktiflestir" style="display:inline">
+            <button class="tamam">Aktifleştir</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="alt" style="margin-top:8px">Başlık, içerik veya kategoriyi değiştirip Enter'a basın — alan kendi formunu gönderir (üç ayrı gizli form; ponytail: JS'siz satır içi düzenleme).</div>
+  {% endif %}
+</div>
+
+{% endif %}
+</body>
+</html>

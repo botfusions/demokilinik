@@ -38,19 +38,7 @@ fi
 .venv/bin/pip install -q -r requirements.txt
 echo "  Python ortamı hazır ($(.venv/bin/python -V))."
 
-# ── 3. Hermes ───────────────────────────────────────────────
-if ! command -v hermes >/dev/null 2>&1; then
-  echo "  Hermes kuruluyor..."
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
-  export PATH="$HOME/.local/bin:$PATH"
-fi
-echo "  Hermes: $(hermes --version 2>&1 | head -1)"
-
-# Ajan bu klasöre özel — global ~/.hermes kullanılmaz
-export HERMES_HOME="$KOK/hermes-home"
-hermes config check >/dev/null 2>&1 && echo "  Ajan yapılandırması geçerli."
-
-# ── 4. Docker ───────────────────────────────────────────────
+# ── 3. Docker ───────────────────────────────────────────────
 docker compose up -d
 echo "  Postgres ve OpenWA ayakta."
 
@@ -63,7 +51,7 @@ done
 .venv/bin/python -m app.db
 echo "  Veritabanı şeması kuruldu."
 
-# ── 5. WhatsApp oturumu ─────────────────────────────────────
+# ── 4. WhatsApp oturumu ─────────────────────────────────────
 echo "→ WhatsApp oturumu hazırlanıyor..."
 sleep 10
 

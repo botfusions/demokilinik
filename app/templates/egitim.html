@@ -1,0 +1,57 @@
+{% extends "temel.html" %}
+{% block baslik %}Eğitim — Klinik Paneli{% endblock %}
+
+{% block icerik %}
+
+{% include "yonetici_sekmeler.html" %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>Ajan Eğitimi</h1>
+    <div class="alt-baslik">Bilgi tabanını yazarak veya siteden kazıyarak besle</div>
+  </div>
+</div>
+
+{# Sonuç/uyarı çubuğu — query ile gelir (rota 303 sonrası). #}
+{% set hata = request.query_params.get('hata') %}
+{% set eklendi = request.query_params.get('eklendi') %}
+{% set uyari = request.query_params.get('uyari') %}
+{% if hata %}
+<div class="hata">{{ hata }}</div>
+{% endif %}
+{% if eklendi %}
+<div class="kart" style="padding:12px 16px">
+  <strong>{{ eklendi }}</strong> kayıt eklendi (aktif). Ajan bir sonraki mesajda kullanır.
+</div>
+{% endif %}
+{% if uyari %}
+<div class="kart" style="padding:12px 16px;border-left:4px solid #d97706">
+  ⚠ {{ uyari }}
+  <div class="bos" style="margin-top:4px">Fiyat bilgi tabanına girmez; fiyatı
+  <a href="/yonetici">Fiyat ve Kampanya</a> sayfasından ekleyin.</div>
+</div>
+{% endif %}
+
+{% if taslak_adedi %}
+<div class="kart" style="padding:10px 16px">
+  <a href="/bilgi">{{ taslak_adedi }}</a> taslak onay bekliyor (Bilgi Tabanı'nda <em>Aktifleştir</em>).
+</div>
+{% endif %}
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Sohbetle eğit</h2>
+  <p class="bos" style="margin-top:-8px">
+    Aklınızdaki bilgiyi serbest cümlelerle yazın; ajan bunu bilgi tabanı
+    kayıtlarına ayırır ve anında yayına alır. Örnek: <em>“Cumartesi 10-16
+    açığız, park yerimiz var.”</em> Yazdığınız an aktif olur.
+  </p>
+  <form method="post" action="/egitim/egit">
+    <label for="m">Bilgi metni</label>
+    <textarea id="m" name="metin" rows="4"
+              placeholder="Örn: Cumartesi 10:00-16:00 arası açığız. Otopark ücretsizdir."
+              required></textarea>
+    <div style="margin-top:12px"><button>Eğit</button></div>
+  </form>
+</div>
+
+{% endblock %}

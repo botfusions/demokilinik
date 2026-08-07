@@ -142,6 +142,14 @@ def test_personel_bilgi_sayfasini_goremez(personel_istemci):
     assert personel_istemci.get("/bilgi").status_code == 403
 
 
+def test_yonetici_iyilestirme_sayfasini_gorur(girisli):
+    assert girisli.get("/iyilestirme").status_code == 200
+
+
+def test_personel_iyilestirme_sayfasini_goremez(personel_istemci):
+    assert personel_istemci.get("/iyilestirme").status_code == 403
+
+
 @pytest.mark.parametrize("yol,veri", [
     ("/bilgi", {"baslik": "x", "icerik": "y", "kategori": "genel"}),
     ("/bilgi/1/guncelle", {"baslik": "x", "icerik": "y", "kategori": "genel"}),
