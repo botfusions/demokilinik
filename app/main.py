@@ -22,7 +22,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, bildirim, hatirlatma, instagram, iyilestirme, kural, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -325,16 +325,66 @@ def bilgi_ac(request: Request, bilgi_id: int, conn=Depends(db)):
 # İki girdi: sohbetle eğit (personel yazar, AKTİF iner) ve site tarama
 # (makine kazır, PASİF/taslak iner — onay Bilgi Tabanı'nda, yukarıdaki rotalarla).
 
-@app.get("/egitim", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
-def egitim_sayfasi(request: Request, conn=Depends(db)):
-    # beklemede taslak sayısı: pasif KB kayıtları (onay bekleyen kazınan içerik)
-    taslak_adedi = sum(1 for b in bilgiler_listele(conn) if not b["aktif"])
+# Ajana sor: personelin "ne öğrendim?" diye sorduğu demo sohbeti.
+# ponytail: oturum-başı sohbet bellekte (dict[user_id]). Demo aracıdır;
+# yeniden başlatmada sıfırlanır, çok-worker'da paylaşılmaz. Üretim değil.
+_egitim_sohbet: dict[int, list[dict]] = {}
+
+
+def _ajan_sor(conn, gecmis: list[dict], mesaj: str) -> str:
+    """Demo yolu: kural → hafif → ajan. WhatsApp/CRM yan etkisi yoktur.
+
+    Bu gerçek ajan beynidir — simülasyon değil. Ajan araç çağırabilir
+    (randevu açar vb.); burada WhatsApp yerine bu ekran kullanıldığı için
+    görüşme DB'ye yazılmaz, kimseye mesaj gitmez. Aynısı vendor konsolunda
+    (egitim.sunucu._ajan_sor) — iki ayrı app, bilinçli tekrar."""
+    yanit = kural.cevap_dene(conn, mesaj)
+    if yanit:
+        return yanit
+    dene = hafif.cevap_dene(gecmis, mesaj)
+    if dene:
+        return dene[0]
+    yanit, _maliyet = ajan.cevap_uret(gecmis, mesaj)
+    yanit, _konum = ajan.konum_ayikla(yanit)
+    return yanit
+
+
+def _egitim_render(request: Request, conn, **ekstra):
+    kid = _kim(request)["id"]
     return sablonlar.TemplateResponse(request, "egitim.html", {
         "sayfa": "egitim",
         "kullanici": _kim(request),
-        "taslak_adedi": taslak_adedi,
+        "taslak_adedi": sum(1 for b in bilgiler_listele(conn) if not b["aktif"]),
         "saglik": saglik.saglik_ozeti(conn),
+        "sohbet": _egitim_sohbet.get(kid, []),
+        **ekstra,
     })
+
+
+@app.get("/egitim", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
+def egitim_sayfasi(request: Request, conn=Depends(db)):
+    return _egitim_render(request, conn)
+
+
+@app.post("/egitim/sor", dependencies=[Depends(yonetici)])
+def egitim_sor(request: Request, mesaj: str = Form(...), conn=Depends(db)):
+    """Öğrenileni sorgula: ajanın beynine gider, hiçbir yere mesaj yazmaz."""
+    kid = _kim(request)["id"]
+    gecmis = list(_egitim_sohbet.get(kid, []))
+    try:
+        yanit = _ajan_sor(conn, gecmis, mesaj)
+    except Exception as e:
+        log.warning("Ajana sor başarısız: %s", e)
+        return _egitim_render(request, conn, soru=mesaj, soru_hata=str(e))
+    _egitim_sohbet.setdefault(kid, []).append({"yon": "gelen", "mesaj": mesaj})
+    _egitim_sohbet[kid].append({"yon": "giden", "mesaj": yanit})
+    return _egitim_render(request, conn)
+
+
+@app.post("/egitim/sohbet/sifirla", dependencies=[Depends(yonetici)])
+def egitim_sohbet_sifirla(request: Request, conn=Depends(db)):
+    _egitim_sohbet.pop(_kim(request)["id"], None)
+    return RedirectResponse("/egitim", status_code=303)
 
 
 @app.post("/egitim/egit", dependencies=[Depends(yonetici)])

@@ -54,4 +54,72 @@
   </form>
 </div>
 
+<div class="kart">
+  <h2>Ajana sor</h2>
+  <p class="bos" style="margin-top:-8px">
+    Yazdığınız bilgileri ajan öğrendi mi? Hemen sorun ve görün. Bu gerçek
+    ajanın beynidir — simülasyon değil; cevap bilgi tabanından gelir.
+  </p>
+
+  <style>
+    .sor-cips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
+    .sor-cips form{display:inline}
+    .sohbet-kutu{
+      max-height:340px;overflow-y:auto;padding:14px;
+      background:var(--canvas-soft);border:1px solid var(--hairline-cool);
+      border-radius:var(--r-md);margin-bottom:12px;
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .balon{max-width:80%;padding:9px 13px;border-radius:14px;font-size:14px;
+           line-height:1.45;white-space:pre-wrap;word-break:break-word}
+    .balon.benden{align-self:flex-end;background:var(--primary);color:var(--on-primary);
+                  border-bottom-right-radius:4px}
+    .balon.ajandan{align-self:flex-start;background:var(--canvas);
+                   border:1px solid var(--hairline);color:var(--ink);
+                   border-bottom-left-radius:4px}
+    .sor-form{display:flex;gap:8px;align-items:flex-end}
+    .sor-form textarea{min-height:48px;flex:1}
+  </style>
+
+  <div class="sor-cips">
+    <form method="post" action="/egitim/sor">
+      <input type="hidden" name="mesaj" value="Hangi günler çalışıyorsunuz?">
+      <button type="submit" class="sade">Hangi günler çalışıyorsunuz?</button>
+    </form>
+    <form method="post" action="/egitim/sor">
+      <input type="hidden" name="mesaj" value="Neleri biliyorsun?">
+      <button type="submit" class="sade">Neleri biliyorsun?</button>
+    </form>
+    <form method="post" action="/egitim/sor">
+      <input type="hidden" name="mesaj" value="Otopark var mı?">
+      <button type="submit" class="sade">Otopark var mı?</button>
+    </form>
+    <form method="post" action="/egitim/sor">
+      <input type="hidden" name="mesaj" value="İmplant tedavisi ne kadar sürüyor?">
+      <button type="submit" class="sade">İmplant ne kadar sürüyor?</button>
+    </form>
+  </div>
+
+  <div class="sohbet-kutu">
+    {% for m in sohbet %}
+    <div class="balon {{ 'benden' if m.yon == 'gelen' else 'ajandan' }}">{{ m.mesaj }}</div>
+    {% else %}
+    <div class="bos">Henüz konuşma yok. Yukarıdaki hızlı butonlardan birine dokun ya da kendi cümleni yaz.</div>
+    {% endfor %}
+    {% if soru_hata %}
+    <div class="hata" style="margin:0">{{ soru_hata }}</div>
+    {% endif %}
+  </div>
+
+  <form method="post" action="/egitim/sor" class="sor-form">
+    <textarea name="mesaj" rows="1"
+              placeholder="Örn: Cumartesi de açıyor musunuz?"
+              required>{{ soru or '' }}</textarea>
+    <button type="submit">Gönder</button>
+  </form>
+  <form method="post" action="/egitim/sohbet/sifirla" style="margin-top:10px">
+    <button type="submit" class="sade">Sohbeti sıfırla</button>
+  </form>
+</div>
+
 {% endblock %}
