@@ -1,0 +1,119 @@
+{% extends "temel.html" %}
+{% block baslik %}Sistem Doktoru — Klinik Paneli{% endblock %}
+
+{% block icerik %}
+
+{% set yonetici_mi = kullanici.rol == 'admin' %}
+<div class="baslik-satir">
+  <div>
+    <h1>Sistem Doktoru</h1>
+    <div class="alt-baslik">Aksaklıkta otomatik müdahale — saglik tespit eder, doktor onarır</div>
+  </div>
+</div>
+
+{% set q_servis = request.query_params.get('servis') %}
+{% set q_ok = request.query_params.get('ok') %}
+{% if q_servis %}
+<div class="kart" style="padding:12px 16px;border-left:4px solid {% if q_ok == '1' %}var(--primary){% else %}var(--danger){% endif %}">
+  <strong>{{ q_servis }}</strong> için onarım
+  {% if q_ok == '1' %}başarılı — bir sonraki kontrol doğrulayacak.{% else %}içeriden yapılamadı (aşağıdaki açıklamaya bak).{% endif %}
+</div>
+{% endif %}
+
+{# ── Nöbetçi görevleri (asyncio task canlılık) ── #}
+<div class="kart">
+  <h2>Nöbetçi görevleri</h2>
+  <p class="bos" style="margin-top:-8px">
+    Arka plan döngüleri (sağlık, hatırlatma, instagram). Çökerse doktor
+    süpervizörü otomatik yeniden doğurur.
+  </p>
+  <table>
+    <thead><tr><th>Görev</th><th>Durum</th></tr></thead>
+    <tbody>
+      {% for ad, g in gorevler.items() %}
+      <tr>
+        <td class="t-name">{{ ad }}</td>
+        <td>
+          {% if not g.etkin %}
+            <span class="rozet pasif">kapalı</span>
+          {% elif g.canli %}
+            <span class="rozet aktif">çalışıyor</span>
+          {% elif g.crashed %}
+            <span class="rozet iptal">çöktü — yeniden başlatılacak</span>
+          {% else %}
+            <span class="rozet">duraklatıldı</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2"><span class="bos">Görev kaydı yok.</span></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Bağlantı durumu + elle onar ── #}
+<div class="kart">
+  <h2>Bağlantı durumu</h2>
+  <p class="bos" style="margin-top:-8px">
+    Her servis için sağlık durumu ve son hata. 'Onar' düğmesi doktoru Elle
+    çağırır; otomatik onarılamayanlar ne yapılması gerektiğini söyler.
+  </p>
+  <table>
+    <thead><tr><th>Servis</th><th>Durum</th><th>Son hata</th><th></th></tr></thead>
+    <tbody>
+      {% for s in saglik %}
+      <tr>
+        <td class="t-name">{{ s.servis }}</td>
+        <td>
+          {% if s.durum == 'saglikli' %}
+            <span class="rozet aktif">sağlıklı</span>
+          {% else %}
+            <span class="rozet iptal">bozuk</span>
+            <span class="not">{{ s.ardisik_hata }} ardışık hata</span>
+          {% endif %}
+        </td>
+        <td class="bos">{{ s.hata or '—' }}</td>
+        <td style="text-align:right">
+          <form method="post" action="/doktor/onar">
+            <input type="hidden" name="servis" value="{{ s.servis }}">
+            <button type="submit" class="sade">Onar</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4"><span class="bos">Henüz sağlık kontrolü yapılmadı.</span></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="bos" style="margin-top:12px;font-size:12px">
+    Instagram döngüsel onarılabilir (yeniden başlatılır). WhatsApp ayrı Chromium
+    süreci, Composio OAuth gerektirir — bunlar insan müdahalesi ister.
+  </div>
+</div>
+
+{# ── Onarım geçmişi ── #}
+<div class="kart">
+  <h2>Onarım geçmişi</h2>
+  <table>
+    <thead><tr><th>Saat</th><th>Servis</th><th>Tetikleyici</th><th>Sonuç</th><th>Açıklama</th></tr></thead>
+    <tbody>
+      {% for o in gecmis %}
+      <tr>
+        <td class="mono" style="white-space:nowrap">{{ o.zaman.strftime('%d.%m %H:%M') }}</td>
+        <td class="t-name">{{ o.servis }}</td>
+        <td>{{ o.tetikleyici }}</td>
+        <td>
+          {% if o.basarili %}<span class="rozet aktif">başarılı</span>
+          {% else %}<span class="rozet iptal">başarısız</span>{% endif %}
+        </td>
+        <td class="bos">{{ o.mesaj }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5"><span class="bos">Henüz onarım girişimi yok.</span></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

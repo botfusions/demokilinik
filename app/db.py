@@ -154,6 +154,18 @@ CREATE TABLE IF NOT EXISTS baglanti_saglik (
     ardisik_hata     integer NOT NULL DEFAULT 0,
     uyari_gonderildi boolean NOT NULL DEFAULT false
 );
+
+-- Sistem doktorunun onarım girişimleri (app/doktor.py). saglik tespit eder,
+-- doktor onarır; her girişim buraya yazılır, /doktor panelinde görünür.
+CREATE TABLE IF NOT EXISTS sistem_onarim (
+    id          bigserial PRIMARY KEY,
+    servis      text NOT NULL,
+    zaman       timestamptz NOT NULL DEFAULT now(),
+    tetikleyici text NOT NULL,        -- 'otomatik' | 'manuel' | 'supervisor'
+    basarili    boolean NOT NULL,
+    mesaj       text
+);
+CREATE INDEX IF NOT EXISTS sistem_onarim_zaman_idx ON sistem_onarim (zaman DESC);
 """
 
 

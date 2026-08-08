@@ -189,11 +189,27 @@ async def nobetci(baglan_fn) -> None:
                     aksiyon = kontrol_sonucu_isle(conn, servis, basarili, hata)
 
                     if aksiyon == "uyari":
-                        uyari_maili_gonder(
-                            f"[Klinik] {servis} bağlantısı koptu",
-                            f"{servis} bağlantısı iki ardışık kontrolde başarısız.\n\n"
-                            f"Hata: {hata}\n\nPanelden 'Bağlantı Durumu' bölümüne bakın.",
-                        )
+                        # Önce sistem doktoru denesin: otomatik onarılabilirse
+                        # (ör. Instagram poller restart) 'koptu' alarmı yumuşar.
+                        from app import doktor  # geç import: döngü yok
+                        try:
+                            onarildi, onarim_mesaji = doktor.onar(conn, servis, "otomatik")
+                        except Exception as e:
+                            onarildi, onarim_mesaji = False, f"onarım hatası: {e}"
+                        if onarildi:
+                            uyari_maili_gonder(
+                                f"[Klinik] {servis} otomatik onarıldı",
+                                f"{servis} bozuktu; sistem doktoru müdahale etti:\n\n"
+                                f"{onarim_mesaji}\n\nBir sonraki kontrol doğrulayacak.",
+                            )
+                        else:
+                            uyari_maili_gonder(
+                                f"[Klinik] {servis} bağlantısı koptu",
+                                f"{servis} bağlantısı iki ardışık kontrolde başarısız.\n\n"
+                                f"Hata: {hata}\n\n"
+                                f"Otomatik onarım denendi: {onarim_mesaji}\n\n"
+                                f"Panelden 'Doktor' bölümüne bakın.",
+                            )
                     elif aksiyon == "duzeldi":
                         uyari_maili_gonder(
                             f"[Klinik] {servis} bağlantısı geri geldi",

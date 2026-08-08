@@ -44,6 +44,13 @@
       <a class="nav-item" href="http://localhost:2785" target="_blank" rel="noopener">WhatsApp (QR)</a>
     </div>
 
+    {% if kullanici and kullanici.rol == 'admin' %}
+    <div class="nav-group">
+      <div class="nav-label">Sistem</div>
+      <a class="nav-item {% if sayfa == 'doktor' %}active{% endif %}" href="/doktor">Doktor</a>
+    </div>
+    {% endif %}
+
     <div class="conn">
       <div class="conn-label">Bağlantı</div>
       {% for s in saglik or [] %}

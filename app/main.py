@@ -22,7 +22,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, bildirim, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -115,19 +115,20 @@ async def yasam(app: FastAPI):
         log.warning("İlk yönetici oluşturuldu: kullanıcı 'admin', parola .env'deki PANEL_PAROLA")
     c.close()
 
-    gorevler = []
-    if os.environ.get("SAGLIK_NOBETCISI", "1") == "1":
-        gorevler.append(asyncio.create_task(saglik.nobetci(baglan)))
-    if os.environ.get("HATIRLATMA_NOBETCISI", "1") == "1":
-        gorevler.append(asyncio.create_task(hatirlatma.nobetci(baglan)))
+    # Nöbetçiler doktorun gözetiminde: kayıt + supervisor başlatır. Biri
+    # çökerse doktor yeniden doğurur (app/doktor.py supervisor).
+    doktor.baglan_fn_ayarla(baglan)
+    doktor.kayit("saglik", saglik.nobetci, os.environ.get("SAGLIK_NOBETCISI", "1") == "1")
+    doktor.kayit("hatirlatma", hatirlatma.nobetci, os.environ.get("HATIRLATMA_NOBETCISI", "1") == "1")
     # Instagram yapılandırılmamışsa nöbetçi hiç başlamaz — boşa Composio çağrısı
     # yapmaz, sağlık nöbetçisi de bu kanal için alarm çalmaz.
-    if os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1" and instagram.yapilandirildi_mi():
-        gorevler.append(asyncio.create_task(instagram.nobetci(baglan)))
+    ig_acik = os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1" and instagram.yapilandirildi_mi()
+    doktor.kayit("instagram", instagram.nobetci, ig_acik)
+    if ig_acik:
         log.info("Instagram bilgilendirme kanalı açık (%d sn aralık)", instagram.ARALIK_SN)
+    doktor_gorevi = asyncio.create_task(doktor.supervisor())
     yield
-    for g in gorevler:
-        g.cancel()
+    doktor_gorevi.cancel()
 
 
 app = FastAPI(title="Klinik Resepsiyonist", lifespan=yasam)
@@ -422,6 +423,29 @@ def iyilestirme_sayfasi(request: Request, conn=Depends(db)):
         "tekrarlar": iyilestirme.tekrarlanan_sorular(conn),
         "saglik": saglik.saglik_ozeti(conn),
     })
+
+
+# ── sistem doktoru ──────────────────────────────────────────
+# saglik tespit eder, doktor onarır. Burası hem durum ekranı hem elle tetik:
+# personel bir servisi kırılı kırılmaz 'Onar' düğmesiyle yeniden deneyebilir.
+
+@app.get("/doktor", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
+def doktor_sayfasi(request: Request, conn=Depends(db)):
+    return sablonlar.TemplateResponse(request, "doktor.html", {
+        "sayfa": "doktor",
+        "kullanici": _kim(request),
+        "saglik": saglik.saglik_ozeti(conn),
+        "gorevler": doktor.gorev_durumu(),
+        "gecmis": doktor.gecmis(conn),
+    })
+
+
+@app.post("/doktor/onar", dependencies=[Depends(yonetici)])
+def doktor_onar(request: Request, servis: str = Form(...), conn=Depends(db)):
+    ok, mesaj = doktor.onar(conn, servis, "manuel")
+    islem_yaz(conn, _kim(request), "sistem onardı", f"{servis}: {mesaj}")
+    qs = f"servis={quote(servis)}&ok={'1' if ok else '0'}"
+    return RedirectResponse(f"/doktor?{qs}", status_code=303)
 
 
 # ── takvim ──────────────────────────────────────────────────
