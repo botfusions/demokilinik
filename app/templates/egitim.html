@@ -62,23 +62,71 @@
   </p>
 
   <style>
-    .sor-cips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
+    .sor-cips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}
     .sor-cips form{display:inline}
-    .sohbet-kutu{
-      max-height:340px;overflow-y:auto;padding:14px;
-      background:var(--canvas-soft);border:1px solid var(--hairline-cool);
-      border-radius:var(--r-md);margin-bottom:12px;
-      display:flex;flex-direction:column;gap:8px;
+    .sor-cips button{font-weight:500;padding:7px 14px}
+
+    /* ── iPhone 17 mockup ── */
+    .tel-sarma{display:flex;justify-content:center;margin-top:4px}
+    .iphone{
+      width:100%;max-width:378px;border-radius:55px;padding:12px;
+      background:linear-gradient(145deg,#4a4a4d,#1a1a1c);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:0 24px 60px rgba(0,0,0,.40),inset 0 1px 2px rgba(255,255,255,.18);
     }
-    .balon{max-width:80%;padding:9px 13px;border-radius:14px;font-size:14px;
-           line-height:1.45;white-space:pre-wrap;word-break:break-word}
-    .balon.benden{align-self:flex-end;background:var(--primary);color:var(--on-primary);
-                  border-bottom-right-radius:4px}
+    .ekran{
+      position:relative;overflow:hidden;border-radius:44px;
+      background:var(--canvas-soft);min-height:540px;
+      display:flex;flex-direction:column;
+    }
+    /* Dynamic Island */
+    .ada{position:absolute;top:11px;left:50%;transform:translateX(-50%);
+         width:116px;height:34px;background:#000;border-radius:20px;z-index:6}
+    .durum-cubugu{display:flex;justify-content:space-between;align-items:center;
+      padding:16px 30px 8px;color:var(--ink);font-size:14px;font-weight:600;
+      font-variant-numeric:tabular-nums}
+    .durum-cubugu .sag{display:flex;gap:7px;align-items:center}
+
+    .konuk-basi{display:flex;align-items:center;gap:11px;padding:8px 16px 12px;
+      border-bottom:1px solid var(--hairline-cool);background:var(--canvas)}
+    .aj-av{width:36px;height:36px;border-radius:50%;flex:none;
+      background:linear-gradient(145deg,var(--primary),var(--primary-deep));
+      display:flex;align-items:center;justify-content:center;color:var(--on-primary);
+      font-weight:750;font-size:16px}
+    .konuk-basi .ad{font-weight:650;font-size:15px;color:var(--ink);line-height:1.2}
+    .konuk-basi .alt{font-size:12px;color:var(--primary-deep);font-weight:500}
+    .konuk-basi .alt .nokta{display:inline-block;width:7px;height:7px;border-radius:50%;
+      background:var(--primary);margin-right:5px;vertical-align:middle}
+
+    .soyleti{flex:1;overflow-y:auto;padding:16px 13px;display:flex;flex-direction:column;gap:7px}
+    .bos-mesaj{align-self:center;color:var(--ink-mute);font-size:13px;text-align:center;
+      margin:auto 12px;line-height:1.5}
+    .balon{max-width:78%;padding:9px 14px;font-size:14.5px;line-height:1.42;
+      white-space:pre-wrap;word-break:break-word;position:relative}
+    .balon.benden{align-self:flex-end;background:#0b93f6;color:#fff;
+      border-radius:18px 18px 5px 18px}
     .balon.ajandan{align-self:flex-start;background:var(--canvas);
-                   border:1px solid var(--hairline);color:var(--ink);
-                   border-bottom-left-radius:4px}
-    .sor-form{display:flex;gap:8px;align-items:flex-end}
-    .sor-form textarea{min-height:48px;flex:1}
+      border:1px solid var(--hairline);color:var(--ink);
+      border-radius:18px 18px 18px 5px}
+
+    .giris-bar{display:flex;gap:8px;align-items:flex-end;padding:8px 12px 8px;
+      background:var(--canvas);border-top:1px solid var(--hairline-cool)}
+    .giris-bar textarea{flex:1;min-height:36px;max-height:120px;border-radius:18px;
+      padding:8px 14px;background:var(--canvas-soft)}
+    .ios-gonder{flex:none;width:36px;height:36px;border-radius:50%;padding:0;
+      background:#0b93f6;border:none;box-shadow:none;color:#fff}
+    .ios-gonder:hover{background:#0a82e6;box-shadow:none}
+    .ios-gonder svg{display:block}
+
+    .ev-gosterge{height:22px;display:flex;align-items:center;justify-content:center;
+      background:var(--canvas)}
+    .ev-gosterge i{width:130px;height:5px;border-radius:3px;background:var(--ink-mute-2);opacity:.5}
+
+    .sifir-sira{display:flex;justify-content:center;margin-top:14px}
+    @media (max-width:460px){
+      .iphone{border-radius:38px;padding:7px}
+      .ekran{border-radius:31px}
+    }
   </style>
 
   <div class="sor-cips">
@@ -100,26 +148,56 @@
     </form>
   </div>
 
-  <div class="sohbet-kutu">
-    {% for m in sohbet %}
-    <div class="balon {{ 'benden' if m.yon == 'gelen' else 'ajandan' }}">{{ m.mesaj }}</div>
-    {% else %}
-    <div class="bos">Henüz konuşma yok. Yukarıdaki hızlı butonlardan birine dokun ya da kendi cümleni yaz.</div>
-    {% endfor %}
-    {% if soru_hata %}
-    <div class="hata" style="margin:0">{{ soru_hata }}</div>
-    {% endif %}
+  <div class="tel-sarma">
+    <div class="iphone">
+      <div class="ekran">
+        <div class="ada"></div>
+        <div class="durum-cubugu">
+          <span>9:41</span>
+          <span class="sag">
+            <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="3" width="3" height="8" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+            <svg width="15" height="11" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.2c2.5 0 4.8 1 6.5 2.6l-1.4 1.5A7.3 7.3 0 008 4.3 7.3 7.3 0 002.9 6.3L1.5 4.8A9.1 9.1 0 018 2.2z"/><path d="M8 5.8c1.6 0 3 .6 4.1 1.6L8 12 3.9 7.4A5.8 5.8 0 018 5.8z"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="3" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="22.5" y="3.5" width="2" height="5" rx="1" fill="currentColor" opacity=".4"/></svg>
+          </span>
+        </div>
+
+        <div class="konuk-basi">
+          <div class="aj-av">A</div>
+          <div>
+            <div class="ad">Ajana</div>
+            <div class="alt"><span class="nokta"></span>çevrimiçi · klinik ajanı</div>
+          </div>
+        </div>
+
+        <div class="soyleti">
+          {% for m in sohbet %}
+          <div class="balon {{ 'benden' if m.yon == 'gelen' else 'ajandan' }}">{{ m.mesaj }}</div>
+          {% else %}
+          <div class="bos-mesaj">Henüz konuşma yok.<br>Aşağıdaki kutudan yaz ya da yukarıdaki hızlı butonlardan birine dokun.</div>
+          {% endfor %}
+          {% if soru_hata %}
+          <div class="balon ajandan" style="border-color:rgba(229,72,77,.5);color:var(--danger)">⚠ {{ soru_hata }}</div>
+          {% endif %}
+        </div>
+
+        <form method="post" action="/egitim/sor" class="giris-bar">
+          <textarea name="mesaj" rows="1"
+                    placeholder="Mesaj yaz"
+                    required>{{ soru or '' }}</textarea>
+          <button type="submit" class="ios-gonder" aria-label="Gönder">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-8.4c.8-.4.8-1.6 0-2L3.4 1.6c-.8-.4-1.7.3-1.5 1.2L4 10c.1.5.5.9 1 .9l8 .5-8 .5c-.5 0-.9.4-1 .9l-2.1 7.2c-.2.9.7 1.6 1.5 1.2z"/></svg>
+          </button>
+        </form>
+        <div class="ev-gosterge"><i></i></div>
+      </div>
+    </div>
   </div>
 
-  <form method="post" action="/egitim/sor" class="sor-form">
-    <textarea name="mesaj" rows="1"
-              placeholder="Örn: Cumartesi de açıyor musunuz?"
-              required>{{ soru or '' }}</textarea>
-    <button type="submit">Gönder</button>
-  </form>
-  <form method="post" action="/egitim/sohbet/sifirla" style="margin-top:10px">
-    <button type="submit" class="sade">Sohbeti sıfırla</button>
-  </form>
+  <div class="sifir-sira">
+    <form method="post" action="/egitim/sohbet/sifirla">
+      <button type="submit" class="sade">Sohbeti sıfırla</button>
+    </form>
+  </div>
 </div>
 
 {% endblock %}
