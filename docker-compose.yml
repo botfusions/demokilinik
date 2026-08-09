@@ -59,9 +59,9 @@ services:
       RATE_LIMIT_ENABLED: "true"
       SIMULATE_TYPING: "true"
 
-      # Webhook hedefimiz konteyner dışındaki köprü; SSRF koruması varsayılan
-      # olarak iç adresleri engelliyor. Genel koruma açık kalır, yalnız bu host geçer.
-      SSRF_ALLOWED_HOSTS: ${KOPRU_HOST:-host.docker.internal}
+      # Webhook hedefimiz artık aynı ağdaki app servisi. SSRF koruması iç adresleri
+      # engellediği için servis adını açıyoruz; genel koruma açık kalır.
+      SSRF_ALLOWED_HOSTS: app,host.docker.internal
 
       # Chromium ilk açılışta 60s'e sığmıyor (özellikle macOS/Docker Desktop'ta)
       WWEBJS_AUTH_TIMEOUT_MS: "180000"
@@ -71,6 +71,23 @@ services:
     volumes:
       - ./openwa-data:/app/data
     shm_size: 1gb          # Chromium'un ihtiyacı; düşük olursa sekmeler çöker
+    restart: unless-stopped
+
+  app:
+    # FastAPI köprüsü. host'taki .env localhost:5434 / localhost:2785 bekler;
+    # container ağında servis adları + iç portlar geçerli olduğu için burada
+    # override ediyoruz. ${POSTGRES_PASSWORD} .env'den gelir.
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://klinik:${POSTGRES_PASSWORD}@postgres:5432/klinik_crm
+      OPENWA_URL: http://openwa:2785
+      KOPRU_WEBHOOK_URL: http://app:8000/webhook/whatsapp
+    expose:
+      - "8000"            # host'a açılmaz (8002 Coolify panelinde dolu); Coolify proxy internal erişir
     restart: unless-stopped
 
 volumes:

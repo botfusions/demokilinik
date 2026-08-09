@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.git/
+.pytest_cache/
+openwa-data/
+hermes-home/
+tests/
+*.pyc
+.env
+*.md
+doktorum-dashboard*.html
+mockup_*.png
+referans/
