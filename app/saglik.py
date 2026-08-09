@@ -20,6 +20,11 @@ log = logging.getLogger("saglik")
 ARALIK_SN = int(os.environ.get("SAGLIK_ARALIK_SN", "600"))
 UYARI_ESIGI = 2
 
+# Aynı VPS'te birden çok klinik instance'ı çalışıyor (bkz. docker-compose,
+# her klinik kendi stack'i) — tek bir Telegram/mail'den hepsi izlenebiliyorsa
+# hangi klinikten geldiği etikette belli olmalı.
+KLINIK_ADI = os.environ.get("KLINIK_ADI", "Klinik Paneli")
+
 
 def kontrol_sonucu_isle(
     conn: psycopg.Connection, servis: str, basarili: bool, hata: str | None = None
@@ -100,6 +105,23 @@ def uyari_maili_gonder(konu: str, govde: str) -> None:
             s.send_message(m)
     except Exception as e:  # mail gidemezse nöbetçi durmamalı
         log.error("Uyarı maili gönderilemedi: %s", e)
+
+
+def uyari_telegram_gonder(mesaj: str) -> None:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        log.warning("Uyarı Telegram atlanıyor (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID yok)")
+        return
+
+    try:
+        httpx.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": mesaj},
+            timeout=20,
+        )
+    except Exception as e:  # Telegram'a ulaşılamazsa nöbetçi durmamalı
+        log.error("Uyarı Telegram gönderilemedi: %s", e)
 
 
 # ── kontroller ──────────────────────────────────────────────
@@ -197,24 +219,26 @@ async def nobetci(baglan_fn) -> None:
                         except Exception as e:
                             onarildi, onarim_mesaji = False, f"onarım hatası: {e}"
                         if onarildi:
-                            uyari_maili_gonder(
-                                f"[Klinik] {servis} otomatik onarıldı",
+                            konu = f"[{KLINIK_ADI}] {servis} otomatik onarıldı"
+                            govde = (
                                 f"{servis} bozuktu; sistem doktoru müdahale etti:\n\n"
-                                f"{onarim_mesaji}\n\nBir sonraki kontrol doğrulayacak.",
+                                f"{onarim_mesaji}\n\nBir sonraki kontrol doğrulayacak."
                             )
                         else:
-                            uyari_maili_gonder(
-                                f"[Klinik] {servis} bağlantısı koptu",
+                            konu = f"[{KLINIK_ADI}] {servis} bağlantısı koptu"
+                            govde = (
                                 f"{servis} bağlantısı iki ardışık kontrolde başarısız.\n\n"
                                 f"Hata: {hata}\n\n"
                                 f"Otomatik onarım denendi: {onarim_mesaji}\n\n"
-                                f"Panelden 'Doktor' bölümüne bakın.",
+                                f"Panelden 'Doktor' bölümüne bakın."
                             )
+                        uyari_maili_gonder(konu, govde)
+                        uyari_telegram_gonder(f"{konu}\n\n{govde}")
                     elif aksiyon == "duzeldi":
-                        uyari_maili_gonder(
-                            f"[Klinik] {servis} bağlantısı geri geldi",
-                            f"{servis} yeniden çalışıyor.",
-                        )
+                        konu = f"[{KLINIK_ADI}] {servis} bağlantısı geri geldi"
+                        govde = f"{servis} yeniden çalışıyor."
+                        uyari_maili_gonder(konu, govde)
+                        uyari_telegram_gonder(f"{konu}\n\n{govde}")
             finally:
                 conn.close()
         except Exception as e:

@@ -4,7 +4,7 @@
 her kontrolde mail atıp uyarıyı gürültüye çevirmek. İkisi de test edilir.
 """
 
-from app.saglik import kontrol_sonucu_isle
+from app.saglik import kontrol_sonucu_isle, uyari_telegram_gonder
 
 
 def test_saglikli_serviste_aksiyon_yok(conn):
@@ -82,3 +82,25 @@ def test_son_basarili_zamani_korunur(conn):
     with conn.cursor() as cur:
         cur.execute("SELECT son_basarili FROM baglanti_saglik WHERE servis = 'whatsapp'")
         assert cur.fetchone()[0] == onceki
+
+
+def test_telegram_yapilandirilmamissa_gonderim_atlanir(monkeypatch):
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    cagrildi = []
+    monkeypatch.setattr("httpx.post", lambda *a, **k: cagrildi.append((a, k)))
+    uyari_telegram_gonder("test")
+    assert cagrildi == []
+
+
+def test_telegram_yapilandirilmissa_dogru_istekle_gonderilir(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "abc123")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "999")
+    cagrildi = []
+    monkeypatch.setattr("httpx.post", lambda *a, **k: cagrildi.append((a, k)))
+    uyari_telegram_gonder("bağlantı koptu")
+
+    assert len(cagrildi) == 1
+    (url,), kwargs = cagrildi[0]
+    assert url == "https://api.telegram.org/botabc123/sendMessage"
+    assert kwargs["json"] == {"chat_id": "999", "text": "bağlantı koptu"}
