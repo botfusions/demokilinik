@@ -78,6 +78,8 @@ def gorusme_ekle(
     mesaj: str,
     wa_message_id: str | None = None,
     maliyet_usd: float | None = None,
+    giris_token: int | None = None,
+    cikis_token: int | None = None,
     kanal: str = "whatsapp",
 ) -> int | None:
     """Görüşmeyi kaydeder. Aynı wa_message_id ikinci kez gelirse None döner.
@@ -90,12 +92,13 @@ def gorusme_ekle(
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO gorusmeler (kisi_id, yon, mesaj, wa_message_id, maliyet_usd, kanal)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO gorusmeler
+                (kisi_id, yon, mesaj, wa_message_id, maliyet_usd, giris_token, cikis_token, kanal)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (wa_message_id) DO NOTHING
             RETURNING id
             """,
-            (kisi_id, yon, mesaj, wa_message_id, maliyet_usd, kanal),
+            (kisi_id, yon, mesaj, wa_message_id, maliyet_usd, giris_token, cikis_token, kanal),
         )
         satir = cur.fetchone()
     conn.commit()
@@ -374,6 +377,25 @@ def ozet_sayilar(conn: psycopg.Connection) -> dict:
         "toplam_hasta": hasta,
         "haftalik_mesaj": mesaj,
     }
+
+
+def kullanim_ozeti(conn: psycopg.Connection, pencere_saniye: int) -> dict:
+    """Son `pencere_saniye` içindeki mesaj adedi ve toplam token — app/rapor.py."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              (SELECT count(*) FROM gorusmeler
+                WHERE yon = 'gelen' AND olusturma >= now() - make_interval(secs => %s)),
+              (SELECT coalesce(sum(giris_token), 0) FROM gorusmeler
+                WHERE olusturma >= now() - make_interval(secs => %s)),
+              (SELECT coalesce(sum(cikis_token), 0) FROM gorusmeler
+                WHERE olusturma >= now() - make_interval(secs => %s))
+            """,
+            (pencere_saniye, pencere_saniye, pencere_saniye),
+        )
+        mesaj, giris, cikis = cur.fetchone()
+    return {"mesaj_adedi": mesaj, "giris_token": giris, "cikis_token": cikis}
 
 
 # ── doktorlar ───────────────────────────────────────────────

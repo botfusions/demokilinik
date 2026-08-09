@@ -28,6 +28,7 @@ Sonra `.env` içinde şunları doldur:
 | `COMPOSIO_API_KEY`, `COMPOSIO_MCP_URL` | Google Takvim + Gmail |
 | `YONETICI_EPOSTA`, `SMTP_*` | Bağlantı koptuğunda uyarı maili |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Bağlantı koptuğunda uyarı Telegram mesajı. @BotFather'dan bot açıp token al, bota mesaj atıp `https://api.telegram.org/bot<TOKEN>/getUpdates` ile chat_id'ni öğren |
+| `RAPOR_ARALIK_SN` | Haftalık kullanım özeti aralığı (sn) — mesaj adedi + token, $ maliyet yok, yalnızca Telegram'a gider |
 
 Köprüyü başlat:
 

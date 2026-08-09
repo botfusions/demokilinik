@@ -104,8 +104,8 @@ def klinik_konumu() -> tuple[float, float] | None:
 
 
 def cevap_uret(gecmis: list[dict], mesaj: str,
-               kanal: str = "whatsapp") -> tuple[str, float | None]:
-    """(yanıt, maliyet_usd) döner. Başarısızlıkta CevapUretilemedi.
+               kanal: str = "whatsapp") -> tuple[str, dict]:
+    """(yanıt, {"prompt_tokens":.., "completion_tokens":..}) döner. Başarısızlıkta CevapUretilemedi.
 
     Bilgi soruları ve tek kelimelik hatırlatma cevapları buraya hiç uğramaz —
     `app/kural.py` ve `app/hafif.py` daha ucuz katmanlarda cevap üretir. Kapı
@@ -154,7 +154,7 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
             metin = (msg.get("content") or "").strip()
             if not metin:
                 raise CevapUretilemedi("LLM boş cevap döndü")
-            return metin, hafif._maliyet(toplam_kullanim)
+            return metin, toplam_kullanim
 
         messages.append(msg)
         for tc in tool_calls:

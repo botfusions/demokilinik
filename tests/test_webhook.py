@@ -96,7 +96,10 @@ def istemci(conn, monkeypatch):
     import app.main as main
 
     gonderilenler = []
-    monkeypatch.setattr(ajan, "cevap_uret", lambda gecmis, mesaj: ("Test yanıtı", 0.001))
+    monkeypatch.setattr(
+        ajan, "cevap_uret",
+        lambda gecmis, mesaj: ("Test yanıtı", {"prompt_tokens": 100, "completion_tokens": 50}),
+    )
     monkeypatch.setattr(openwa, "mesaj_gonder", lambda tel, metin: gonderilenler.append((tel, metin)) or "wamid.OUT")
 
     c = TestClient(main.app)

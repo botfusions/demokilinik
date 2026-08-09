@@ -35,6 +35,10 @@ CREATE TABLE IF NOT EXISTS gorusmeler (
 );
 CREATE INDEX IF NOT EXISTS gorusmeler_kisi_idx ON gorusmeler (kisi_id, id);
 
+-- Haftalık kullanım raporu için (app/rapor.py) — $ maliyet değil, ham token.
+ALTER TABLE gorusmeler ADD COLUMN IF NOT EXISTS giris_token integer;
+ALTER TABLE gorusmeler ADD COLUMN IF NOT EXISTS cikis_token integer;
+
 CREATE TABLE IF NOT EXISTS doktorlar (
     id        serial PRIMARY KEY,
     ad        text NOT NULL,

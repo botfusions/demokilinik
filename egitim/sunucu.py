@@ -155,7 +155,7 @@ def _ajan_sor(conn, gecmis: list[dict], mesaj: str) -> str:
     dene = hafif.cevap_dene(gecmis, mesaj)
     if dene:
         return dene[0]
-    yanit, _maliyet = ajan.cevap_uret(gecmis, mesaj)
+    yanit, _kullanim = ajan.cevap_uret(gecmis, mesaj)
     yanit, _konum = ajan.konum_ayikla(yanit)
     return yanit
 

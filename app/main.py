@@ -22,7 +22,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, bildirim, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, rapor, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -129,6 +129,10 @@ async def yasam(app: FastAPI):
     doktor.kayit("instagram", instagram.nobetci, ig_acik)
     if ig_acik:
         log.info("Instagram bilgilendirme kanalı açık (%d sn aralık)", instagram.ARALIK_SN)
+    # Telegram yapılandırılmamışsa haftalık rapor da atlanır — göndereceği yer yok.
+    rapor_acik = (os.environ.get("RAPOR_NOBETCISI", "1") == "1"
+                  and bool(os.environ.get("TELEGRAM_BOT_TOKEN")))
+    doktor.kayit("rapor", rapor.nobetci, rapor_acik)
     doktor_gorevi = asyncio.create_task(doktor.supervisor())
     yield
     doktor_gorevi.cancel()
@@ -348,7 +352,7 @@ def _ajan_sor(conn, gecmis: list[dict], mesaj: str) -> str:
     dene = hafif.cevap_dene(gecmis, mesaj)
     if dene:
         return dene[0]
-    yanit, _maliyet = ajan.cevap_uret(gecmis, mesaj)
+    yanit, _kullanim = ajan.cevap_uret(gecmis, mesaj)
     yanit, _konum = ajan.konum_ayikla(yanit)
     return yanit
 
@@ -985,21 +989,25 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
         # Kural katmanı (LLM'siz) → hatırlatma kısayolu (LLM'siz) → tam ajan (LLM).
         # Sıralama en ucuzdan en pahalıya: "100 mesajın 100'ü LLM'ye" olmasın.
         if (yanit := kural.cevap_dene(conn, mesaj)) is not None:
-            maliyet = None
+            kullanim = None
         elif (yanit := kural.hatirlatma_cevabi_dene(telefon, mesaj)) is not None:
-            maliyet = None
+            kullanim = None
         else:
             try:
-                yanit, maliyet = ajan.cevap_uret(gecmis, mesaj)
+                yanit, kullanim = ajan.cevap_uret(gecmis, mesaj)
             except ajan.CevapUretilemedi as e:
                 log.error("Ajan cevap üretemedi (%s): %s", telefon, e)
-                yanit, maliyet = HATA_MESAJI, None
+                yanit, kullanim = HATA_MESAJI, None
 
         yanit, konum_istendi = ajan.konum_ayikla(yanit)
 
         # Önce kaydet, sonra gönder: WhatsApp'a ulaşılamazsa bile personel
         # panelde ajanın ne dediğini görebilmeli.
-        gorusme_ekle(conn, kid, "giden", yanit, maliyet_usd=maliyet)
+        gorusme_ekle(
+            conn, kid, "giden", yanit,
+            giris_token=(kullanim or {}).get("prompt_tokens"),
+            cikis_token=(kullanim or {}).get("completion_tokens"),
+        )
         openwa.mesaj_gonder(telefon, yanit)
 
         # Konum iğnesi metinden SONRA gider: hasta önce adresi okur, sonra
