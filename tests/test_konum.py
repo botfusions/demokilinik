@@ -69,7 +69,10 @@ def webhook_ortami(conn, monkeypatch):
 def _ajan_cevabi(monkeypatch, yanit):
     import app.main as main
 
-    monkeypatch.setattr(main.ajan, "cevap_uret", lambda g, m, kanal="whatsapp": (yanit, 0.001))
+    monkeypatch.setattr(
+        main.ajan, "cevap_uret",
+        lambda g, m, kanal="whatsapp": (yanit, {"prompt_tokens": 100, "completion_tokens": 50}),
+    )
 
 
 def test_isaretli_cevapta_konum_gider(webhook_ortami, monkeypatch, conn):
@@ -137,8 +140,12 @@ def test_isaret_veritabanina_yazilmaz(webhook_ortami, monkeypatch, conn):
 def test_instagramda_isaret_sizmaz(conn, monkeypatch):
     from app import instagram
 
-    monkeypatch.setattr("app.ajan.cevap_uret",
-                        lambda g, m, kanal="whatsapp": ("Bağdat Cad. No:120.\n[KONUM]", 0.001))
+    monkeypatch.setattr(
+        "app.ajan.cevap_uret",
+        lambda g, m, kanal="whatsapp": (
+            "Bağdat Cad. No:120.\n[KONUM]", {"prompt_tokens": 100, "completion_tokens": 50},
+        ),
+    )
     monkeypatch.setattr(instagram, "okundu_isaretle", lambda _: None)
     monkeypatch.setattr(instagram, "yeni_mesajlar", lambda: [
         {"igsid": "17841400000000001", "mesaj_id": "ig:k1", "metin": "adres", "ad": None}])

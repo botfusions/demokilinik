@@ -380,13 +380,13 @@ def ozet_sayilar(conn: psycopg.Connection) -> dict:
 
 
 def kullanim_ozeti(conn: psycopg.Connection, pencere_saniye: int) -> dict:
-    """Son `pencere_saniye` içindeki mesaj adedi ve toplam token — app/rapor.py."""
+    """Son `pencere_saniye` içinde WhatsApp'a gönderilen mesaj adedi ve toplam token — app/rapor.py."""
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT
               (SELECT count(*) FROM gorusmeler
-                WHERE yon = 'gelen' AND olusturma >= now() - make_interval(secs => %s)),
+                WHERE yon = 'giden' AND olusturma >= now() - make_interval(secs => %s)),
               (SELECT coalesce(sum(giris_token), 0) FROM gorusmeler
                 WHERE olusturma >= now() - make_interval(secs => %s)),
               (SELECT coalesce(sum(cikis_token), 0) FROM gorusmeler
@@ -394,8 +394,8 @@ def kullanim_ozeti(conn: psycopg.Connection, pencere_saniye: int) -> dict:
             """,
             (pencere_saniye, pencere_saniye, pencere_saniye),
         )
-        mesaj, giris, cikis = cur.fetchone()
-    return {"mesaj_adedi": mesaj, "giris_token": giris, "cikis_token": cikis}
+        giden, giris, cikis = cur.fetchone()
+    return {"giden_mesaj": giden, "giris_token": giris, "cikis_token": cikis}
 
 
 # ── doktorlar ───────────────────────────────────────────────

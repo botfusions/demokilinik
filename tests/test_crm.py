@@ -80,18 +80,18 @@ def test_gecmis_eskiden_yeniye_sirali_ve_sinirli(conn, kisi_id):
     assert gecmis[-1]["mesaj"] == "mesaj-14"
 
 
-def test_kullanim_ozeti_mesaj_ve_token_toplar(conn, kisi_id):
+def test_kullanim_ozeti_giden_mesaj_ve_token_toplar(conn, kisi_id):
     gorusme_ekle(conn, kisi_id, "gelen", "Soru bir")
     gorusme_ekle(conn, kisi_id, "giden", "Cevap bir", giris_token=100, cikis_token=50)
     gorusme_ekle(conn, kisi_id, "gelen", "Soru iki")
     gorusme_ekle(conn, kisi_id, "giden", "Cevap iki", giris_token=200, cikis_token=80)
 
     ozet = kullanim_ozeti(conn, 3600)
-    assert ozet == {"mesaj_adedi": 2, "giris_token": 300, "cikis_token": 130}
+    assert ozet == {"giden_mesaj": 2, "giris_token": 300, "cikis_token": 130}
 
 
 def test_kullanim_ozeti_pencere_disini_saymaz(conn, kisi_id):
-    gid = gorusme_ekle(conn, kisi_id, "gelen", "Eski soru")
+    gid = gorusme_ekle(conn, kisi_id, "giden", "Eski cevap", giris_token=50, cikis_token=20)
     with conn.cursor() as cur:
         cur.execute(
             "UPDATE gorusmeler SET olusturma = now() - interval '2 hours' WHERE id = %s",
@@ -100,4 +100,4 @@ def test_kullanim_ozeti_pencere_disini_saymaz(conn, kisi_id):
     conn.commit()
 
     ozet = kullanim_ozeti(conn, 3600)  # 1 saatlik pencere
-    assert ozet == {"mesaj_adedi": 0, "giris_token": 0, "cikis_token": 0}
+    assert ozet == {"giden_mesaj": 0, "giris_token": 0, "cikis_token": 0}

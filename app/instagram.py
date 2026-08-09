@@ -234,10 +234,10 @@ def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
         gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]
 
         if (yanit := kural.cevap_dene(conn, m["metin"])) is not None:
-            maliyet = None
+            kullanim = None
         else:
             try:
-                yanit, maliyet = ajan.cevap_uret(gecmis, m["metin"], kanal="instagram")
+                yanit, kullanim = ajan.cevap_uret(gecmis, m["metin"], kanal="instagram")
             except ajan.CevapUretilemedi as e:
                 log.error("Ajan cevap üretemedi (%s): %s", m["igsid"], e)
                 continue     # WhatsApp'taki gibi hazır metin göndermiyoruz: bu kanalda
@@ -248,7 +248,11 @@ def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
         yanit, _ = ajan.konum_ayikla(yanit)
 
         # Önce kaydet sonra gönder — Instagram'a ulaşılamasa da personel panelde görür
-        gorusme_ekle(conn, kid, "giden", yanit, maliyet_usd=maliyet, kanal="instagram")
+        gorusme_ekle(
+            conn, kid, "giden", yanit, kanal="instagram",
+            giris_token=(kullanim or {}).get("prompt_tokens"),
+            cikis_token=(kullanim or {}).get("completion_tokens"),
+        )
         try:
             gonder_fn(m["igsid"], yanit)
         except InstagramHatasi as e:

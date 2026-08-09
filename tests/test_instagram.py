@@ -76,7 +76,7 @@ def sahte_ajan(monkeypatch):
 
     def cevap_uret(gecmis, mesaj, kanal="whatsapp"):
         cagrilar.append({"gecmis": gecmis, "mesaj": mesaj, "kanal": kanal})
-        return "Merhaba, implant fiyatımız 15.000 TL'dir.", 0.0012
+        return "Merhaba, implant fiyatımız 15.000 TL'dir.", {"prompt_tokens": 100, "completion_tokens": 50}
 
     monkeypatch.setattr("app.ajan.cevap_uret", cevap_uret)
     monkeypatch.setattr(instagram, "okundu_isaretle", lambda _: None)
@@ -99,7 +99,8 @@ def test_tur_mesaji_kaydeder_ve_cevaplar(conn, monkeypatch, sahte_ajan):
     gecmis = gorusme_gecmisi(conn, kisi["id"])
     assert [g["yon"] for g in gecmis] == ["gelen", "giden"]
     assert all(g["kanal"] == "instagram" for g in gecmis)
-    assert gecmis[1]["maliyet_usd"] is not None
+    assert gecmis[1]["giris_token"] == 100
+    assert gecmis[1]["cikis_token"] == 50
 
 
 def test_ayni_mesaj_ikinci_turda_tekrar_cevaplanmaz(conn, monkeypatch, sahte_ajan):

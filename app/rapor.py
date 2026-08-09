@@ -20,7 +20,7 @@ ARALIK_SN = int(os.environ.get("RAPOR_ARALIK_SN", "604800"))  # 7 gün
 def _mesaj(ozet: dict) -> str:
     return (
         f"[{saglik.KLINIK_ADI}] Haftalık kullanım özeti\n\n"
-        f"Mesaj: {ozet['mesaj_adedi']}\n"
+        f"Gönderilen mesaj (WhatsApp): {ozet['giden_mesaj']}\n"
         f"Token: {ozet['giris_token'] + ozet['cikis_token']} "
         f"(giriş {ozet['giris_token']}, çıkış {ozet['cikis_token']})"
     )
@@ -42,8 +42,8 @@ async def nobetci(baglan_fn) -> None:
 
 if __name__ == "__main__":
     # self-check: mesaj formatı token toplamını doğru gösteriyor mu.
-    m = _mesaj({"mesaj_adedi": 12, "giris_token": 4000, "cikis_token": 1500})
-    assert "Mesaj: 12" in m
+    m = _mesaj({"giden_mesaj": 12, "giris_token": 4000, "cikis_token": 1500})
+    assert "Gönderilen mesaj (WhatsApp): 12" in m
     assert "Token: 5500" in m
     assert "giriş 4000, çıkış 1500" in m
     print("rapor self-check OK")
