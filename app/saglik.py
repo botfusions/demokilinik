@@ -155,10 +155,18 @@ def _composio_kontrol() -> tuple[bool, str | None]:
         return False, f"Composio HTTP {y.status_code}"
 
     hesaplar = y.json().get("items", y.json().get("data", []))
-    kopuk = [h for h in hesaplar if h.get("status") not in ("ACTIVE", "active", None)]
+    # Composio her OAuth token yenilemesinde yeni connected account bırakıp
+    # eski kaydı EXPIRED olarak tutabiliyor (gmail'de 9 birikmiş EXPIRED gibi).
+    # Toolkit başına en az bir ACTIVE hesap varsa o toolkit sağlıklı sayılır;
+    # eski EXPIRED kayıtlar uyarı gürültüsü yapmasın.
+    def _slug(h: dict) -> str:
+        tk = h.get("toolkit")
+        return tk.get("slug") if isinstance(tk, dict) else str(h.get("appName", "?"))
+    aktif = {_slug(h) for h in hesaplar if h.get("status") in ("ACTIVE", "active")}
+    tum = {_slug(h) for h in hesaplar}
+    kopuk = tum - aktif
     if kopuk:
-        adlar = ", ".join(str(h.get("toolkit", h.get("appName", "?"))) for h in kopuk)
-        return False, f"bağlantı düştü: {adlar}"
+        return False, f"bağlantı düştü: {', '.join(sorted(kopuk))}"
     return True, None
 
 
