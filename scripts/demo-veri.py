@@ -40,7 +40,6 @@ HIZMETLER = [
 ]
 
 GENEL_BILGILER = [
-    ("Klinik adı", "DemoDent Ağız ve Diş Sağlığı Kliniği", "genel"),
     ("Çalışma saatleri", "Hafta içi ve cumartesi 09:00-18:00 açığız, pazar kapalıyız.",
      "calisma_saatleri"),
     ("Adres", "Örnek Mahallesi Demo Caddesi No:1, İstanbul. Otopark mevcuttur.", "adres"),
