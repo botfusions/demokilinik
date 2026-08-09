@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Demo hasta + randevu — satış demosu için takvimi doldurur.
 
-7 uydurma hasta (gerçek olmayan 905000000XX telefonlar), aktif doktorlara
-round-robin + çakışmasız dağıtılmış 7 randevu açar. **Her zaman içinde
+8 uydurma hasta (gerçek olmayan 905000000XX telefonlar), aktif doktorlara
+round-robin + çakışmasız dağıtılmış 8 randevu açar. **Her zaman içinde
 bulunulan takvim haftasına** (Pazartesi-Cumartesi) yazar — panel varsayılan
 olarak o haftayı açtığı için müşteriye demo gösterirken "Sonraki" tıklamaya
 gerek kalmaz. Tekrar çalıştırılabilir: önceki demo randevularını silip aynı
@@ -29,7 +29,7 @@ from app.hizmet import hizmetler_listele  # noqa: E402
 
 HASTALAR = [
     "Ayşe Demir", "Mehmet Kaya", "Fatma Şahin", "Ali Yılmaz",
-    "Zeynep Çelik", "Mustafa Aydın", "Elif Öztürk",
+    "Zeynep Çelik", "Mustafa Aydın", "Elif Öztürk", "Hüseyin Arslan",
 ]
 
 # gerçek numaralarla çakışmayacak, açıkça "demo" deseni
