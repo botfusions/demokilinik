@@ -23,6 +23,7 @@ os.environ["COOKIE_SECRET"] = "test-cookie-secret"
 os.environ["IC_API_ANAHTARI"] = "test-ic-anahtar"
 os.environ["OPENWA_SESSION"] = "test"
 os.environ["SAGLIK_NOBETCISI"] = "0"   # testlerde arka plan nöbetçisi çalışmaz
+os.environ["DOKTORA_BILDIRIM"] = "1"   # klinik .env'de kapalı olsa da bildirim testleri açık varsayar
 
 
 def _test_veritabani_url() -> str | None:
