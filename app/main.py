@@ -94,7 +94,10 @@ HATA_MESAJI = (
     "Mesajınızı aldık, birazdan size dönüş yapacağız. Acil durumlar için bizi arayabilirsiniz."
 )
 
-imzalayici = URLSafeSerializer(os.environ.get("COOKIE_SECRET", "gelistirme"), salt="panel")
+_cookie_secret = os.environ.get("COOKIE_SECRET")
+if not _cookie_secret:
+    raise RuntimeError("COOKIE_SECRET env değişkeni zorunlu (panel oturum çerezlerini imzalar)")
+imzalayici = URLSafeSerializer(_cookie_secret, salt="panel")
 sablonlar = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 # Panelde görünen isimler — DB'deki 3 durum (bekliyor/onayli/iptal) değişmiyor,
