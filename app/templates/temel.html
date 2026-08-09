@@ -44,13 +44,6 @@
       <a class="nav-item" href="http://localhost:2785" target="_blank" rel="noopener">WhatsApp (QR)</a>
     </div>
 
-    {% if kullanici and kullanici.rol == 'admin' %}
-    <div class="nav-group">
-      <div class="nav-label">Sistem</div>
-      <a class="nav-item {% if sayfa == 'doktor' %}active{% endif %}" href="/doktor">Doktor</a>
-    </div>
-    {% endif %}
-
     <div class="conn">
       <div class="conn-label">Bağlantı</div>
       {% for s in saglik or [] %}
@@ -68,7 +61,7 @@
          elle yazsa da 403 döner — koruma iki katmanlı. #}
       {% if kullanici %}
       {% set yonetici_mi = kullanici.rol == 'admin' %}
-      <{{ 'a' if yonetici_mi else 'div' }} class="user-card {% if sayfa in ['yonetici','bilgi','kullanicilar','iyilestirme'] %}active{% endif %}"
+      <{{ 'a' if yonetici_mi else 'div' }} class="user-card {% if sayfa in ['yonetici','bilgi','kullanicilar','iyilestirme','doktor'] %}active{% endif %}"
         {% if yonetici_mi %}href="/yonetici" title="Yönetici Paneli"{% endif %}>
         <div class="avatar">{{ (kullanici.ad or kullanici.kullanici_adi)[0] | upper }}</div>
         <div class="user-meta">

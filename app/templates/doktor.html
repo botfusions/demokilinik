@@ -3,6 +3,8 @@
 
 {% block icerik %}
 
+{% include "yonetici_sekmeler.html" %}
+
 {% set yonetici_mi = kullanici.rol == 'admin' %}
 <div class="baslik-satir">
   <div>
