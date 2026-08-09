@@ -3,11 +3,10 @@
 
 8 uydurma hasta (gerçek olmayan 905000000XX telefonlar), aktif doktorlara
 round-robin + çakışmasız dağıtılmış 8 randevu açar. **Her zaman içinde
-bulunulan takvim haftasına** (Pazartesi-Cumartesi) yazar — panel varsayılan
-olarak o haftayı açtığı için müşteriye demo gösterirken "Sonraki" tıklamaya
-gerek kalmaz. Tekrar çalıştırılabilir: önceki demo randevularını silip aynı
-haftaya yeniden yazar (hafta değiştiyse eski veri "geçen hafta" gibi kalıp
-kafa karıştırmasın diye).
+bulunulan takvim haftasından başlayıp 6 haftaya** (her hafta Pazar kapalı)
+yazar — müşteri takvimde ileri/geri gittiğinde her hafta dolu görsün. Her
+hafta aynı şablon olduğu için tüm doktor renkleri 6 hafta boyunca görünür.
+Tekrar çalıştırılabilir: önceki demo randevularını silip yeniden yazar.
 
 Bu yüzden `app.crm.randevu_olustur`'un "geçmiş tarihe randevu açılamaz"
 korumasını kasıtlı olarak atlıyor (doğrudan SQL) — haftanın geçmişte kalan
@@ -66,47 +65,52 @@ def main() -> None:
 
     bugun = date.today()
     pazartesi = _hafta_basi(bugun)
-    gunler = [pazartesi + timedelta(days=i) for i in range(6)]  # Pzt-Cmt, Pazar kapalı
+    # Demo: tek hafta değil 6 hafta dolu olsun — müşteri takvimde ileri/geri
+    # gittiğinde her hafta dolu görsün. Her hafta aynı şablon (her doktora 2),
+    # böylece tüm renkler 6 hafta boyunca görünür kalır.
+    HAFTALAR = 6
 
     eklenen = 0
     with conn.cursor() as cur:
-        for i, ad in enumerate(HASTALAR):
-            telefon = f"{TELEFON_ONEK}{i + 1}"
-            kid = kisi_upsert(conn, telefon, ad)
+        for hafta in range(HAFTALAR):
+            for i, ad in enumerate(HASTALAR):
+                telefon = f"{TELEFON_ONEK}{i + 1}"
+                kid = kisi_upsert(conn, telefon, ad)
 
-            gun = gunler[i % len(gunler)]
-            saat = SAATLER[i % len(SAATLER)]
-            baslangic = datetime.combine(gun, datetime.min.time()).replace(hour=saat)
-            bitis = baslangic + timedelta(minutes=30)
+                gun = pazartesi + timedelta(days=hafta * 7 + (i % 6))  # her hafta Pzt-Cmt
+                saat = SAATLER[i % len(SAATLER)]
+                baslangic = datetime.combine(gun, datetime.min.time()).replace(hour=saat)
+                bitis = baslangic + timedelta(minutes=30)
 
-            doktor = doktorlar[i % len(doktorlar)]
-            hizmet = hizmetler[i % len(hizmetler)]
+                doktor = doktorlar[i % len(doktorlar)]
+                hizmet = hizmetler[i % len(hizmetler)]
 
-            cur.execute(
-                """
-                SELECT 1 FROM randevular
-                 WHERE durum <> 'iptal' AND doktor_id = %s
-                   AND baslangic < %s AND bitis > %s
-                """,
-                (doktor["id"], bitis, baslangic),
-            )
-            if cur.fetchone():
-                print(f"  atlandı ({ad}): {doktor['ad']} o saatte dolu")
-                continue
+                cur.execute(
+                    """
+                    SELECT 1 FROM randevular
+                     WHERE durum <> 'iptal' AND doktor_id = %s
+                       AND baslangic < %s AND bitis > %s
+                    """,
+                    (doktor["id"], bitis, baslangic),
+                )
+                if cur.fetchone():
+                    print(f"  atlandı ({ad}): {doktor['ad']} o saatte dolu")
+                    continue
 
-            cur.execute(
-                """
-                INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, doktor_id)
-                VALUES (%s, %s, %s, %s, %s) RETURNING id
-                """,
-                (kid, hizmet, baslangic, bitis, doktor["id"]),
-            )
-            rid = cur.fetchone()[0]
-            print(f"  eklendi: #{rid} {ad} — {doktor['ad']} — {hizmet} — {baslangic:%d.%m %H:%M}")
-            eklenen += 1
+                cur.execute(
+                    """
+                    INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, doktor_id)
+                    VALUES (%s, %s, %s, %s, %s) RETURNING id
+                    """,
+                    (kid, hizmet, baslangic, bitis, doktor["id"]),
+                )
+                rid = cur.fetchone()[0]
+                eklenen += 1
     conn.commit()
 
-    print(f"\n{eklenen}/{len(HASTALAR)} randevu eklendi ({pazartesi:%d.%m}-{gunler[-1]:%d.%m} haftası).")
+    son_hafta_basi = pazartesi + timedelta(days=(HAFTALAR - 1) * 7)
+    print(f"\n{eklenen}/{len(HASTALAR) * HAFTALAR} randevu eklendi "
+          f"({pazartesi:%d.%m}-{son_hafta_basi:%d.%m} başlangıçlı {HAFTALAR} hafta).")
     print("Dağılım:", hizmet_dagilimi(conn))
 
 
