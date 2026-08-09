@@ -49,6 +49,9 @@ KURALLAR:
   bunun yerine "uyarilar" listesine "fiyat: ..." diye ekle (fiyatın tek kaynağı
   Fiyat ve Kampanya sayfasıdır).
 - Tıbbi teşhis/öneri içeren hiçbir şeyi kayda çevirme.
+- Kaynak sitenin marka adı, klinik adı, kişi/doktor ismi veya unvanı kayda GİRMEZ;
+  yalnızca genel tedavi/hizmet ve kurum türü bilgisi kalır (örn. "Diş Kliniği A"
+  değil "diş kliniği", kişi adı değil "uzman hekim").
 - Metinde gerçek bir bilgi yoksa boş bırak; asla uydurma.
 
 ÇIKTI: yalnızca şu biçimde bir JSON nesnesi, başka hiçbir şey yazma:
