@@ -93,11 +93,21 @@ def test_telegram_yapilandirilmamissa_gonderim_atlanir(monkeypatch):
     assert cagrildi == []
 
 
+class _SahteYanit:
+    def raise_for_status(self):
+        pass
+
+
 def test_telegram_yapilandirilmissa_dogru_istekle_gonderilir(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "abc123")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "999")
     cagrildi = []
-    monkeypatch.setattr("httpx.post", lambda *a, **k: cagrildi.append((a, k)))
+
+    def sahte_post(*a, **k):
+        cagrildi.append((a, k))
+        return _SahteYanit()
+
+    monkeypatch.setattr("httpx.post", sahte_post)
     uyari_telegram_gonder("bağlantı koptu")
 
     assert len(cagrildi) == 1

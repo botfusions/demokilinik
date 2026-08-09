@@ -115,12 +115,13 @@ def uyari_telegram_gonder(mesaj: str) -> None:
         return
 
     try:
-        httpx.post(
+        y = httpx.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": mesaj},
             timeout=20,
         )
-    except Exception as e:  # Telegram'a ulaşılamazsa nöbetçi durmamalı
+        y.raise_for_status()
+    except Exception as e:  # Telegram'a ulaşılamazsa/token geçersizse nöbetçi durmamalı
         log.error("Uyarı Telegram gönderilemedi: %s", e)
 
 
