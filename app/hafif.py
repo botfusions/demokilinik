@@ -129,6 +129,20 @@ def _maliyet(kullanim: dict) -> float | None:
     )
 
 
+def istek_govdesi(model: str | None, mesajlar: list[dict], **ekstra) -> dict:
+    """`/chat/completions` istek gövdesi + opsiyonel effort (reasoning modelleri).
+
+    `effort` yalnızca `AJAN_EFFORT` tanımlıysa eklenir — GLM/ZAI gibi reasoning
+    beklemeyen sağlayıcılarda boş kalır, payload'a girmez. Hem hafif yol hem tam
+    ajan (`app/ajan.py`) burayı kullanır; iki yerde ayrı payload kurmak yerine.
+    """
+    govde = {"model": model, "messages": mesajlar, "temperature": 0.3, **ekstra}
+    effort = os.environ.get("AJAN_EFFORT")
+    if effort:
+        govde["effort"] = effort
+    return govde
+
+
 def saglayici() -> tuple[str | None, str, str | None]:
     """Sağlayıcı yapılandırması: (taban_url, anahtar, model).
 
@@ -178,11 +192,7 @@ def cevap_dene(gecmis: list[dict], mesaj: str,
         yanit = httpx.post(
             f"{taban}/chat/completions",
             headers={"Authorization": f"Bearer {anahtar}"},
-            json={
-                "model": model,
-                "messages": mesajlar,
-                "temperature": 0.3,
-            },
+            json=istek_govdesi(model, mesajlar),
             timeout=ZAMAN_ASIMI,
         )
         yanit.raise_for_status()

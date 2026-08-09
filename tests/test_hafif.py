@@ -165,3 +165,17 @@ def _sahte_api(monkeypatch, cevap: str, yakala: dict | None = None,
         return SahteYanit()
 
     monkeypatch.setattr(hafif.httpx, "post", sahte_post)
+
+
+# ── istek_govdesi: opsiyonel effort (reasoning modelleri) ─────────
+def test_istek_govdesi_effort_yoksa_payloada_girmez(monkeypatch):
+    monkeypatch.delenv("AJAN_EFFORT", raising=False)
+    g = hafif.istek_govdesi("m", [{"role": "user", "content": "x"}])
+    assert "effort" not in g
+
+
+def test_istek_govdesi_effort_doluysa_eklenir(monkeypatch):
+    monkeypatch.setenv("AJAN_EFFORT", "high")
+    g = hafif.istek_govdesi("m", [{"role": "user", "content": "x"}], tools=None)
+    assert g["effort"] == "high"
+    assert g["tools"] is None

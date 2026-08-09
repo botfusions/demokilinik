@@ -131,12 +131,7 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
             yanit = httpx.post(
                 f"{taban}/chat/completions",
                 headers={"Authorization": f"Bearer {anahtar}"},
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "tools": tools or None,
-                    "temperature": 0.3,
-                },
+                json=hafif.istek_govdesi(model, messages, tools=tools or None),
                 timeout=ZAMAN_ASIMI,
             )
             yanit.raise_for_status()
