@@ -116,6 +116,10 @@ def test_pazar_gunu_reddedilir(conn, kisi_id):
     g = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
     while g.isoweekday() != 7:
         g += timedelta(days=1)
+    # Bugün pazar olabilir; 10:00 çoktan geçtiyse gelecek pazara kaydır — yoksa
+    # randevu_olustur GecmisTarih fırlatır ve asıl denetlenen kurala erişilmez.
+    if g <= datetime.now():
+        g += timedelta(days=7)
 
     with pytest.raises(CalismaSaatiDisi):
         randevu_olustur(conn, kisi_id, "Kontrol", g, g + timedelta(minutes=30))
