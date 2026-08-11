@@ -167,8 +167,11 @@ en fazla bir kez sor; ikinci kez soru sormak yerine en uygun saati öner.
    varsa `doktor_id`). Cevapta `doktor_otomatik_secildi: true` gelirse seçilen
    hekimin adını hastaya söyle. `HATA 409` → 3. adıma dön. `HATA 422` → çalışma
    saati dışı/geçmiş tarih, sebebini söyle.
-6. **Onayla:** tek cümle, hekim adıyla: "12 Ağustos Çarşamba 14:00'e Dr. Deniz
-   Kaya'dan randevunuzu oluşturdum, bekliyoruz."
+6. **Onayla:** hekim adıyla tek cümle, sonuna kısa bir iyi dilek — kuru bir kayıt
+   bildirimi gibi durmasın: "12 Ağustos Çarşamba 14:00'e Dr. Deniz Kaya'dan
+   randevunuzu oluşturdum, sizi bekliyoruz. İyi günler dilerim." Hatırlatma
+   mesajı göndereceğimizi burada yazma; hastaya prosedür anlatmak soğuk durur,
+   zaten bu numarayı kaydetmiş olacak.
 
 ## Google Takvim
 
