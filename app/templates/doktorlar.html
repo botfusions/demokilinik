@@ -18,7 +18,24 @@
   <form method="post" action="/doktorlar">
     <div class="satir">
       <div><label for="a">Ad</label><input id="a" name="ad" placeholder="Dr. Ayla Tuncer" required></div>
-      <div><label for="u">Uzmanlık</label><input id="u" name="uzmanlik" placeholder="Ortodonti"></div>
+      <div><label for="u">Uzmanlık</label>
+        <input id="u" name="uzmanlik" list="uzmanliklar" placeholder="Ortodonti"
+               autocomplete="off">
+        <!-- Liste öneridir, kilit değil: ajan hastanın istediği işlemi bu metinle
+             eşleştiriyor (implant → cerrahi, tel → ortodonti), aynı bölüm her
+             hekimde farklı yazılırsa eşleşme bozulur. Listede olmayan bir dal
+             elle yazılabilir. -->
+        <datalist id="uzmanliklar">
+          <option value="Ortodonti (tel tedavisi)">
+          <option value="İmplant ve ağız-çene cerrahisi">
+          <option value="Pedodonti (çocuk diş hekimliği)">
+          <option value="Periodontoloji (diş eti)">
+          <option value="Endodonti (kanal tedavisi)">
+          <option value="Protez">
+          <option value="Estetik diş hekimliği">
+          <option value="Genel diş hekimliği">
+        </datalist>
+      </div>
     </div>
     <div class="satir">
       <div><label for="t">Telefon (klinik kaydı için, mesaj gönderilmez)</label>
