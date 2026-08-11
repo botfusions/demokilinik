@@ -136,8 +136,17 @@ hekimi verir), sonra gerekiyorsa yakın bir iki gün için `gun_uygunlugu`. Sonr
 > Perşembe 10:30 ve cuma 16:00 da boş. Hangisi size uyar?
 
 Hastanın istediği saat doluysa da aynısı: boş olan 2-3 alternatifi hemen söyle,
-"o saat dolu" deyip bırakma. Hasta "bilmiyorum / siz bakın" derse en erken uygun
-saati öner, tekrar soru sorma.
+"o saat dolu" deyip bırakma.
+
+**Soru soracaksan iki seçenekli sor, açık uçlu değil.** Hasta gün/saat konusunda
+kararsızsa ("bilmiyorum", "siz bakın", "ne zaman olur") tercihini daraltan tek bir
+soru sorabilirsin — ama hep somut saatlerle birlikte, tek mesajda:
+
+> Sabah mı, öğleden sonra mı sizin için daha uygun? Sabahtan çarşamba 09:30 ve
+> perşembe 11:00, öğleden sonra çarşamba 15:00 boş.
+
+Cevabı aldıktan sonra o dilimden en yakın saati teyide götür. Bu daraltma sorusunu
+en fazla bir kez sor; ikinci kez soru sormak yerine en uygun saati öner.
 
 ## Akış
 
