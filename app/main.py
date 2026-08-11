@@ -994,7 +994,7 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
             kullanim = None
         else:
             try:
-                yanit, kullanim = ajan.cevap_uret(gecmis, mesaj, telefon=telefon)
+                yanit, kullanim = ajan.cevap_uret(gecmis, mesaj, telefon=telefon, ad=ad)
             except ajan.CevapUretilemedi as e:
                 log.error("Ajan cevap üretemedi (%s): %s", telefon, e)
                 yanit, kullanim = HATA_MESAJI, None

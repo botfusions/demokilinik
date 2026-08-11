@@ -104,7 +104,8 @@ def klinik_konumu() -> tuple[float, float] | None:
 
 
 def cevap_uret(gecmis: list[dict], mesaj: str,
-               kanal: str = "whatsapp", telefon: str | None = None) -> tuple[str, dict]:
+               kanal: str = "whatsapp", telefon: str | None = None,
+               ad: str | None = None) -> tuple[str, dict]:
     """(yanıt, {"prompt_tokens":.., "completion_tokens":..}) döner. Başarısızlıkta CevapUretilemedi.
 
     Bilgi soruları ve tek kelimelik hatırlatma cevapları buraya hiç uğramaz —
@@ -119,8 +120,9 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
         sistem += (
             "\n\n# Bu hasta\n\n"
             f"Bu mesajı yazan hastanın telefonu: {telefon}\n"
-            "Araç çağrılarında `telefon` alanına bunu koy. Hastadan telefon "
-            "numarası İSTEME, zaten sende."
+            + (f"WhatsApp'taki adı: {ad}\n" if ad else "")
+            + "Araç çağrılarında `telefon` (ve varsa `ad`) alanına bunları koy. "
+            "Hastadan telefon numarası ya da ad İSTEME, zaten sende."
         )
     taban, anahtar = _saglayici_ayarlari()
 

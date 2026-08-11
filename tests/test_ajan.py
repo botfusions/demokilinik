@@ -128,10 +128,12 @@ def test_telefon_sistem_promptuna_girer(monkeypatch):
     monkeypatch.setattr(ajan.httpx, "post", _sahte_post(
         [{"role": "assistant", "content": "Tabii.", "tool_calls": None}], yakalanan))
 
-    ajan.cevap_uret([], "Randevu almak istiyorum", telefon="905326111749")
+    ajan.cevap_uret([], "Randevu almak istiyorum",
+                    telefon="905326111749", ad="Cenk Tokgöz")
 
     sistem = yakalanan[0]["messages"][0]["content"]
     assert "905326111749" in sistem
+    assert "Cenk Tokgöz" in sistem
     assert "İSTEME" in sistem
 
 
