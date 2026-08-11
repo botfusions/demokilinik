@@ -137,11 +137,16 @@ def istek_govdesi(model: str | None, mesajlar: list[dict], **ekstra) -> dict:
     varsayılan 1). Canlıda ikisi de yanlıştı, OpenAI 400 dönüyordu — ajan hiçbir
     mesaja cevap üretemedi. Effort yoksa GLM/ZAI yolu: temperature 0.3.
     Hem hafif yol hem tam ajan (`app/ajan.py`) burayı kullanır.
+
+    Araçlı çağrıda (tam ajan) reasoning kapatılmak ZORUNDA: gpt-5.6-luna
+    `/chat/completions`'ta function tools ile reasoning'i birlikte kabul etmiyor,
+    parametreyi atlamak da 400 döndürüyor — açıkça `"none"` göndermek gerekiyor.
+    Araçsız çağrıda (hafif yol) `AJAN_EFFORT` aynen geçerli.
     """
     govde = {"model": model, "messages": mesajlar, **ekstra}
     effort = os.environ.get("AJAN_EFFORT")
     if effort:
-        govde["reasoning_effort"] = effort
+        govde["reasoning_effort"] = "none" if ekstra.get("tools") else effort
     else:
         govde["temperature"] = 0.3
     return govde

@@ -138,7 +138,12 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
             govde = yanit.json()
             msg = govde["choices"][0]["message"]
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
-            raise CevapUretilemedi(f"LLM çağrısı başarısız: {e}") from e
+            # Sağlayıcının hata gövdesi olmadan 400 teşhis edilemiyor (canlıda
+            # iki deploy turu buna gitti: "Unknown parameter: 'effort'" ve
+            # "function tools with reasoning_effort not supported" yalnız
+            # gövdede yazıyordu, durum kodunda değil).
+            ayrinti = getattr(getattr(e, "response", None), "text", "")[:300]
+            raise CevapUretilemedi(f"LLM çağrısı başarısız: {e} {ayrinti}") from e
 
         for k, v in (govde.get("usage") or {}).items():
             if k in toplam_kullanim:

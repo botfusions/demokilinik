@@ -186,3 +186,14 @@ def test_istek_govdesi_effort_doluysa_eklenir(monkeypatch):
     assert "effort" not in g
     assert "temperature" not in g
     assert g["tools"] is None
+
+
+def test_istek_govdesi_araclarla_reasoning_kapanir(monkeypatch):
+    """gpt-5.6-luna araç + reasoning'i kabul etmiyor, açıkça 'none' şart.
+
+    Parametreyi atlamak da 400 döndürüyor — canlıda ölçüldü.
+    """
+    monkeypatch.setenv("AJAN_EFFORT", "high")
+    g = hafif.istek_govdesi("m", [{"role": "user", "content": "x"}],
+                            tools=[{"type": "function"}])
+    assert g["reasoning_effort"] == "none"
