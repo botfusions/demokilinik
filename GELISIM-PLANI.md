@@ -2,6 +2,22 @@
 
 Henüz yapılmamış, ileride ele alınacak fikirler. Sıra önceliği göstermez.
 
+## İptalden sonra yeniden randevu teklifi
+
+**Fikir:** Hasta randevusunu iptal edince ajan "iptal ettim" deyip bırakmasın,
+aynı mesajda başka bir gün için randevu ayarlamayı teklif etsin — iptal eden
+hasta çoğu zaman vazgeçmiş değil, günü uymamıştır; teklif gelmezse müşteri kaçar.
+
+**Nerede:** `hermes-home/SOUL.md` § Randevu, iptal davranışı. Kod değişikliği
+gerekmez, tek bir talimat satırı. "Seçenekle karşıla" kuralının kardeşi:
+teklifle birlikte 1-2 somut alternatif saat verilirse daha güçlü olur
+(`en_erken_musait` zaten elde).
+
+**Dikkat:** ısrarcı olmamalı. Hasta ikinci kez "istemiyorum/gerek yok" derse
+konu kapanır; iptal eden hastayı zorlamak kliniğin itibarına zarar verir.
+
+**Tetikleyici:** kullanıcı "şimdi değil, sonra yapmalıyız" dedi (2026-08-11).
+
 ## Google Takvim entegrasyonu (doktor müsaitlik/randevu görünümü)
 
 **Fikir:** Doktorlar randevularını kendi telefonlarında native Google Takvim
