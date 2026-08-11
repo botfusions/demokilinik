@@ -84,6 +84,23 @@ def test_telefon_ayiklanir(chat_id, beklenen):
     assert telefon_ayikla(chat_id) == beklenen
 
 
+def test_cozulemeyen_lid_adres_olarak_kalir(monkeypatch):
+    """LID rehberde yoksa kırpılmaz — kırpılırsa gönderim 400 döner."""
+    import app.openwa as ow
+    monkeypatch.setattr(ow, "_LID_ONBELLEK", {})
+    monkeypatch.setattr(ow, "_istemci", lambda: (_ for _ in ()).throw(RuntimeError("uç yok")))
+    assert ow.telefon_ayikla("253201391558876@lid") == "253201391558876@lid"
+
+
+@pytest.mark.parametrize("telefon,beklenen", [
+    ("905321112233", "905321112233@c.us"),
+    ("253201391558876@lid", "253201391558876@lid"),
+])
+def test_chat_id_lid_adresini_bozmaz(telefon, beklenen):
+    from app.openwa import _chat_id
+    assert _chat_id(telefon) == beklenen
+
+
 # ── uç davranışı ────────────────────────────────────────────
 
 @pytest.fixture

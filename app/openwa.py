@@ -30,8 +30,35 @@ def imza_dogrula(ham_govde: bytes, imza_basligi: str | None, gizli: str) -> bool
 
 
 def telefon_ayikla(chat_id: str) -> str:
-    """'905321112233@c.us' -> '905321112233'"""
+    """'905321112233@c.us' -> '905321112233'
+
+    WhatsApp yeni gizlilik adreslemesinde göndereni numara yerine LID olarak
+    veriyor ('253201391558876@lid'). LID'i numaraya çevirmeyi deneriz; olmazsa
+    adresi **olduğu gibi** ('...@lid') döndürürüz — kırpıp `@c.us` eklersek
+    gönderim 400 döner (canlıda böyle oldu, hastaya cevap gitmedi).
+    """
+    if chat_id.endswith("@lid"):
+        return _lid_numaraya(chat_id)
     return chat_id.split("@", 1)[0]
+
+
+_LID_ONBELLEK: dict[str, str] = {}
+
+
+def _lid_numaraya(lid: str) -> str:
+    """LID → gerçek numara; çözülemezse LID adresi aynen döner."""
+    if lid in _LID_ONBELLEK:
+        return _LID_ONBELLEK[lid]
+    try:
+        with _istemci() as c:
+            y = c.get(f"/api/sessions/{oturum_id(c)}/contacts/{lid}")
+            y.raise_for_status()
+            kimlik = y.json().get("id", "")
+    except Exception:                       # rehberde yoksa/uç hata verirse LID ile devam
+        kimlik = ""
+    sonuc = kimlik.split("@", 1)[0] if kimlik.endswith("@c.us") else lid
+    _LID_ONBELLEK[lid] = sonuc
+    return sonuc
 
 
 def _istemci() -> httpx.Client:
@@ -73,12 +100,17 @@ def oturum_id(c: httpx.Client | None = None) -> str:
     raise RuntimeError(f"OpenWA'da '{ad}' adlı oturum yok — dashboard'dan oluşturun")
 
 
+def _chat_id(telefon: str) -> str:
+    """Numaraya '@c.us' ekler; adres zaten tamsa (LID) olduğu gibi bırakır."""
+    return telefon if "@" in telefon else f"{telefon}@c.us"
+
+
 def mesaj_gonder(telefon: str, metin: str) -> str:
     """WhatsApp mesajı gönderir, messageId döner."""
     with _istemci() as c:
         y = c.post(
             f"/api/sessions/{oturum_id(c)}/messages/send-text",
-            json={"chatId": f"{telefon}@c.us", "text": metin},
+            json={"chatId": _chat_id(telefon), "text": metin},
         )
         y.raise_for_status()
         return y.json().get("messageId", "")
@@ -94,7 +126,7 @@ def konum_gonder(telefon: str, enlem: float, boylam: float) -> str:
     with _istemci() as c:
         y = c.post(
             f"/api/sessions/{oturum_id(c)}/messages/send-location",
-            json={"chatId": f"{telefon}@c.us", "latitude": enlem, "longitude": boylam},
+            json={"chatId": _chat_id(telefon), "latitude": enlem, "longitude": boylam},
         )
         y.raise_for_status()
         return y.json().get("messageId", "")
