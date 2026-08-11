@@ -132,14 +132,18 @@ def _maliyet(kullanim: dict) -> float | None:
 def istek_govdesi(model: str | None, mesajlar: list[dict], **ekstra) -> dict:
     """`/chat/completions` istek gövdesi + opsiyonel effort (reasoning modelleri).
 
-    `effort` yalnızca `AJAN_EFFORT` tanımlıysa eklenir — GLM/ZAI gibi reasoning
-    beklemeyen sağlayıcılarda boş kalır, payload'a girmez. Hem hafif yol hem tam
-    ajan (`app/ajan.py`) burayı kullanır; iki yerde ayrı payload kurmak yerine.
+    `AJAN_EFFORT` doluysa reasoning modeli (gpt-5.6-luna) demektir: parametrenin
+    adı `reasoning_effort`'tür ve bu modeller `temperature`ı reddeder (yalnız
+    varsayılan 1). Canlıda ikisi de yanlıştı, OpenAI 400 dönüyordu — ajan hiçbir
+    mesaja cevap üretemedi. Effort yoksa GLM/ZAI yolu: temperature 0.3.
+    Hem hafif yol hem tam ajan (`app/ajan.py`) burayı kullanır.
     """
-    govde = {"model": model, "messages": mesajlar, "temperature": 0.3, **ekstra}
+    govde = {"model": model, "messages": mesajlar, **ekstra}
     effort = os.environ.get("AJAN_EFFORT")
     if effort:
-        govde["effort"] = effort
+        govde["reasoning_effort"] = effort
+    else:
+        govde["temperature"] = 0.3
     return govde
 
 

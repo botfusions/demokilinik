@@ -171,11 +171,18 @@ def _sahte_api(monkeypatch, cevap: str, yakala: dict | None = None,
 def test_istek_govdesi_effort_yoksa_payloada_girmez(monkeypatch):
     monkeypatch.delenv("AJAN_EFFORT", raising=False)
     g = hafif.istek_govdesi("m", [{"role": "user", "content": "x"}])
-    assert "effort" not in g
+    assert "reasoning_effort" not in g
+    assert g["temperature"] == 0.3
 
 
 def test_istek_govdesi_effort_doluysa_eklenir(monkeypatch):
+    """OpenAI reasoning modeli: ad `reasoning_effort`, temperature yasak.
+
+    İkisi de yanlışken canlıda her çağrı 400 döndü, ajan hiç cevap veremedi.
+    """
     monkeypatch.setenv("AJAN_EFFORT", "high")
     g = hafif.istek_govdesi("m", [{"role": "user", "content": "x"}], tools=None)
-    assert g["effort"] == "high"
+    assert g["reasoning_effort"] == "high"
+    assert "effort" not in g
+    assert "temperature" not in g
     assert g["tools"] is None
