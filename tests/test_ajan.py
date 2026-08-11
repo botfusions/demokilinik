@@ -119,3 +119,28 @@ def test_anahtar_yoksa_hata_firlatir(monkeypatch):
     monkeypatch.delenv("ZAI_API_KEY", raising=False)
     with pytest.raises(ajan.CevapUretilemedi):
         ajan.cevap_uret([], "Merhaba")
+
+
+def test_telefon_sistem_promptuna_girer(monkeypatch):
+    """Numara webhook'ta elimizde; verilmezse ajan hastadan numara istiyor."""
+    _ortam(monkeypatch)
+    yakalanan = []
+    monkeypatch.setattr(ajan.httpx, "post", _sahte_post(
+        [{"role": "assistant", "content": "Tabii.", "tool_calls": None}], yakalanan))
+
+    ajan.cevap_uret([], "Randevu almak istiyorum", telefon="905326111749")
+
+    sistem = yakalanan[0]["messages"][0]["content"]
+    assert "905326111749" in sistem
+    assert "İSTEME" in sistem
+
+
+def test_telefon_verilmezse_prompt_bolumu_eklenmez(monkeypatch):
+    _ortam(monkeypatch)
+    yakalanan = []
+    monkeypatch.setattr(ajan.httpx, "post", _sahte_post(
+        [{"role": "assistant", "content": "Tabii.", "tool_calls": None}], yakalanan))
+
+    ajan.cevap_uret([], "Merhaba")
+
+    assert "# Bu hasta" not in yakalanan[0]["messages"][0]["content"]

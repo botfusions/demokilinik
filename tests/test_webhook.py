@@ -115,7 +115,7 @@ def istemci(conn, monkeypatch):
     gonderilenler = []
     monkeypatch.setattr(
         ajan, "cevap_uret",
-        lambda gecmis, mesaj: ("Test yanıtı", {"prompt_tokens": 100, "completion_tokens": 50}),
+        lambda gecmis, mesaj, **kw: ("Test yanıtı", {"prompt_tokens": 100, "completion_tokens": 50}),
     )
     monkeypatch.setattr(openwa, "mesaj_gonder", lambda tel, metin: gonderilenler.append((tel, metin)) or "wamid.OUT")
 
@@ -190,7 +190,7 @@ def test_grup_mesaji_yoksayilir(istemci, conn):
 def test_ajan_hatasinda_hasta_sessiz_kalmaz(istemci, conn, monkeypatch):
     import app.ajan as ajan
 
-    def patla(gecmis, mesaj):
+    def patla(gecmis, mesaj, **kw):
         raise ajan.CevapUretilemedi("zaman aşımı")
 
     monkeypatch.setattr(ajan, "cevap_uret", patla)

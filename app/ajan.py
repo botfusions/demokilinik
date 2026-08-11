@@ -104,7 +104,7 @@ def klinik_konumu() -> tuple[float, float] | None:
 
 
 def cevap_uret(gecmis: list[dict], mesaj: str,
-               kanal: str = "whatsapp") -> tuple[str, dict]:
+               kanal: str = "whatsapp", telefon: str | None = None) -> tuple[str, dict]:
     """(yanıt, {"prompt_tokens":.., "completion_tokens":..}) döner. Başarısızlıkta CevapUretilemedi.
 
     Bilgi soruları ve tek kelimelik hatırlatma cevapları buraya hiç uğramaz —
@@ -112,6 +112,16 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
     çağıranda (`app/main.py`) sırayla denenir; burası son ve en pahalı adım.
     """
     sistem = _sistem_promptu(kanal)
+    if telefon:
+        # Numara webhook'ta zaten elimizde; ajana söylemezsek araç şeması
+        # `telefon`u zorunlu istediği için hastaya soruyor ("numaranızı paylaşır
+        # mısınız?") — hastanın WhatsApp'tan yazdığı numarayı sormak saçma.
+        sistem += (
+            "\n\n# Bu hasta\n\n"
+            f"Bu mesajı yazan hastanın telefonu: {telefon}\n"
+            "Araç çağrılarında `telefon` alanına bunu koy. Hastadan telefon "
+            "numarası İSTEME, zaten sende."
+        )
     taban, anahtar = _saglayici_ayarlari()
 
     messages = [{"role": "system", "content": sistem}]

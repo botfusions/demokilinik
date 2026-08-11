@@ -71,7 +71,7 @@ def _ajan_cevabi(monkeypatch, yanit):
 
     monkeypatch.setattr(
         main.ajan, "cevap_uret",
-        lambda g, m, kanal="whatsapp": (yanit, {"prompt_tokens": 100, "completion_tokens": 50}),
+        lambda g, m, kanal="whatsapp", **kw: (yanit, {"prompt_tokens": 100, "completion_tokens": 50}),
     )
 
 
@@ -142,7 +142,7 @@ def test_instagramda_isaret_sizmaz(conn, monkeypatch):
 
     monkeypatch.setattr(
         "app.ajan.cevap_uret",
-        lambda g, m, kanal="whatsapp": (
+        lambda g, m, kanal="whatsapp", **kw: (
             "Bağdat Cad. No:120.\n[KONUM]", {"prompt_tokens": 100, "completion_tokens": 50},
         ),
     )
