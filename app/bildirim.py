@@ -21,7 +21,10 @@ log = logging.getLogger(__name__)
 
 
 def _acik_mi() -> bool:
-    return os.environ.get("DOKTORA_BILDIRIM", "1") != "0"
+    # Varsayılan KAPALI: kullanıcı hekime WhatsApp bildirimi istemiyor, hekim
+    # randevuyu Google Takvim'de görüyor (app/gtakvim.py). Doktorun telefonu
+    # panelde artık yalnız klinik kaydı; açmak isteyen `DOKTORA_BILDIRIM=1` yazar.
+    return os.environ.get("DOKTORA_BILDIRIM", "0") == "1"
 
 
 def _randevu_ozeti(conn: psycopg.Connection, randevu_id: int) -> dict | None:

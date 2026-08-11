@@ -5,12 +5,13 @@ Satış demosu için: 4 doktor, ilgili hizmet/fiyat listesi, birkaç genel bilgi
 kaydı. Tekrar çalıştırılabilir — aynı isimde doktor/hizmet varsa atlanır,
 ikinci kez eklenmez.
 
-Doktorların hepsine **aynı telefon numarası** yazılır (DEMO_DOKTOR_TELEFON ya
-da argüman) — demoda telefonu elinde tutan kişi (satışçı/doktor adayı) hangi
-doktor seçilirse seçilsin bildirimi kendi telefonunda görür.
+Doktorların hepsine **aynı e-posta** yazılır (DEMO_DOKTOR_EPOSTA ya da 2.
+argüman): demoda hangi hekim seçilirse seçilsin randevu daveti aynı Google
+Takvim'e düşer, demoyu yapan kişi kendi telefonunda görür. Telefon (1. argüman)
+yalnız klinik kaydıdır — `DOKTORA_BILDIRIM=1` yazılmadıkça mesaj gönderilmez.
 
-    .venv/bin/python scripts/demo-veri.py 905321112233
-    # ya da .env'de DEMO_DOKTOR_TELEFON=905321112233 iken argümansız çalıştır
+    .venv/bin/python scripts/demo-veri.py 905321112233 demo@ornek.com
+    # ya da .env'de DEMO_DOKTOR_TELEFON / DEMO_DOKTOR_EPOSTA doluyken argümansız
 """
 
 import sys
@@ -48,6 +49,8 @@ GENEL_BILGILER = [
 
 def main() -> None:
     telefon = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("DEMO_DOKTOR_TELEFON")
+    eposta = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("DEMO_DOKTOR_EPOSTA")
+    eposta = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("DEMO_DOKTOR_EPOSTA")
 
     conn = baglan()
     sema_kur(conn)
@@ -57,8 +60,17 @@ def main() -> None:
         if ad in mevcut_adlar:
             print(f"  atlandı (zaten var): {ad}")
             continue
-        doktor_ekle(conn, ad, uzmanlik, telefon=telefon)
-        print(f"  eklendi: {ad} ({uzmanlik})" + (f" — bildirim: {telefon}" if telefon else ""))
+        doktor_ekle(conn, ad, uzmanlik, telefon=telefon, eposta=eposta)
+        print(f"  eklendi: {ad} ({uzmanlik})" + (f" — takvim: {eposta}" if eposta else ""))
+
+    # Doktorlar zaten varsa yukarısı atlar; e-posta sonradan eklenen bir alan
+    # olduğu için mevcut kayıtlara da yazılır (script tekrar çalıştırılabilir).
+    if eposta:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE doktorlar SET eposta = %s WHERE eposta IS DISTINCT FROM %s",
+                        (eposta, eposta))
+            print(f"  e-posta güncellendi: {cur.rowcount} doktor → {eposta}")
+        conn.commit()
 
     for ad, fiyat in HIZMETLER:
         try:

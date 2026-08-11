@@ -53,15 +53,44 @@ AJAN_PROVIDER=zai      AJAN_MODEL=glm-4.6          # test
 AJAN_PROVIDER=openai   AJAN_MODEL=gpt-5.6-luna     # canlı
 ```
 
-## Composio (Google Takvim + Gmail)
+## Google Takvim (doktorun cebinde randevu)
 
-⏳ **Henüz yeniden bağlanmadı.** Eski `scripts/composio-ac.sh` Hermes'in
-`config.yaml`'ına MCP sunucusu ekliyordu; Hermes kalkınca bu betik de kalktı.
-Composio'yu yeni ajana bağlamak ayrı bir iş: ya `app/araclar.py`'ye yeni bir
-araç olarak eklenir (Instagram'ın Composio REST çağrısına benzer şekilde,
-bkz. `app/instagram.py`), ya da genel bir MCP istemcisi yazılır. `.env`'de
-`COMPOSIO_API_KEY`/`COMPOSIO_MCP_URL` doldurulsa bile şu an hiçbir kod bunları
-okumuyor.
+Randevu açılınca kliniğin Google Takvim'ine etkinlik yazılır ve **hekimin
+e-postası davetli olarak eklenir** — Google etkinliği davetlinin kendi takvimine
+düşürür, hekim randevuyu kendi telefonunda, kendi rengiyle görür. Randevu iptal
+edilince etkinlik silinir (`randevular.google_event_id`).
+
+**Hekim tarafında kurulum yoktur:** ayrı Google hesabı bağlama, ayrı takvim
+oluşturma, abone olma yok. Tek gereken, hekimin e-postasının panelde (Doktorlar
+sayfası) tanımlı olması.
+
+```bash
+# 1. Composio'da Google Calendar'ı kliniğin hesabıyla bağla
+# 2. Araç adlarını doğrula (slug'lar belgelenmiş değil)
+.venv/bin/python -m app.gtakvim --kesfet
+# 3. .env: COMPOSIO_API_KEY, TAKVIM_KULLANICI (connected account user_id)
+#    GOOGLE_TAKVIM_ID varsayılan "primary"
+```
+
+`COMPOSIO_API_KEY` ya da `TAKVIM_KULLANICI` boşsa takvim tamamen kapalıdır;
+randevu akışı etkilenmez. Composio'ya ulaşılamazsa da randevu düşmez — CRM
+kaydı geçerlidir, hataya yalnız log düşer, hastaya normal onay gider.
+
+**Neden davetli, neden renk yok:** Composio'nun Takvim araçlarında `colorId`
+alanı yok (`CREATE/UPDATE/PATCH_EVENT` — 2026-08-11'de doğrulandı), yani
+"her hekime bir Google rengi" yapılamıyor. Davetli modelinde renk zaten hekimin
+kendi telefonunda ayarlanır ve hekim yalnız kendi randevularını görür.
+
+**Doktora WhatsApp bildirimi varsayılan olarak kapalıdır** (`DOKTORA_BILDIRIM=0`)
+— hekim randevuyu takvimde görüyor. Panelde tanımlı doktor telefonu yalnız klinik
+kaydıdır; `DOKTORA_BILDIRIM=1` yazılmadıkça o numaraya mesaj gitmez.
+
+## Composio (Gmail)
+
+Gmail bağlantısı sağlık nöbetçisi tarafından izlenir (`app/saglik.py`). Ajanın
+kendi Composio aracı yoktur — takvim işini `app/gtakvim.py`, Instagram'ı
+`app/instagram.py` doğrudan REST üzerinden yapar. `COMPOSIO_MCP_URL` Hermes
+döneminden kalmadır, hiçbir kod okumaz.
 
 ## Fiyatlar ve kampanyalar
 

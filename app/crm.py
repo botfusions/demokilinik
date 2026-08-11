@@ -11,6 +11,8 @@ from datetime import datetime, time
 import psycopg
 from psycopg.rows import dict_row
 
+from app import gtakvim
+
 
 class RandevuCakismasi(Exception):
     """İstenen aralık dolu."""
@@ -199,10 +201,18 @@ def randevu_olustur(
         )
         rid = cur.fetchone()[0]
     conn.commit()
+
+    # Takvim kancası burada, çağıranlarda değil: randevu iki yoldan açılıyor
+    # (ajan → /api/randevu, personel → panel formu) ve ikisinin de takvime
+    # düşmesi gerekiyor. Yapılandırılmamışsa (anahtar yok) sessizce atlanır.
+    gtakvim.randevuyu_takvime_yaz(conn, rid)
     return rid
 
 
 def randevu_iptal(conn: psycopg.Connection, randevu_id: int) -> None:
+    # Silme önce: durum 'iptal' olduktan sonra da okunabilir ama etkinliğin
+    # hastanın/hekimin takviminde kalmaması daha önemli.
+    gtakvim.randevuyu_takvimden_sil(conn, randevu_id)
     with conn.cursor() as cur:
         cur.execute("UPDATE randevular SET durum = 'iptal' WHERE id = %s", (randevu_id,))
     conn.commit()
@@ -401,11 +411,13 @@ def kullanim_ozeti(conn: psycopg.Connection, pencere_saniye: int) -> dict:
 # ── doktorlar ───────────────────────────────────────────────
 
 def doktor_ekle(conn: psycopg.Connection, ad: str, uzmanlik: str | None = None,
-                notlar: str | None = None, telefon: str | None = None) -> int:
+                notlar: str | None = None, telefon: str | None = None,
+                eposta: str | None = None) -> int:
     with conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO doktorlar (ad, uzmanlik, notlar, telefon) VALUES (%s, %s, %s, %s) RETURNING id",
-            (ad, uzmanlik, notlar, telefon),
+            "INSERT INTO doktorlar (ad, uzmanlik, notlar, telefon, eposta) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (ad, uzmanlik, notlar, telefon, eposta),
         )
         did = cur.fetchone()[0]
     conn.commit()

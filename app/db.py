@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS doktorlar (
 );
 -- Doktora yeni randevu bildirimi göndermek için sonradan eklendi.
 ALTER TABLE doktorlar ADD COLUMN IF NOT EXISTS telefon text;
+-- Google Takvim daveti bu adrese gider; hekim randevuyu kendi takviminde görür.
+ALTER TABLE doktorlar ADD COLUMN IF NOT EXISTS eposta text;
 
 CREATE TABLE IF NOT EXISTS randevular (
     id              serial PRIMARY KEY,

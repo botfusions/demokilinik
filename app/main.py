@@ -676,9 +676,10 @@ def doktor_sayfasi(request: Request, hata: str = "", conn=Depends(db)):
 
 @app.post("/doktorlar", dependencies=[Depends(yonetici)])
 def doktor_kaydet(request: Request, ad: str = Form(...), uzmanlik: str = Form(""),
-                  notlar: str = Form(""), telefon: str = Form(""), conn=Depends(db)):
+                  notlar: str = Form(""), telefon: str = Form(""),
+                  eposta: str = Form(""), conn=Depends(db)):
     did = doktor_ekle(conn, ad.strip(), uzmanlik.strip() or None, notlar.strip() or None,
-                      telefon.strip() or None)
+                      telefon.strip() or None, eposta.strip() or None)
     islem_yaz(conn, _kim(request), "doktor ekledi", f"#{did} {ad}")
     return RedirectResponse("/doktorlar", status_code=303)
 
