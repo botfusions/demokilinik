@@ -1,8 +1,45 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-07 · **Durum:** çalışır, 334 test yeşil, QR bekliyor + demo hazır
+**Son güncelleme:** 2026-08-11 · **Durum:** **canlıda çalışıyor** —
+`demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
+edildi, Google Takvim'e düşüyor. 353 test yeşil.
 
-**Bu güncellemede:** Hermes CLI bağımlılığı tamamen kaldırıldı — ajan artık
+## 2026-08-11: WhatsApp canlıya alındı + Google Takvim
+
+VPS'te OpenWA kuruldu (Coolify dışında, `coolify` ağında manuel container), QR
+okutuldu, hat **905323314569**. Uçtan uca doğrulandı: hasta yazıyor → kural/hafif/
+tam ajan → randevu → Google Takvim etkinliği → iptalde etkinlik siliniyor.
+
+**Canlıda çıkan beş hata — hepsi dış dünyayla temas noktasında, hiçbiri testle
+yakalanamazdı.** Yeni bir entegrasyon açarken bu listeye bak:
+
+1. **LID adreslemesi.** WhatsApp göndereni artık numara yerine LID veriyor
+   (`253201391558876@lid`). Kod domaini kırpıp `@c.us` ekleyince `send-text` 400
+   döndü — ajan cevabı üretti, hastaya hiç ulaşmadı. `openwa.telefon_ayikla` artık
+   LID'i contacts ucundan numaraya çeviriyor, çözemezse adresi bozmadan bırakıyor.
+2. **İmajda `SOUL.md` yoktu.** `.dockerignore` `hermes-home/` klasörünü tümüyle
+   dışlıyordu; ajan ve hafif yol "SOUL.md okunamadı" ile düşüyordu. Yalnız kural
+   katmanı çalışıyordu (o DB'den okuyor, dosyaya bakmıyor).
+3. **`effort` yanlış parametre.** OpenAI'de adı `reasoning_effort`.
+4. **`temperature` yasak.** gpt-5.6-luna yalnız varsayılan 1'i kabul ediyor.
+5. **Araçlarla reasoning birlikte olmuyor.** `/chat/completions`'ta function tools
+   varken `reasoning_effort: "none"` göndermek ZORUNLU — parametreyi atlamak da
+   400 döndürüyor.
+
+3-5 tek bir 400 durum kodunun arkasındaydı; `ajan.py` artık sağlayıcının hata
+gövdesini de logluyor, iki teşhis turu bu yüzden kaybedildi.
+
+**Randevu akışı SOUL.md'ye geri kondu.** SOUL.md "akışın tamamı `randevu-al`
+skill'inde" diyordu ama o skill Hermes kaldırılırken silinmişti (7eb2949) — ajan
+aylardır akışsız, doğaçlama çalışıyormuş. Akış git geçmişinden çıkarılıp SOUL.md'ye
+yazıldı, üstüne yeni davranış eklendi: **hastayı soruyla değil seçenekle karşıla**
+(önce `en_erken_musait`, sonra hekim adıyla 2-3 somut saat), kararsız hastaya
+iki seçenekli daraltma sorusu (sabah/öğleden sonra) ama hep saatlerle birlikte,
+işlem→uzmanlık eşlemesi (implant → cerrahi, tel → ortodonti, çocuk → pedodonti).
+
+**Google Takvim eklendi** (`app/gtakvim.py`) — detay aşağıda.
+
+**Bu güncellemede (2026-08-07):** Hermes CLI bağımlılığı tamamen kaldırıldı — ajan artık
 `app/ajan.py`'de elle yazılmış, framework'süz bir in-process tool-calling
 döngüsü (doğrudan `/chat/completions`, MCP/JSON-RPC yok). Ekonomik hedef için
 yeni bir LLM'siz kural katmanı (`app/kural.py`) eklendi: bilgi tabanı
@@ -54,36 +91,33 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 | Doktorlar + otomatik dağıtım | ✅ |
 | Kullanıcılar + roller + işlem izi | ✅ |
 | Randevu hatırlatmaları | ✅ kod hazır, canlıda hiç mesaj göndermedi |
-| Instagram (yalnız bilgilendirme) | ✅ kod hazır, ⏳ Composio anahtarı bekliyor |
+| Instagram (yalnız bilgilendirme) | ✅ kod hazır, ⏳ gerçek IG hesabı bağlanmadı (Composio'daki iki hesap sandbox) |
 | Konum iğnesi | ✅ `.env`'de `KLINIK_KONUM` doldurulunca çalışır |
 | Panel yeni tasarım + Takvim + Fiyat/Kampanya | ✅ |
 | Bilgi tabanı (ekle/düzenle) | ✅ panelde, **yalnız yönetici** |
-| Doktora yeni randevu bildirimi | ✅ WhatsApp, `.env`'de `DOKTORA_BILDIRIM=0` ile kapatılır |
 | İyileştirme öneri paneli | ✅ panelde `/iyilestirme`, salt-okunur, yalnız yönetici |
 | Demo verisi (DemoDent) | ✅ `scripts/demo-veri.py`, tekrar çalıştırılabilir |
-| Composio (Takvim + Gmail) | ⏳ **anahtar bekliyor** — bu olmadan takvim/mail adımı çalışmaz |
-| WhatsApp QR | ⏳ **müşteri okutacak** |
-| VPS | ⏳ scriptler hazır, çıkılmadı |
+| Composio (Takvim + Gmail) | ✅ anahtar geçerli, Gmail + Calendar ACTIVE |
+| Google Takvim | ✅ randevu → etkinlik, hekim davetli, iptalde silinir |
+| Doktora WhatsApp bildirimi | ⛔ **varsayılan kapalı** (`DOKTORA_BILDIRIM=0`) — hekim takvimde görüyor |
+| WhatsApp QR | ✅ okutuldu, hat 905323314569 |
+| VPS | ✅ canlı: demoklinik.botfusions.com (Coolify) |
 
 ## Sırada ne var
 
-1. **QR okutmak.** `http://localhost:2785` → `klinik` oturumu. Klinik için **ayrı
-   bir numara** — OpenWA resmi olmayan istemci, ban geri alınamıyor.
-2. **Composio.** Hesap aç, Google Takvim + Gmail bağla, `.env`'e `COMPOSIO_API_KEY`
-   ve `COMPOSIO_MCP_URL` yaz. **Bağlama betiği artık yok** — eski
-   `scripts/composio-ac.sh` Hermes'in `config.yaml`'ına MCP sunucusu ekliyordu,
-   Hermes kalkınca anlamsızlaştı ve silindi. Yeni ajana bağlamak ayrı bir iş:
-   `app/araclar.py`'ye yeni bir araç olarak eklenebilir (Instagram'ın Composio
-   REST çağrısına benzer, bkz. `app/instagram.py`) ya da genel bir MCP istemcisi
-   yazılabilir. Bkz. README § Composio.
-3. **VPS.** `README.md` § VPS'e çıkış. `.env`'de `AJAN_PROVIDER=openai`,
-   `AJAN_MODEL=gpt-5.6-luna`, `OPENAI_API_KEY` doldur. En az 2GB RAM.
-4. **Demo günü.** `scripts/demo-veri.py <telefon>` çalıştır (telefon = demoda
-   cihazı tutan kişinin numarası, tüm demo doktorlarına bildirim oraya gider).
-   QR okutulmuş olmalı. Senaryo: "İmplant için randevu almak istiyorum" →
-   ajan Dr. Deniz Kaya'yı önerir, uygunluk gösterir, randevu açar → doktor
-   telefonuna WhatsApp bildirimi gider → dashboard'da (`/randevular`) "Planlandı"
-   durumunda görünür.
+1. **Müşteri kurulumunda kliniğin KENDİ Google hesabını bağla.** Şu an Composio'ya
+   bağlı hesap `cenk.tokgoz@gmail.com` — demoda sorun değil ama gerçek klinikte
+   tüm randevular satıcının kişisel takvimine yazılır. Klinik hesabı bağlanır,
+   `TAKVIM_KULLANICI` yeni connected account user_id'siyle değiştirilir.
+2. **Gerçek Instagram hesabı.** Composio'daki iki IG hesabı sandbox
+   (`is_composio_managed: true`), `resepta.botfusions` değil. Bağlamak için IG
+   Business/Creator + bağlı Facebook Sayfası şart.
+3. **Demo günü.** `scripts/demo-veri.py <telefon> <eposta>` (e-posta = demoyu
+   yapanın Google hesabı, tüm demo hekimlerine yazılır → randevu onun takvimine
+   düşer). Senaryo: "İmplant için randevu almak istiyorum" → ajan Dr. Deniz
+   Kaya'yı önerir, 2-3 saat sunar, randevu açar → panelde "Planlandı" + Google
+   Takvim'de etkinlik.
+4. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
 5. *(sonraya)* Meta reklam modülü — PRD Faz 8.
 
 ## Çalıştırma
@@ -98,7 +132,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 323 test, hiçbiri LLM çağırmaz
+.venv/bin/python -m pytest        # 353 test, hiçbiri LLM çağırmaz
 ```
 
 ## Bilinmesi gerekenler
@@ -171,6 +205,24 @@ yalnız aktarıyor. `tests/test_araclar.py` liste genişlemesini ve modülde
 `subprocess`/`os.system`/`open(` gibi kabuk/dosya erişimi izlerinin olmadığını
 denetliyor.
 
+**Google Takvim davetli modeliyle çalışır.** Etkinlik kliniğin bağlı Google
+hesabının takvimine yazılır, hekimin e-postası (`doktorlar.eposta`) **davetli**
+olarak eklenir — hekim randevuyu kendi telefonundaki takvimde, kendi rengiyle
+görür, hiçbir kurulum yapmaz. Ayrı takvim + ACL yolu seçilmedi çünkü Composio'nun
+Takvim araçlarında `colorId` alanı YOK (2026-08-11'de dört araçta doğrulandı),
+yani "her hekime bir Google rengi" planı zaten yapılamıyordu. Kanca
+`crm.randevu_olustur`/`randevu_iptal` içinde, çağıranlarda değil: randevu iki
+yoldan açılıyor (ajan + panel), ikisi de takvime düşmeli. `TAKVIM_KULLANICI` ya da
+`COMPOSIO_API_KEY` boşsa takvim tamamen sessizdir. **Takvim hatası randevuyu
+düşürmez**, yalnız log'a uyarı düşer. `google_event_id`'nin dolu olması yazmanın,
+boşalması silmenin başarılı olduğunun kanıtıdır — kod başarısızlıkta alanı
+değiştirmiyor.
+
+**Doktora WhatsApp bildirimi artık varsayılan KAPALI.** Kullanıcının kararı: hekim
+randevuyu takvimde görüyor, WhatsApp bildirimi istenmedi. `doktorlar.telefon`
+panelde yalnız klinik kaydı; o alana numara yazmak mesaj göndermeye başlatmaz.
+Açmak isteyen `.env`'e `DOKTORA_BILDIRIM=1` yazar. Kod ve KVKK kuralı duruyor:
+
 **Doktora bildirim tek alıcı, panelden ayarlanmaz.** `app/bildirim.py` sabit
 kural: yeni randevu → doktorun (telefonu kayıtlıysa) WhatsApp'ına haber gider.
 Mesaj metninde hastanın serbest metin notu (`randevular.notlar`) hiç yok —
@@ -240,9 +292,10 @@ app/static/       panel.css, panel.js (tema + mobil çekmece)
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
 app/saglik.py     bağlantı nöbetçisi (Composio + WhatsApp)
 app/iyilestirme.py  salt-okunur öneri taraması (bkz. aşağı) — panelde /iyilestirme
-app/bildirim.py   doktora yeni randevu bildirimi (WhatsApp, tek alıcı)
+app/bildirim.py   doktora yeni randevu bildirimi (WhatsApp, tek alıcı, VARSAYILAN KAPALI)
+app/gtakvim.py    Google Takvim — randevu → etkinlik, hekim davetli, iptalde silinir
 hermes-home/SOUL.md  ajanın kimliği (bu klasöre özel)
-tests/            334 test, LLM'siz
+tests/            353 test, LLM'siz
 scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme
 scripts/demo-veri.py  satış demosu için DemoDent verisi (idempotent)
 ```
