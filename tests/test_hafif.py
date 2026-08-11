@@ -197,3 +197,23 @@ def test_istek_govdesi_araclarla_reasoning_kapanir(monkeypatch):
     g = hafif.istek_govdesi("m", [{"role": "user", "content": "x"}],
                             tools=[{"type": "function"}])
     assert g["reasoning_effort"] == "none"
+
+
+# ── prompt boyutu: hafif yol randevu akışını taşımaz ─────────
+
+def test_hafif_yolda_randevu_akisi_yok():
+    """Hafif yolun randevu aracı yok; akış metnini taşımak boşuna token.
+
+    Kesme SOUL.md'deki `# Randevu` başlığına dayanıyor — başlık yeniden
+    adlandırılırsa bu test kırmızıya döner (sessizce büyümesin diye).
+    """
+    tam = hafif.kimlik_ve_bilgi()
+    kisa = hafif.kimlik_ve_bilgi(randevu_akisi=False)
+    assert tam and kisa
+
+    assert "randevu_olustur" in tam and "randevu_olustur" not in kisa
+    assert len(kisa) < len(tam) - 2000          # gerçekten kesilmiş olmalı
+
+    # Kesilmemesi gerekenler: kimlik, sınırlar, konu kilidi ve klinik bilgileri
+    for korunan in ("# Kimlik", "Teşhis koymazsın", "Konu kilidi", "# Klinik bilgileri"):
+        assert korunan in kisa

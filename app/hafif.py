@@ -81,17 +81,26 @@ def _gecmiste_randevu_var(gecmis: list[dict]) -> bool:
     return any(_randevu_sinyali(g["mesaj"]) for g in gecmis)
 
 
-def kimlik_ve_bilgi() -> str | None:
+def kimlik_ve_bilgi(randevu_akisi: bool = True) -> str | None:
     """SOUL + bilgi tabanı — ajanın kimliğinin tek üretim yeri.
 
     `app/ajan.py`'nin tam-araçlı tur da bunu kullanır; iki ayrı yerde kimlik
-    metni üretilmesin diye ortak burada tutuluyor."""
+    metni üretilmesin diye ortak burada tutuluyor.
+
+    `randevu_akisi=False`: SOUL.md'nin randevu bölümü (araç adları, akış adımları,
+    hata kodları — ~3.4 KB) atlanır. Hafif yolun randevu aracı yok, tek yapacağı
+    `[RANDEVU]` yazıp devretmek; o metni her bilgi sorusunda taşımak boşuna token.
+    Kesme başlığa dayanıyor — SOUL.md'de `# Randevu` başlığı yeniden adlandırılırsa
+    kesme sessizce çalışmaz olur, `test_hafif_yolda_randevu_akisi_yok` bunu yakalar.
+    """
     try:
         soul = SOUL.read_text()
         bilgi = HERMES_MD.read_text()
     except OSError as e:
         log.warning("Kimlik okunamadı: %s", e)
         return None
+    if not randevu_akisi:
+        soul = soul.split("\n# Randevu\n")[0].rstrip()
     return f"{soul}\n\n# Klinik bilgileri\n\n{bilgi}"
 
 
@@ -100,7 +109,7 @@ def _sistem_promptu() -> str | None:
 
     Biri okunamıyorsa hafif yol devre dışı — eksik kimlikle cevap üretmektense
     tam ajana düşmek doğru."""
-    if (temel := kimlik_ve_bilgi()) is None:
+    if (temel := kimlik_ve_bilgi(randevu_akisi=False)) is None:
         return None
 
     return (
