@@ -3,11 +3,15 @@ __pycache__/
 .git/
 .pytest_cache/
 openwa-data/
-hermes-home/
+hermes-home/*
 tests/
 *.pyc
 .env
 *.md
+# Ajanın kimliği — imajda ŞART. Yoksa ajan ve hafif yol
+# "SOUL.md ya da .hermes.md okunamadı" ile çöker, yalnız kural katmanı çalışır.
+# `.hermes.md` imaja girmez, açılışta bilgi tabanından üretilir (app/main.py).
+!hermes-home/SOUL.md
 doktorum-dashboard*.html
 mockup_*.png
 referans/
