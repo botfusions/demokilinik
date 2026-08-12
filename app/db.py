@@ -1,7 +1,7 @@
 """Veritabanı bağlantısı ve şema.
 
-ORM yok — beş tablo ve düz SQL. Migration aracı da yok: şema `CREATE TABLE IF NOT EXISTS`
-ile açılışta kurulur. Şema büyüyüp geçmişe dönük veri taşımak gerekirse Alembic ekle.
+ORM yok — düz SQL, tablolar aşağıda. Migration aracı da yok: şema
+`CREATE TABLE IF NOT EXISTS` ile açılışta kurulur. Şema büyüyüp geçmişe dönük veri taşımak gerekirse Alembic ekle.
 """
 
 import os
