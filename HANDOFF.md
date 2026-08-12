@@ -175,8 +175,29 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    düşer). Senaryo: "İmplant için randevu almak istiyorum" → ajan Dr. Deniz
    Kaya'yı önerir, 2-3 saat sunar, randevu açar → panelde "Planlandı" + Google
    Takvim'de etkinlik.
-4. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
-5. *(sonraya)* Meta reklam modülü — PRD Faz 8.
+4. **Demo sonrası: yönetici bölümüne ikinci parola + 5 denemede kilit.**
+   Bugün rol yeterli — yönetici hesabıyla giriş yapılmışsa Fiyat/Kampanya,
+   Bilgi Tabanı, Kullanıcılar sekmeleri doğrudan açılıyor. Resepsiyonda açık
+   kalan ekranda fiyat değiştirilebilir. Yapılacak:
+   - `yonetici` bağımlılığına (`app/main.py:199`) tek kontrol: oturumda
+     "yönetici doğrulandı" damgası yoksa küçük bir parola ekranı. Kullanıcı
+     KENDİ parolasını girer, damga N dakika geçerli (süre kararlaştırılacak),
+     sonra düşer. Rotalar tek tek değişmez, bağımlılık hepsini kapsıyor.
+   - **Yanlış parolada 5 deneme kilidi.** Şu an hiçbir yerde yok:
+     `POST /giris` (`app/main.py:241`) sınırsız deneme kabul ediyor ve panel
+     internete açık. Kilit hem ana girişe hem ikinci parolaya konmalı;
+     sayaç `kullanicilar` tablosunda (`basarisiz_deneme`, `kilit_bitis`),
+     süreli kilit — kalıcı değil, yoksa kliniği kendi panelinden kilitleriz.
+   - **Parola unutulursa:** self-servis sıfırlama YOK ve planlanmıyor (e-posta
+     altyapısı yok, SMTP env'i bile dolu değil). Çıkış yolu **sunucudan
+     müdahale**: başka bir yönetici varsa panelden değiştirir; tek yönetici
+     kilitlendiyse vendor `docker exec` ile sıfırlar. Bunun için elle SQL
+     yazmak yerine küçük bir script yazılacak:
+     `scripts/parola-sifirla.py <kullanıcı_adı> <yeni_parola>` —
+     `parola_degistir()`'i çağırır, kilidi ve sayacı sıfırlar, `islem_kaydi`'na
+     "vendor sıfırladı" yazar. Denetim izi kalsın diye sessiz UPDATE değil.
+5. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
+6. *(sonraya)* Meta reklam modülü — PRD Faz 8.
 
 ## Çalıştırma
 
