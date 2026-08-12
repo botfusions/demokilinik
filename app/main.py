@@ -28,6 +28,9 @@ from app.crm import (  # noqa: E402
     GecmisTarih,
     RandevuCakismasi,
     DoktorYok,
+    _calisma_penceresi,
+    ayar_yaz,
+    ayarlari_yukle,
     dolu_araliklar,
     doktor_bazli_doluluk,
     doktor_durum_yaz,
@@ -119,6 +122,8 @@ async def yasam(app: FastAPI):
 
     c = baglan()
     sema_kur(c)
+    # Panelden girilen ayarlar env'i ezer — env yalnız hiç kayıt yoksa geçerli.
+    ayarlari_yukle(c)
     hermes_md_yaz(c, HERMES_MD)
     if ilk_admin_kur(c):
         log.warning("İlk yönetici oluşturuldu: kullanıcı 'admin', parola .env'deki PANEL_PAROLA")
@@ -288,13 +293,39 @@ def ozet(request: Request, conn=Depends(db)):
 
 
 @app.get("/bilgi", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
-def bilgi_sayfasi(request: Request, conn=Depends(db)):
+def bilgi_sayfasi(request: Request, hata: str = "", conn=Depends(db)):
+    gunler, ac, kapa = _calisma_penceresi()
     return sablonlar.TemplateResponse(request, "bilgi.html", {
         "sayfa": "bilgi",
         "kullanici": _kim(request),
         "bilgiler": bilgiler_listele(conn),
+        "hata": hata,
+        "calisma_gunleri": gunler,
+        "acilis": ac.strftime("%H:%M"),
+        "kapanis": kapa.strftime("%H:%M"),
         "saglik": saglik.saglik_ozeti(conn),
     })
+
+
+@app.post("/bilgi/calisma", dependencies=[Depends(yonetici)])
+def calisma_kaydet(request: Request, acilis: str = Form(...), kapanis: str = Form(...),
+                   gun: list[int] = Form([]), conn=Depends(db)):
+    """Çalışma günleri/saatleri — randevu penceresinin tek doğru kaynağı.
+
+    Bilgi tabanındaki "çalışma saatleri" metni ajanın AĞZI, burası sistemin
+    KAPISI. İkisi ayrışınca ajan cumartesi öneriyor ama randevu 422 dönüyor;
+    canlıda tam olarak bu yaşandı, o yüzden ayar metnin yanına kondu.
+    """
+    if not gun:
+        return RedirectResponse("/bilgi?hata=En az bir gün seçilmeli", status_code=303)
+    if acilis >= kapanis:
+        return RedirectResponse("/bilgi?hata=Açılış kapanıştan önce olmalı", status_code=303)
+
+    ayar_yaz(conn, "calisma_gunleri", ",".join(str(g) for g in sorted(gun)))
+    ayar_yaz(conn, "calisma_saatleri", f"{acilis}-{kapanis}")
+    islem_yaz(conn, _kim(request), "çalışma penceresini değiştirdi",
+              f"{sorted(gun)} {acilis}-{kapanis}")
+    return RedirectResponse("/bilgi", status_code=303)
 
 
 @app.post("/bilgi", dependencies=[Depends(yonetici)])
@@ -789,8 +820,6 @@ def doktorlar_api(telefon: str = "", conn=Depends(db)):
 
 @app.get("/api/uygunluk", dependencies=[Depends(ic_anahtar)])
 def uygunluk(gun: str, doktor_id: int | None = None, conn=Depends(db)):
-    from app.crm import _calisma_penceresi
-
     gunler, ac, kapa = _calisma_penceresi()
     g = date.fromisoformat(gun)
     if g.isoweekday() not in gunler:

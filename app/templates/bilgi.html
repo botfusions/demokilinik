@@ -25,6 +25,33 @@
   </div>
 </div>
 
+{% if hata %}<div class="uyari-kutu"><span>⚠</span><div>{{ hata }}</div></div>{% endif %}
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Çalışma günleri ve saatleri</h2>
+  <p class="bos" style="margin-top:-8px">
+    Randevu penceresi budur. Kapalı bir güne ya da bu saatlerin dışına randevu
+    <b>açılamaz</b> — ajan önerse bile sistem reddeder. Aşağıdaki "Çalışma
+    Saatleri" bilgisiyle aynı olmasına dikkat edin: oradaki metin ajanın
+    hastaya söylediği, buradaki ayar sistemin kabul ettiğidir.
+  </p>
+
+  <form method="post" action="/bilgi/calisma" style="margin-top:12px">
+    <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:12px">
+      {% for no, ad in [(1,'Pzt'),(2,'Sal'),(3,'Çar'),(4,'Per'),(5,'Cum'),(6,'Cmt'),(7,'Paz')] %}
+      <label style="display:flex; align-items:center; gap:6px; font-weight:500">
+        <input type="checkbox" name="gun" value="{{ no }}" {% if no in calisma_gunleri %}checked{% endif %}> {{ ad }}
+      </label>
+      {% endfor %}
+    </div>
+    <div class="satir">
+      <div><label for="ac">Açılış</label><input id="ac" type="time" name="acilis" value="{{ acilis }}" required></div>
+      <div><label for="ka">Kapanış</label><input id="ka" type="time" name="kapanis" value="{{ kapanis }}" required></div>
+    </div>
+    <button>Kaydet</button>
+  </form>
+</div>
+
 <div class="kart" style="margin-bottom:14px">
   <h2>Yeni bilgi ekle</h2>
   <p class="bos" style="margin-top:-8px">

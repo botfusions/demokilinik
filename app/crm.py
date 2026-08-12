@@ -121,6 +121,42 @@ def gorusme_gecmisi(conn: psycopg.Connection, kisi_id: int, limit: int = 10) -> 
         return cur.fetchall()
 
 
+# ── ayarlar ─────────────────────────────────────────────────
+
+# Panelden değiştirilebilen ayarlar. DB tek doğru kaynak; okuma yolu ise hâlâ
+# `os.environ` — açılışta ve her kayıtta DB'den env'e basılıyor. Böylece
+# `_calisma_penceresi()`'nin beş çağrı yerinden hiçbirine `conn` taşımak
+# gerekmiyor.
+# ponytail: tek süreç varsayımı. Birden çok uvicorn worker'ı açılırsa kayıt
+# yalnız kendi sürecinin env'ini günceller — o gün her worker'ın DB'den okuması
+# ya da restart gerekir.
+AYAR_ENV = {"calisma_gunleri": "CALISMA_GUNLERI", "calisma_saatleri": "CALISMA_SAATLERI"}
+
+
+def ayarlari_yukle(conn: psycopg.Connection) -> None:
+    """DB'deki ayarları process env'ine basar. Açılışta bir kez çağrılır."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT anahtar, deger FROM ayarlar")
+        for anahtar, deger in cur.fetchall():
+            if (env_adi := AYAR_ENV.get(anahtar)):
+                os.environ[env_adi] = deger
+
+
+def ayar_yaz(conn: psycopg.Connection, anahtar: str, deger: str) -> None:
+    """Ayarı DB'ye yazar ve aynı anda env'e basar — restart beklemeden geçerli."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ayarlar (anahtar, deger) VALUES (%s, %s)
+            ON CONFLICT (anahtar) DO UPDATE SET deger = EXCLUDED.deger
+            """,
+            (anahtar, deger),
+        )
+    conn.commit()
+    if (env_adi := AYAR_ENV.get(anahtar)):
+        os.environ[env_adi] = deger
+
+
 # ── çalışma saatleri ────────────────────────────────────────
 
 def _calisma_penceresi() -> tuple[set[int], time, time]:

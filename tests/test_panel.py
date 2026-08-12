@@ -218,6 +218,39 @@ def test_geldi_isaretleme_durumu_yazar(girisli, conn, kisi_id):
         assert cur.fetchone()[0] == "geldi"
 
 
+def test_calisma_penceresi_panelden_degisir(girisli, conn, monkeypatch):
+    """Panelden cumartesi açılınca randevu penceresi anında genişler.
+
+    Canlıda ters yönü yaşandı: bilgi tabanı "cumartesi açığız" diyordu ama
+    CALISMA_GUNLERI env'i Pzt-Cum'du, randevu 422 dönüyordu."""
+    from datetime import time as _time
+
+    from app.crm import _calisma_penceresi
+
+    # İkisi de monkeypatch'le kurulmalı: `ayar_yaz` env'i doğrudan yazıyor,
+    # monkeypatch olmadan değer sonraki testlere sızar.
+    monkeypatch.setenv("CALISMA_GUNLERI", "1,2,3,4,5")
+    monkeypatch.setenv("CALISMA_SAATLERI", "09:00-18:00")
+    assert 6 not in _calisma_penceresi()[0]
+
+    girisli.post("/bilgi/calisma", data={"gun": [1, 2, 3, 4, 5, 6],
+                                         "acilis": "08:30", "kapanis": "19:00"})
+
+    gunler, ac, kapa = _calisma_penceresi()
+    assert 6 in gunler and 7 not in gunler
+    assert (ac, kapa) == (_time(8, 30), _time(19, 0))
+
+    with conn.cursor() as cur:      # restart sonrası da geçerli olsun diye DB'de
+        cur.execute("SELECT deger FROM ayarlar WHERE anahtar = 'calisma_gunleri'")
+        assert cur.fetchone()[0] == "1,2,3,4,5,6"
+
+
+def test_gunsuz_kayit_reddedilir(girisli):
+    """Bütün günler kapalıysa hiç randevu açılamaz — kaza eseri kaydedilmesin."""
+    r = girisli.post("/bilgi/calisma", data={"acilis": "09:00", "kapanis": "18:00"})
+    assert "hata=" in r.headers["location"]
+
+
 # ── ajanın kullandığı iç API ────────────────────────────────
 
 def test_ic_api_anahtarsiz_reddedilir(istemci, kisi_id):

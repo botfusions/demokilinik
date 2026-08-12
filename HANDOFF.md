@@ -27,7 +27,7 @@ Kodun okuduğu tüm değişkenleri çıkarmak için: `app/*.py` içinde `environ
 
 | Eksik | Ne oluyor |
 |---|---|
-| `CALISMA_GUNLERI` | **Canlı hata.** Varsayılan `1,2,3,4,5` (Pzt-Cum). `.hermes.md` "hafta içi **ve cumartesi**" diyor → ajan cumartesi öneriyor, `randevu_olustur` 422 dönüyor, hasta boşa çevriliyor. Coolify'a `1,2,3,4,5,6` eklenmeli. |
+| `CALISMA_GUNLERI` | **Canlı hata çıktı, sonra panele taşındı.** Varsayılan `1,2,3,4,5` (Pzt-Cum) iken `.hermes.md` "hafta içi **ve cumartesi**" diyordu → ajan cumartesi öneriyor, `randevu_olustur` 422 dönüyor, hasta boşa çevriliyordu. Artık **Bilgi Tabanı sayfasındaki form** tek doğru kaynak (`ayarlar` tablosu); env yalnız hiç kayıt yokken geçerli. Yeni klinikte Coolify'a girmeye gerek yok. |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Sağlık uyarıları ve haftalık rapor hiçbir yere gitmiyor (`saglik.py:113` log'a yazıp dönüyor). WhatsApp oturumu düşerse kimse haber almaz. SMTP/`YONETICI_EPOSTA` da yok → ikinci kanal da kapalı. |
 | `KLINIK_KONUM` | `[KONUM]` iğnesi ölü; adres yazıyla gidiyor, harita gitmiyor. |
 | `KLINIK_ADI` | Uyarı/rapor başlığı "Klinik Paneli". Yerelde "Demo Klinik". |

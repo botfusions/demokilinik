@@ -177,6 +177,16 @@ CREATE TABLE IF NOT EXISTS sistem_onarim (
     mesaj       text
 );
 CREATE INDEX IF NOT EXISTS sistem_onarim_zaman_idx ON sistem_onarim (zaman DESC);
+
+-- Klinikten kliniğe değişen ayarlar. Bunlar önce yalnız env'deydi; env yalnız
+-- deploy sırasında (Coolify panelinden) girilebildiği için bir klinikte
+-- unutulduğunda kod sessizce varsayılana düşüyordu — canlıda cumartesi
+-- randevusu tam olarak böyle reddedildi. Artık personel panelden değiştirir,
+-- env yalnız satır yoksa yedek kalır.
+CREATE TABLE IF NOT EXISTS ayarlar (
+    anahtar text PRIMARY KEY,
+    deger   text NOT NULL
+);
 """
 
 
