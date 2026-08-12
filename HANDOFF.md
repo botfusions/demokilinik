@@ -1,8 +1,66 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-11 · **Durum:** **canlıda çalışıyor** —
+**Son güncelleme:** 2026-08-12 · **Durum:** **canlıda çalışıyor** —
 `demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
-edildi, Google Takvim'e düşüyor. 353 test yeşil.
+edildi, Google Takvim'e düşüyor. 356 test yeşil.
+
+## 2026-08-12: Canlı env envanteri, geç kalma cevabı, hafif yol üretimde
+
+### Canlıdaki env — tek doğru kayıt burası
+
+Yerel `.env` ile Coolify env'i AYRI. Yerelde doğru olan bir değer canlıda
+yoksa kod sessizce varsayılana düşer; bu bölüm o farkı görünür tutmak için var.
+Kontrol yöntemi (SSH):
+
+```
+ssh root@5.182.33.26 'docker exec $(docker ps -q --filter name=ar26914sno6qomlwm7q0fmp2) env | cut -d= -f1 | sort'
+```
+
+Kodun okuduğu tüm değişkenleri çıkarmak için: `app/*.py` içinde `environ` araması.
+
+**Canlıda DOLU (2026-08-12):** `AJAN_PROVIDER`, `AJAN_MODEL`, `AJAN_EFFORT`,
+`OPENAI_API_KEY` (luna geçişi yapılmış), `COMPOSIO_API_KEY`, `TAKVIM_KULLANICI`,
+`DATABASE_URL`, `COOKIE_SECRET`, `IC_API_ANAHTARI`, `WEBHOOK_SECRET`,
+`OPENWA_*`, `PANEL_PAROLA`, `POSTGRES_*`, `TZ`, `SOURCE_COMMIT` (Coolify veriyor).
+
+**Canlıda EKSİK — sonucuyla birlikte:**
+
+| Eksik | Ne oluyor |
+|---|---|
+| `CALISMA_GUNLERI` | **Canlı hata.** Varsayılan `1,2,3,4,5` (Pzt-Cum). `.hermes.md` "hafta içi **ve cumartesi**" diyor → ajan cumartesi öneriyor, `randevu_olustur` 422 dönüyor, hasta boşa çevriliyor. Coolify'a `1,2,3,4,5,6` eklenmeli. |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Sağlık uyarıları ve haftalık rapor hiçbir yere gitmiyor (`saglik.py:113` log'a yazıp dönüyor). WhatsApp oturumu düşerse kimse haber almaz. SMTP/`YONETICI_EPOSTA` da yok → ikinci kanal da kapalı. |
+| `KLINIK_KONUM` | `[KONUM]` iğnesi ölü; adres yazıyla gidiyor, harita gitmiyor. |
+| `KLINIK_ADI` | Uyarı/rapor başlığı "Klinik Paneli". Yerelde "Demo Klinik". |
+| `KLINIK_WHATSAPP_NUMARASI` | Instagram yönlendirmesi numarasız. |
+| `AJAN_1M_GIRIS_USD` / `_CIKIS_USD` | `maliyet_usd` hep NULL, hafif yolun kazancı ölçülemiyor. |
+| `DOKTORA_BILDIRIM` | Varsayılan `0` → doktor bildirimi kapalı (bilinçli). |
+| `INSTAGRAM_KULLANICI` | Nöbetçi `_acik()` kapısıyla temiz kapanıyor, hata döngüsü yok. |
+
+### Canlı kodun hangi commit olduğunu anlamak
+
+İki yol, ikisi de SSH'siz:
+1. Panelin sağ altındaki `sürüm <kısa SHA>` etiketi (`SOURCE_COMMIT`, giriş
+   sayfasında değil — `temel.html`'i genişleten sayfalarda).
+2. `curl https://demoklinik.botfusions.com/openapi.json` → rota listesini
+   yereldeki `@app.get/@app.post` listesiyle karşılaştır. Rota değiştirmeyen
+   commit'ler (prompt/mantık) bu yolla görünmez.
+
+### Kod değişiklikleri (commit 5595437)
+
+- **Geç kalma cevabı:** hasta 14:00 hatırlatmasına "14:30 gibi geliyorum" yazınca
+  ajan konu kilidinin ret cümlesini basıyordu. `SOUL.md`'ye "Hatırlatmaya gelen
+  cevaplar" bölümü: hatırlatma sonrası her mesaj konu içi, geç kalma bildirimi
+  `randevu_onayla` + kısa teyitle karşılanıyor, saat değiştirilmiyor.
+- **Elle "Geldi":** `durum` CHECK'ine dördüncü değer + mevcut kurulumlar için
+  ALTER. `geldi` iptal değil, saat dolu kalır. Panelde buton.
+- **Hafif yol üretime bağlandı:** `app/hafif.py` yazılmış ama üretim WhatsApp
+  yoluna hiç bağlanmamıştı — yalnız panelin test ekranından çağrılıyordu, bilgi
+  sorularının tamamı araç şemasıyla tam ajana gidiyordu. Sıra artık
+  `kural → hatırlatma → hafif → tam ajan`. Reasoning modelinde hafif yolun
+  effort'u ayrı: `AJAN_HAFIF_EFFORT`, varsayılan `none`.
+- **Testler ağa çıkıyordu:** hafif yol bağlanınca `.env`'deki gerçek anahtarla
+  canlı sağlayıcıya HTTP atmaya başladılar (23s → 155s, 3 test canlı cevapla
+  düştü). `tests/conftest.py` artık LLM anahtarlarını siliyor.
 
 ## 2026-08-11: WhatsApp canlıya alındı + Google Takvim
 
@@ -132,7 +190,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 353 test, hiçbiri LLM çağırmaz
+.venv/bin/python -m pytest        # 356 test, hiçbiri LLM çağırmaz (conftest anahtarları siler)
 ```
 
 ## Bilinmesi gerekenler
@@ -295,7 +353,7 @@ app/iyilestirme.py  salt-okunur öneri taraması (bkz. aşağı) — panelde /iy
 app/bildirim.py   doktora yeni randevu bildirimi (WhatsApp, tek alıcı, VARSAYILAN KAPALI)
 app/gtakvim.py    Google Takvim — randevu → etkinlik, hekim davetli, iptalde silinir
 hermes-home/SOUL.md  ajanın kimliği (bu klasöre özel)
-tests/            353 test, LLM'siz
+tests/            356 test, LLM'siz
 scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme
 scripts/demo-veri.py  satış demosu için DemoDent verisi (idempotent)
 ```
