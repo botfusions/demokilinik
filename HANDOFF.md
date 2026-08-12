@@ -196,8 +196,23 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
      `scripts/parola-sifirla.py <kullanıcı_adı> <yeni_parola>` —
      `parola_degistir()`'i çağırır, kilidi ve sayacı sıfırlar, `islem_kaydi`'na
      "vendor sıfırladı" yazar. Denetim izi kalsın diye sessiz UPDATE değil.
-5. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
-6. *(sonraya)* Meta reklam modülü — PRD Faz 8.
+5. **Demo için token'lı salt-okunur panel girişi.** (Karar verildi, yazılmadı.)
+   Tanıtım akışı: müşteri QR okutur → WhatsApp'tan hasta gibi konuşup randevu
+   alır → "bu nasıl işliyor" diye panele bakar. Girişte kullanıcı adı/parola
+   yazmak bu akışı kesiyor, ama girişi tamamen kaldırmak hasta adlarını,
+   telefonlarını ve konuşma geçmişini internete açar (üstelik POST'lar da açık
+   kalır — fiyat değiştirilebilir, randevu iptal edilebilir).
+   Seçilen orta yol:
+   - `GET /demo/<token>` → token `.env`'deki `DEMO_TOKEN` ile eşleşirse
+     "izleyici" rolüyle oturum çerezi bırakır, parola sorulmaz. QR bu linki
+     taşır. Demo bitince token değiştirilir.
+   - İzleyici **bütün sayfaları görür, hiçbir POST'u geçemez** —
+     "Demo modunda değişiklik yapılamaz". Kontrol tek yerde (personel/yonetici
+     bağımlılıklarının yanına), rotalar tek tek değişmez.
+   - Böylece aynı mekanizma gerçek klinikte de kullanılabilir; giriş kaldırma
+     yalnız sahte veri olan demo kurulumunda kabul edilebilirdi.
+6. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
+7. *(sonraya)* Meta reklam modülü — PRD Faz 8.
 
 ## Çalıştırma
 
