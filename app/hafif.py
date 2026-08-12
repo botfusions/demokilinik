@@ -45,6 +45,7 @@ RANDEVU_SINYALLERI = (
     "randevu", "müsait", "musait", "iptal", "ertele", "erteliy",
     "geliyorum", "gelemiy", "gelemeyec", "gelebilir", "geleyim",
     "acil", "ağrı", "agri", "şişlik", "kırıl", "kiril", "düştü", "onaylıyorum",
+    "gecik", "geç kal", "gec kal",
 )
 
 # Modelin kendi devretme işareti — kapılardan sızan bir randevu isteği için
@@ -154,7 +155,7 @@ def istek_govdesi(model: str | None, mesajlar: list[dict], **ekstra) -> dict:
     """
     govde = {"model": model, "messages": mesajlar, **ekstra}
     effort = os.environ.get("AJAN_EFFORT")
-    if effort:
+    if effort and "reasoning_effort" not in govde:
         govde["reasoning_effort"] = "none" if ekstra.get("tools") else effort
     else:
         govde["temperature"] = 0.3
@@ -175,8 +176,11 @@ def saglayici() -> tuple[str | None, str, str | None]:
 
 
 def cevap_dene(gecmis: list[dict], mesaj: str,
-               kanal: str = "whatsapp") -> tuple[str, float | None] | None:
-    """(yanıt, maliyet) ya da None. None = Hermes'e devret.
+               kanal: str = "whatsapp") -> tuple[str, float | None, dict] | None:
+    """(yanıt, maliyet, kullanım) ya da None. None = Hermes'e devret.
+
+    `kullanım` haftalık rapora yazılır; bu yol olmadan hafif yolun token'ı
+    hiç sayılmazdı ve rapor gerçekte harcanandan az gösterirdi.
 
     Hiçbir hata dışarı sızmaz: bu yol en iyi çaba katmanıdır, tökezlerse
     mesaj Hermes'e düşer ve hasta farkı görmez.
@@ -206,11 +210,18 @@ def cevap_dene(gecmis: list[dict], mesaj: str,
         })
     mesajlar.append({"role": "user", "content": mesaj})
 
+    # Reasoning modelinde (luna) hafif yolun effort'u ayrı: "adresiniz nerede"
+    # sorusuna `AJAN_EFFORT=high` ile düşünme token'ı ödemek bu katmanın varlık
+    # sebebini yer. Ezmek isteyen `AJAN_HAFIF_EFFORT`e yazar.
+    ekstra = {}
+    if os.environ.get("AJAN_EFFORT"):
+        ekstra["reasoning_effort"] = os.environ.get("AJAN_HAFIF_EFFORT", "none")
+
     try:
         yanit = httpx.post(
             f"{taban}/chat/completions",
             headers={"Authorization": f"Bearer {anahtar}"},
-            json=istek_govdesi(model, mesajlar),
+            json=istek_govdesi(model, mesajlar, **ekstra),
             timeout=ZAMAN_ASIMI,
         )
         yanit.raise_for_status()
@@ -223,4 +234,5 @@ def cevap_dene(gecmis: list[dict], mesaj: str,
     if not metin or DEVRET in metin:
         return None
 
-    return metin, _maliyet(govde.get("usage") or {})
+    kullanim = govde.get("usage") or {}
+    return metin, _maliyet(kullanim), kullanim

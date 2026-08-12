@@ -25,6 +25,12 @@ os.environ["OPENWA_SESSION"] = "test"
 os.environ["SAGLIK_NOBETCISI"] = "0"   # testlerde arka plan nöbetçisi çalışmaz
 os.environ["DOKTORA_BILDIRIM"] = "1"   # klinik .env'de kapalı olsa da bildirim testleri açık varsayar
 
+# LLM anahtarları testte YOK. .env'deki gerçek anahtar burada kalırsa hafif yol
+# canlı sağlayıcıya HTTP atar: testler ağa çıkar, yavaşlar ve para harcar.
+# Sağlayıcı çağrısını sınayan testler anahtarı kendileri monkeypatch'ler.
+os.environ.pop("ZAI_API_KEY", None)
+os.environ.pop("OPENAI_API_KEY", None)
+
 
 def _test_veritabani_url() -> str | None:
     """Testler ASLA canlı veritabanına dokunmaz.

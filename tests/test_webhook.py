@@ -156,6 +156,35 @@ def test_gecerli_istek_200_ve_kayit(istemci, conn):
     assert istemci.gonderilenler == [("905321112233", "Test yanıtı")]
 
 
+def test_hafif_yol_uretimde_bagli(istemci, conn, monkeypatch):
+    """Bilgi sorusu araçlı tura HİÇ gitmemeli.
+
+    Hafif yol bir dönem yazılıp üretim yoluna bağlanmadan kalmıştı; ajan
+    patlatılarak sıranın gerçekten hafif yoldan geçtiği sabitleniyor."""
+    import app.ajan as ajan
+    import app.hafif as hafif
+
+    monkeypatch.setattr(
+        hafif, "cevap_dene",
+        lambda gecmis, mesaj: ("Hafta içi 09:00-18:00 açığız.", 0.0001,
+                               {"prompt_tokens": 900, "completion_tokens": 30}),
+    )
+    monkeypatch.setattr(ajan, "cevap_uret", _patlat_ajan)
+
+    g = _govde("Kaçta kapanıyorsunuz?")
+    istemci.post("/webhook/whatsapp", content=g, headers={"X-OpenWA-Signature": _imzala(g)})
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT mesaj, giris_token FROM gorusmeler WHERE yon = 'giden'")
+        mesaj, giris = cur.fetchone()
+    assert mesaj == "Hafta içi 09:00-18:00 açığız."
+    assert giris == 900          # hafif yolun token'ı da raporlanır
+
+
+def _patlat_ajan(*a, **kw):
+    raise AssertionError("bilgi sorusu araçlı tura gitti")
+
+
 def test_tekrar_teslimat_tek_kayit(istemci, conn):
     """OpenWA teslimatı at-least-once — aynı olay iki kez gelebilir, iki cevap gitmemeli."""
     g = _govde("Merhaba", wamid="wamid.AYNI")

@@ -64,7 +64,10 @@
         <a href="https://calendar.google.com/calendar/r/eventedit/{{ r.google_event_id }}" target="_blank">aç</a>
         {% else %}—{% endif %}
       </td>
-      <td>
+      <td style="display:flex; gap:6px">
+        {% if r.durum not in ('iptal', 'geldi') %}
+        <form method="post" action="/randevular/{{ r.id }}/geldi"><button class="sade">Geldi</button></form>
+        {% endif %}
         {% if r.durum != 'iptal' %}
         <form method="post" action="/randevular/{{ r.id }}/iptal"><button class="sade">İptal et</button></form>
         {% endif %}

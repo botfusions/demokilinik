@@ -86,6 +86,9 @@ services:
       DATABASE_URL: postgresql://klinik:${POSTGRES_PASSWORD}@postgres:5432/klinik_crm
       OPENWA_URL: http://openwa:2785
       KOPRU_WEBHOOK_URL: http://app:8000/webhook/whatsapp
+      # Coolify deploy sırasında doldurur; panelin altındaki sürüm etiketi bunu
+      # basar. Yerelde boş kalır ve etiket hiç görünmez.
+      SOURCE_COMMIT: ${SOURCE_COMMIT:-}
     expose:
       - "8000"            # host'a açılmaz (8002 Coolify panelinde dolu); Coolify proxy internal erişir
     restart: unless-stopped

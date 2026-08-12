@@ -103,8 +103,14 @@ sablonlar = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 # Panelde görünen isimler — DB'deki 3 durum (bekliyor/onayli/iptal) değişmiyor,
 # yalnız daha açıklayıcı görünsün diye eşleniyor. CSS sınıfı hâlâ ham değeri
 # kullanıyor (rozet.aktif/pasif gibi renk sınıfları bundan etkilenmez).
-DURUM_ETIKETLERI = {"bekliyor": "Planlandı", "onayli": "Teyit Edildi", "iptal": "İptal Edildi"}
+DURUM_ETIKETLERI = {"bekliyor": "Planlandı", "onayli": "Teyit Edildi",
+                    "geldi": "Geldi", "iptal": "İptal Edildi"}
 sablonlar.env.filters["durum_etiketi"] = lambda d: DURUM_ETIKETLERI.get(d, d)
+
+# Coolify konteynere deploy edilen commit'i `SOURCE_COMMIT` ile veriyor. Panelin
+# altında görünmesi "sunucudaki kod hangi commit" sorusunu SSH'siz cevaplıyor —
+# tanımlı değilse (yerel çalıştırma) hiç basılmaz.
+sablonlar.env.globals["surum"] = os.environ.get("SOURCE_COMMIT", "")[:7]
 
 
 @asynccontextmanager
@@ -623,6 +629,16 @@ def randevu_iptal_et(request: Request, randevu_id: int, conn=Depends(db)):
     return RedirectResponse("/randevular", status_code=303)
 
 
+@app.post("/randevular/{randevu_id}/geldi", dependencies=[Depends(personel)])
+def randevu_geldi(request: Request, randevu_id: int, conn=Depends(db)):
+    """Hasta geldiğinde personel elle işaretler. Randevu geçerli kalır —
+    'geldi' iptal değil, saat hâlâ dolu sayılır."""
+    randevu_durum_yaz(conn, randevu_id, "geldi")
+    hatirlatma.hatirlatmalari_iptal_et(conn, randevu_id)
+    islem_yaz(conn, _kim(request), "randevuyu geldi işaretledi", f"#{randevu_id}")
+    return RedirectResponse("/randevular", status_code=303)
+
+
 @app.get("/hastalar", response_class=HTMLResponse, dependencies=[Depends(personel)])
 def hastalar(request: Request, conn=Depends(db)):
     return sablonlar.TemplateResponse(request, "hastalar.html", {
@@ -987,12 +1003,17 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
 
         gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]  # yeni mesajı prompt ayrıca ekler
 
-        # Kural katmanı (LLM'siz) → hatırlatma kısayolu (LLM'siz) → tam ajan (LLM).
-        # Sıralama en ucuzdan en pahalıya: "100 mesajın 100'ü LLM'ye" olmasın.
+        # Kural (LLM'siz) → hatırlatma kısayolu (LLM'siz) → hafif yol (araçsız
+        # LLM) → tam ajan (araçlı LLM). Sıralama en ucuzdan en pahalıya:
+        # "100 mesajın 100'ü araçlı tura" olmasın. Hafif yolun kendi kapıları
+        # (randevu sinyali, geçmişte randevu) şüphede tam ajana düşürür.
+        maliyet = None
         if (yanit := kural.cevap_dene(conn, mesaj)) is not None:
             kullanim = None
         elif (yanit := kural.hatirlatma_cevabi_dene(telefon, mesaj)) is not None:
             kullanim = None
+        elif (dene := hafif.cevap_dene(gecmis, mesaj)) is not None:
+            yanit, maliyet, kullanim = dene
         else:
             try:
                 yanit, kullanim = ajan.cevap_uret(gecmis, mesaj, telefon=telefon, ad=ad)
@@ -1006,6 +1027,7 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
         # panelde ajanın ne dediğini görebilmeli.
         gorusme_ekle(
             conn, kid, "giden", yanit,
+            maliyet_usd=maliyet,
             giris_token=(kullanim or {}).get("prompt_tokens"),
             cikis_token=(kullanim or {}).get("completion_tokens"),
         )

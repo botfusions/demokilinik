@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS randevular (
     baslangic       timestamptz NOT NULL,
     bitis           timestamptz NOT NULL,
     durum           text NOT NULL DEFAULT 'bekliyor'
-                    CHECK (durum IN ('bekliyor', 'onayli', 'iptal')),
+                    CHECK (durum IN ('bekliyor', 'onayli', 'geldi', 'iptal')),
     google_event_id text,
     notlar          text,
     olusturma       timestamptz NOT NULL DEFAULT now(),
@@ -77,6 +77,11 @@ CREATE INDEX IF NOT EXISTS randevular_zaman_idx ON randevular (baslangic);
 ALTER TABLE randevular ADD COLUMN IF NOT EXISTS doktor_id integer REFERENCES doktorlar(id) ON DELETE SET NULL;
 ALTER TABLE randevular ADD COLUMN IF NOT EXISTS acil boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS randevular_doktor_idx ON randevular (doktor_id, baslangic);
+
+-- 'geldi' sonradan eklendi; mevcut kurulumlarda CHECK eski üç değeri taşıyor.
+ALTER TABLE randevular DROP CONSTRAINT IF EXISTS randevular_durum_check;
+ALTER TABLE randevular ADD CONSTRAINT randevular_durum_check
+    CHECK (durum IN ('bekliyor', 'onayli', 'geldi', 'iptal'));
 
 -- Giden hatırlatmalar. UNIQUE(randevu_id, tur): aynı randevu için aynı tür
 -- hatırlatma ikinci kez gönderilemez — nöbetçi iki kez çalışsa bile.

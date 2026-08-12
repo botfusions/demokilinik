@@ -418,11 +418,12 @@
 
 .bos { color:var(--ink-mute); font-size:13px; }
 .ipucu { color:var(--ink-mute); font-size:12px; margin-top:8px; }
+.surum { color:var(--ink-faint); font-size:11px; margin-top:20px; text-align:right; }
 
 .rozet { display:inline-flex; align-items:center; gap:6px; padding:3px 10px;
          border-radius:999px; font-size:12px; font-weight:600;
          background:var(--hairline-cool); color:var(--ink-mute); }
-.rozet.onayli, .rozet.aktif { background:rgba(62,207,142,.14); color:var(--primary-deep); }
+.rozet.onayli, .rozet.aktif, .rozet.geldi {background:rgba(62,207,142,.14); color:var(--primary-deep); }
 .rozet.iptal, .rozet.pasif  { background:rgba(229,72,77,.14);  color:var(--danger); }
 .rozet.acil { background:rgba(255,219,19,.18); color:var(--warn); }
 

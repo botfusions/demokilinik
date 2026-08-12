@@ -202,6 +202,22 @@ def test_randevu_listesi_saate_gore_sirali(girisli, conn, kisi_id):
     assert metin.index("İş-9") < metin.index("İş-12") < metin.index("İş-15")
 
 
+def test_geldi_isaretleme_durumu_yazar(girisli, conn, kisi_id):
+    """Personel 'Geldi' der → durum 'geldi', randevu iptal olmaz, saat dolu kalır."""
+    from app.crm import randevu_olustur
+
+    gun = (datetime.now() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+    if gun.isoweekday() == 7:
+        gun += timedelta(days=1)
+    rid = randevu_olustur(conn, kisi_id, "Kontrol", gun, gun + timedelta(minutes=30))
+    conn.commit()
+
+    girisli.post(f"/randevular/{rid}/geldi")
+    with conn.cursor() as cur:
+        cur.execute("SELECT durum FROM randevular WHERE id = %s", (rid,))
+        assert cur.fetchone()[0] == "geldi"
+
+
 # ── ajanın kullandığı iç API ────────────────────────────────
 
 def test_ic_api_anahtarsiz_reddedilir(istemci, kisi_id):
