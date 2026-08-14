@@ -50,6 +50,42 @@ def test_cikis_oturumu_kapatir(girisli):
     assert girisli.get("/").status_code in (302, 303, 307)
 
 
+# ── demo izleyici girişi (tek sabit link, QR'da basılı) ──────
+
+@pytest.fixture
+def izleyici():
+    c = TestClient(main.app, follow_redirects=False)
+    r = c.get("/demo")
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    return c
+
+
+@pytest.mark.parametrize("yol", ["/", "/randevular", "/hastalar", "/takvim", "/bilgi", "/yonetici"])
+def test_izleyici_butun_sayfalari_gorur(izleyici, yol):
+    assert izleyici.get(yol).status_code == 200
+
+
+@pytest.mark.parametrize("yol,veri", [
+    ("/bilgi", {"baslik": "X", "icerik": "Y", "kategori": "genel"}),
+    ("/randevular/1/iptal", {}),
+    ("/kullanicilar", {"kullanici_adi": "k", "parola": "p"}),
+])
+def test_izleyici_hicbir_postu_gecemez(izleyici, yol, veri):
+    r = izleyici.post(yol, data=veri)
+    assert r.status_code == 403
+    assert "Demo modunda" in r.text
+
+
+def test_izleyici_cikis_yapabilir(izleyici):
+    izleyici.post("/cikis")
+    assert izleyici.get("/").status_code in (302, 303, 307)
+
+
+def test_demo_kapatma_anahtari_oturumu_dusurur(izleyici, monkeypatch):
+    monkeypatch.setenv("DEMO_KAPALI", "1")
+    assert izleyici.get("/").status_code in (302, 303, 307)
+
+
 # ── bilgi tabanı ────────────────────────────────────────────
 
 def test_bilgi_ekleme_hermes_md_gunceller(girisli, conn, tmp_path, monkeypatch):

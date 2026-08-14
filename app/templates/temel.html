@@ -66,7 +66,7 @@
         <div class="avatar">{{ (kullanici.ad or kullanici.kullanici_adi)[0] | upper }}</div>
         <div class="user-meta">
           <b>{{ kullanici.ad or kullanici.kullanici_adi }}</b>
-          <span>{{ 'Yönetici Paneli' if yonetici_mi else 'Personel' }}</span>
+          <span>{{ 'Yönetici Paneli' if yonetici_mi else ('Demo İzleyici' if kullanici.rol == 'izleyici' else 'Personel') }}</span>
         </div>
         {% if yonetici_mi %}
         <svg class="uc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>

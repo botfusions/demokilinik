@@ -174,9 +174,15 @@ def _oturum_kullanici_id(request: Request) -> int | None:
         return None
     try:
         veri = imzalayici.loads(kurabiye)
-        return int(veri["k"]) if isinstance(veri, dict) else None
+        return int(veri["k"]) if isinstance(veri, dict) and "k" in veri else None
     except (BadSignature, KeyError, ValueError, TypeError):
         return None
+
+
+# Demo izleyicisi: gerçek kullanıcı değil, GET /demo/<token> çerezi. Bütün
+# sayfaları görür, hiçbir POST'u geçemez — kontrol aşağıda personel'de, tek yerde.
+IZLEYICI = {"id": 0, "kullanici_adi": "demo-izleyici", "ad": "Demo İzleyici",
+            "rol": "izleyici", "aktif": True}
 
 
 def personel(request: Request):
@@ -185,6 +191,21 @@ def personel(request: Request):
     Kullanıcıyı request.state'e koyar; işlem kaydı kimin yaptığını oradan okur.
     Pasifleştirilen kullanıcının açık oturumu bir sonraki istekte kapanır.
     """
+    kurabiye = request.cookies.get(COOKIE_ADI)
+    if kurabiye:
+        try:
+            veri = imzalayici.loads(kurabiye)
+        except (BadSignature, TypeError):
+            veri = None
+        if isinstance(veri, dict) and veri.get("d"):
+            # Kill-switch: DEMO_KAPALI=1 env'i izleyiciyi anında kapatır.
+            if os.environ.get("DEMO_KAPALI"):
+                raise HTTPException(status_code=303, headers={"Location": "/giris"})
+            if request.method == "POST":
+                raise HTTPException(403, "Demo modunda değişiklik yapılamaz")
+            request.state.kullanici = IZLEYICI
+            return
+
     kid = _oturum_kullanici_id(request)
     if kid is None:
         raise HTTPException(status_code=303, headers={"Location": "/giris"})
@@ -202,8 +223,14 @@ def personel(request: Request):
 
 
 def yonetici(request: Request):
-    """Yalnız admin. Kullanıcı yönetimi ve doktor tanımı buradan geçer."""
+    """Yalnız admin. Kullanıcı yönetimi ve doktor tanımı buradan geçer.
+
+    Demo izleyicisi buradan da geçer (sayfaları görür); POST'ları personel
+    kestiği için yazma yolu yok.
+    """
     personel(request)
+    if request.state.kullanici["rol"] == "izleyici":
+        return
     if request.state.kullanici["rol"] != "admin":
         raise HTTPException(403, "Bu sayfa yalnızca yöneticiler içindir")
 
@@ -255,6 +282,19 @@ def giris(kullanici_adi: str = Form(...), parola: str = Form(...), conn=Depends(
 def cikis():
     y = RedirectResponse("/giris", status_code=303)
     y.delete_cookie(COOKIE_ADI)
+    return y
+
+
+@app.get("/demo")
+def demo_giris():
+    """Herkese açık salt-okunur panel girişi — QR koda basılan tek sabit link.
+
+    Parola sormaz, izleyici çerezi bırakır. Demo verisi sahteyken güvenli;
+    gerçek klinik verisi geldiğinde `DEMO_KAPALI=1` env'i ile kapatılır
+    (açık oturumlar dahil, bir sonraki istekte düşer).
+    """
+    y = RedirectResponse("/", status_code=303)
+    y.set_cookie(COOKIE_ADI, imzalayici.dumps({"d": 1}), httponly=True, samesite="lax")
     return y
 
 

@@ -1,8 +1,8 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-12 · **Durum:** **canlıda çalışıyor** —
+**Son güncelleme:** 2026-08-14 · **Durum:** **canlıda çalışıyor** —
 `demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
-edildi, Google Takvim'e düşüyor. 358 test yeşil.
+edildi, Google Takvim'e düşüyor. 369 test yeşil.
 
 ## 2026-08-12: Canlı env envanteri, geç kalma cevabı, hafif yol üretimde
 
@@ -206,21 +206,27 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
      `scripts/parola-sifirla.py <kullanıcı_adı> <yeni_parola>` —
      `parola_degistir()`'i çağırır, kilidi ve sayacı sıfırlar, `islem_kaydi`'na
      "vendor sıfırladı" yazar. Denetim izi kalsın diye sessiz UPDATE değil.
-5. **Demo için token'lı salt-okunur panel girişi.** (Karar verildi, yazılmadı.)
-   Tanıtım akışı: müşteri QR okutur → WhatsApp'tan hasta gibi konuşup randevu
-   alır → "bu nasıl işliyor" diye panele bakar. Girişte kullanıcı adı/parola
-   yazmak bu akışı kesiyor, ama girişi tamamen kaldırmak hasta adlarını,
-   telefonlarını ve konuşma geçmişini internete açar (üstelik POST'lar da açık
-   kalır — fiyat değiştirilebilir, randevu iptal edilebilir).
-   Seçilen orta yol:
-   - `GET /demo/<token>` → token `.env`'deki `DEMO_TOKEN` ile eşleşirse
-     "izleyici" rolüyle oturum çerezi bırakır, parola sorulmaz. QR bu linki
-     taşır. Demo bitince token değiştirilir.
-   - İzleyici **bütün sayfaları görür, hiçbir POST'u geçemez** —
-     "Demo modunda değişiklik yapılamaz". Kontrol tek yerde (personel/yonetici
-     bağımlılıklarının yanına), rotalar tek tek değişmez.
-   - Böylece aynı mekanizma gerçek klinikte de kullanılabilir; giriş kaldırma
-     yalnız sahte veri olan demo kurulumunda kabul edilebilirdi.
+5. **Demo için salt-okunur panel girişi.** ✅ YAZILDI (2026-08-14,
+   369 test yeşil, 11'i yeni). Tanıtım akışı: müşteri QR okutur →
+   WhatsApp'tan hasta gibi konuşup randevu alır → "bu nasıl işliyor" diye
+   panele bakar.
+   - **Tek sabit, herkese açık link: `https://demoklinik.botfusions.com/demo`**
+     (kullanıcı kararı — QR koda bir kez basılır, her müşteri aynı linki
+     okutur; müşteri başına link/token üretmek pazarlamacıya baskı çıkarır).
+     Parola sormaz, izleyici çerezi bırakır.
+   - İzleyici **bütün sayfaları görür** (yönetici sekmeleri dahil, kenar
+     çubuğunda "Demo İzleyici" etiketi), **hiçbir POST'u geçemez** — 403
+     "Demo modunda değişiklik yapılamaz". Kontrol tek yerde (`personel`
+     bağımlılığı, `request.method` bakar), rota rota değişiklik yok. Tek
+     istisna `POST /cikis` (bağımlılıksız) — izleyici çıkış yapabilir.
+   - **Link herkese açık olduğundan adresini bilen paneli OKUYABİLİR**
+     (hasta adları, telefonlar — yazma kapalı). Demo verisi sahteyken
+     kabul edildi (3 müşteride denenecek, duruma göre karar). Gerçek klinik
+     verisi geldiğinde kapatmak için `DEMO_KAPALI=1` env'i — açık oturumlar
+     dahil bir sonraki istekte düşer (testi var).
+   - NOT: müşteri başına link/token üreten ve panelden yönetilen bir sürüm
+     yazılıp sonra bu kararla geri alındı — "her müşteriye ayrı link"
+     istenirse git geçmişine bakılmalı, tüm yıkıp yeniden yazmak gerekmez.
 6. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
 7. *(sonraya)* Meta reklam modülü — PRD Faz 8.
 
@@ -236,7 +242,7 @@ Panel `http://localhost:8000` · geliştirme girişi: `admin` / `.env`'deki `PAN
 OpenWA dashboard `http://localhost:2785`
 
 ```bash
-.venv/bin/python -m pytest        # 358 test, hiçbiri LLM çağırmaz (conftest anahtarları siler)
+.venv/bin/python -m pytest        # 369 test, hiçbiri LLM çağırmaz (conftest anahtarları siler)
 ```
 
 ## Bilinmesi gerekenler
@@ -399,7 +405,7 @@ app/iyilestirme.py  salt-okunur öneri taraması (bkz. aşağı) — panelde /iy
 app/bildirim.py   doktora yeni randevu bildirimi (WhatsApp, tek alıcı, VARSAYILAN KAPALI)
 app/gtakvim.py    Google Takvim — randevu → etkinlik, hekim davetli, iptalde silinir
 hermes-home/SOUL.md  ajanın kimliği (bu klasöre özel)
-tests/            358 test, LLM'siz
+tests/            369 test, LLM'siz
 scripts/          kurulum, vps-deploy, systemd, nginx, yedekleme
 scripts/demo-veri.py  satış demosu için DemoDent verisi (idempotent)
 ```
