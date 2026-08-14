@@ -200,10 +200,15 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
 
 ## Sırada ne var
 
-1. **Müşteri kurulumunda kliniğin KENDİ Google hesabını bağla.** Şu an Composio'ya
-   bağlı hesap `cenk.tokgoz@gmail.com` — demoda sorun değil ama gerçek klinikte
-   tüm randevular satıcının kişisel takvimine yazılır. Klinik hesabı bağlanır,
-   `TAKVIM_KULLANICI` yeni connected account user_id'siyle değiştirilir.
+1. **Müşteri kurulumunda kliniğin KENDİ Google hesabını bağla.** KARAR
+   (2026-08-14): **her CRM kurulumuna bir Gmail açılacak** — kliniğin kendi
+   (ücretsiz) Gmail'i Composio'ya OAuth ile bağlanır, randevular o takvime
+   düşer; `TAKVIM_KULLANCI` env'i o bağlantının connected account user_id'si
+   olur. Gmail'in kendisi kodda KULLANILMIYOR (uyarılar Telegram'da) — hesap
+   yalnız Takvim için. Composio'ya müşteri üyeliği açılmaz: vendor'un tek
+   Composio projesinde her klinik ayrı connected account. Şu an bağlı hesap
+   `cenk.tokgoz@gmail.com` — demoda böyle kalmalı (kurucu randevuları canlı
+   görüyor), gerçek geçişte swap.
 2. **Instagram: pilot için entegrasyon YOK — müşteri IG profiline WhatsApp
    linki koyar** (`https://wa.me/<klinik numarası>`, kullanıcı kararı
    2026-08-14: "ig ye whatsapp linki koysun müşteri"). Hasta IG'den
