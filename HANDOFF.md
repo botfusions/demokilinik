@@ -204,9 +204,17 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    bağlı hesap `cenk.tokgoz@gmail.com` — demoda sorun değil ama gerçek klinikte
    tüm randevular satıcının kişisel takvimine yazılır. Klinik hesabı bağlanır,
    `TAKVIM_KULLANICI` yeni connected account user_id'siyle değiştirilir.
-2. **Gerçek Instagram hesabı.** Composio'daki iki IG hesabı sandbox
-   (`is_composio_managed: true`), `resepta.botfusions` değil. Bağlamak için IG
-   Business/Creator + bağlı Facebook Sayfası şart.
+2. **Instagram: pilot için entegrasyon YOK — müşteri IG profiline WhatsApp
+   linki koyar** (`https://wa.me/<klinik numarası>`, kullanıcı kararı
+   2026-08-14: "ig ye whatsapp linki koysun müşteri"). Hasta IG'den
+   WhatsApp'a geçer, ajan zaten orada. Sıfır kurulum, Composio'da yer yemez.
+   IG DM kanalı (`app/instagram.py`) ürünün içinde duruyor, sonraya:
+   açılırsa Composio'ya MÜŞTERİ üyeliği açılmaz — vendor'un tek Composio
+   hesabında müşteri OAuth linkiyle kendi hesabını bağlar, connected account
+   ID'si `INSTAGRAM_KULLANCI` env'ine yazılır (takvimle aynı desen:
+   `TAKVIM_KULLANCI`). Composio'daki iki IG hesabı sandbox
+   (`is_composio_managed: true`). IG Business/Creator + bağlı Facebook
+   Sayfası şart; kanal yalnız bilgilendirme, randevu açmaz.
 3. **Demo günü.** `scripts/demo-veri.py <telefon> <eposta>` (e-posta = demoyu
    yapanın Google hesabı, tüm demo hekimlerine yazılır → randevu onun takvimine
    düşer). Senaryo: "İmplant için randevu almak istiyorum" → ajan Dr. Deniz
