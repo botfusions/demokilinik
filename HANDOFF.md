@@ -4,6 +4,33 @@
 `demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
 edildi, Google Takvim'e düşüyor. 369 test yeşil.
 
+## 2026-08-14: Demo izleyici girişi canlıda (89c35f7)
+
+**Teklif/QR linkleri:**
+- WhatsApp: `https://wa.me/905323314569`
+- Panel demo (parolasız, salt-okunur): `https://demoklinik.botfusions.com/demo`
+
+Canlıda doğrulandı: `/demo` 303 + izleyici çerezi → panel 200 → POST 403
+("Demo modunda değişiklik yapılamaz"). İzleyici bütün sayfaları görür
+(yönetici sekmeleri dahil, kenar çubuğunda "Demo İzleyici"), hiçbir POST'u
+geçemez; tek istisna `POST /cikis`. Kill-switch: Coolify'ya `DEMO_KAPALI=1`
+→ link ve açık oturumlar anında kapanır (pilot bitip gerçek hasta verisine
+geçerken yapılacak). Kontrol tek yerde: `personel` bağımlılığı `request.method`
+bakar, rotalar tek tek değişmedi.
+
+Karar notları: (1) link HERKESE açık — adresini bilen paneli okuyabilir
+(hasta adları/telefonlar, yazma kapalı); demo verisi sahte olduğu için 3
+müşteri pilotunda kabul edildi, duruma göre karar verilecek. (2) Müşteri
+başına link/token üreten panelli sürüm yazılıp bu kararla geri alındı;
+"ayrı link" istenirse git geçmişinde var (89c35f7^..89c35f7 öncesi çalışma
+dallarında değil, aynı gün commit'ler arasında).
+
+**ÖNEMLİ — deploy elle:** GitHub push bu uygulamada otomatik deploy
+tetiklemiyor (repoda webhook yok, Coolify'ya GitHub App bağlantısı da
+çalışmıyor görünüyor; eski deploy'lar elle). Push sonrası Coolify UI'da
+demokilinik → **Redeploy** tıklanmalı. Doğrulama: panel sağ alttaki sürüm
+etiketi veya `SOURCE_COMMIT` (SSH, aşağıdaki env kontrol komutu).
+
 ## 2026-08-12: Canlı env envanteri, geç kalma cevabı, hafif yol üretimde
 
 ### Canlıdaki env — tek doğru kayıt burası
@@ -206,27 +233,9 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
      `scripts/parola-sifirla.py <kullanıcı_adı> <yeni_parola>` —
      `parola_degistir()`'i çağırır, kilidi ve sayacı sıfırlar, `islem_kaydi`'na
      "vendor sıfırladı" yazar. Denetim izi kalsın diye sessiz UPDATE değil.
-5. **Demo için salt-okunur panel girişi.** ✅ YAZILDI (2026-08-14,
-   369 test yeşil, 11'i yeni). Tanıtım akışı: müşteri QR okutur →
-   WhatsApp'tan hasta gibi konuşup randevu alır → "bu nasıl işliyor" diye
-   panele bakar.
-   - **Tek sabit, herkese açık link: `https://demoklinik.botfusions.com/demo`**
-     (kullanıcı kararı — QR koda bir kez basılır, her müşteri aynı linki
-     okutur; müşteri başına link/token üretmek pazarlamacıya baskı çıkarır).
-     Parola sormaz, izleyici çerezi bırakır.
-   - İzleyici **bütün sayfaları görür** (yönetici sekmeleri dahil, kenar
-     çubuğunda "Demo İzleyici" etiketi), **hiçbir POST'u geçemez** — 403
-     "Demo modunda değişiklik yapılamaz". Kontrol tek yerde (`personel`
-     bağımlılığı, `request.method` bakar), rota rota değişiklik yok. Tek
-     istisna `POST /cikis` (bağımlılıksız) — izleyici çıkış yapabilir.
-   - **Link herkese açık olduğundan adresini bilen paneli OKUYABİLİR**
-     (hasta adları, telefonlar — yazma kapalı). Demo verisi sahteyken
-     kabul edildi (3 müşteride denenecek, duruma göre karar). Gerçek klinik
-     verisi geldiğinde kapatmak için `DEMO_KAPALI=1` env'i — açık oturumlar
-     dahil bir sonraki istekte düşer (testi var).
-   - NOT: müşteri başına link/token üreten ve panelden yönetilen bir sürüm
-     yazılıp sonra bu kararla geri alındı — "her müşteriye ayrı link"
-     istenirse git geçmişine bakılmalı, tüm yıkıp yeniden yazmak gerekmez.
+5. **Demo için salt-okunur panel girişi.** ✅ YAZILDI VE CANLIDA (2026-08-14,
+   `89c35f7`, 369 test yeşil, 11'i yeni). Detay yukarıda "2026-08-14"
+   bölümünde — link, kararlar, kill-switch ve deploy-unutmaması orada.
 6. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
 7. *(sonraya)* Meta reklam modülü — PRD Faz 8.
 
