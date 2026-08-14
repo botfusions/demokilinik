@@ -7,7 +7,9 @@ edildi, Google Takvim'e düşüyor. 369 test yeşil.
 ## 2026-08-14: Demo izleyici girişi canlıda (89c35f7)
 
 **Teklif/QR linkleri:**
-- WhatsApp: `https://wa.me/905323314569`
+- WhatsApp — **KLİNİK HATTI: 0532 331 45 69** (`https://wa.me/905323314569`;
+  link formatı ülke kodu ister: baştaki 0 atılır, `90` eklenir. Aynı numara,
+  iki yazım — karışmasın)
 - Panel demo (parolasız, salt-okunur): `https://demoklinik.botfusions.com/demo`
 
 Canlıda doğrulandı: `/demo` 303 + izleyici çerezi → panel 200 → POST 403
