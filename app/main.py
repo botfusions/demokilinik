@@ -208,7 +208,11 @@ def personel(request: Request):
 
     kid = _oturum_kullanici_id(request)
     if kid is None:
-        raise HTTPException(status_code=303, headers={"Location": "/giris"})
+        # Test süresince oturumsuz gelen şifre ekranına değil demo izleyiciye
+        # düşer (DEMO_KAPALI=1 ile eski haline döner). Personel /giris'ten
+        # giriş yapınca çerezin üzerine yazar, demo bitmiş olur.
+        hedef = "/giris" if os.environ.get("DEMO_KAPALI") else "/demo"
+        raise HTTPException(status_code=303, headers={"Location": hedef})
 
     c = baglan()
     try:
