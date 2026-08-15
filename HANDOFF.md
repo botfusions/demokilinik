@@ -271,6 +271,14 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    test edilir, `openwa` konteyneri kaldırılır. MCP sunucuları
    (`developer.unipile.com/mcp`) yalnız dokümantasyon erişimi, botla ilgisi yok.
    Bugün elleşilmiyor: mevcut yığın çalışıyor, aylık gider €0.
+   **GÜNCELLEME (2026-08-15): karar öne alındı — pazartesi 2026-08-17'de
+   kuruluyor, ödeme planına geçilecek (kullanıcı kararı: "ödEyeceğiz,
+   pazartesi kuralım").** Deneme dönüştürme/kaçırma yok; IG vitrini
+   piyasa günü Unipile'da açılır. Ana demo (WhatsApp+panel) Unipile'dan
+   bağımsız, Unipile gitse de akmaya devam eder. Kurulum sırası:
+   1) Unipile hesabı + ödeme, 2) IG hesabını bağla (account_id gelir),
+   3) `UNIPILE_*` env'leri + `/webhook/unipile` rotası (Composio yolu durur,
+   env ile seçilir), 4) WhatsApp openwa'da kalır.
 
 ## Çalıştırma
 
