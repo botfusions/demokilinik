@@ -232,27 +232,27 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    düşer). Senaryo: "İmplant için randevu almak istiyorum" → ajan Dr. Deniz
    Kaya'yı önerir, 2-3 saat sunar, randevu açar → panelde "Planlandı" + Google
    Takvim'de etkinlik.
-4. **Demo sonrası: yönetici bölümüne ikinci parola + 5 denemede kilit.**
-   Bugün rol yeterli — yönetici hesabıyla giriş yapılmışsa Fiyat/Kampanya,
-   Bilgi Tabanı, Kullanıcılar sekmeleri doğrudan açılıyor. Resepsiyonda açık
-   kalan ekranda fiyat değiştirilebilir. Yapılacak:
-   - `yonetici` bağımlılığına (`app/main.py:199`) tek kontrol: oturumda
-     "yönetici doğrulandı" damgası yoksa küçük bir parola ekranı. Kullanıcı
-     KENDİ parolasını girer, damga N dakika geçerli (süre kararlaştırılacak),
-     sonra düşer. Rotalar tek tek değişmez, bağımlılık hepsini kapsıyor.
-   - **Yanlış parolada 5 deneme kilidi.** Şu an hiçbir yerde yok:
-     `POST /giris` (`app/main.py:241`) sınırsız deneme kabul ediyor ve panel
-     internete açık. Kilit hem ana girişe hem ikinci parolaya konmalı;
-     sayaç `kullanicilar` tablosunda (`basarisiz_deneme`, `kilit_bitis`),
-     süreli kilit — kalıcı değil, yoksa kliniği kendi panelinden kilitleriz.
-   - **Parola unutulursa:** self-servis sıfırlama YOK ve planlanmıyor (e-posta
-     altyapısı yok, SMTP env'i bile dolu değil). Çıkış yolu **sunucudan
-     müdahale**: başka bir yönetici varsa panelden değiştirir; tek yönetici
-     kilitlendiyse vendor `docker exec` ile sıfırlar. Bunun için elle SQL
-     yazmak yerine küçük bir script yazılacak:
-     `scripts/parola-sifirla.py <kullanıcı_adı> <yeni_parola>` —
-     `parola_degistir()`'i çağırır, kilidi ve sayacı sıfırlar, `islem_kaydi`'na
-     "vendor sıfırladı" yazar. Denetim izi kalsın diye sessiz UPDATE değil.
+4. **Yönetici ikinci parolası + 5 denemede kilit — ✅ YAZILDI (2026-08-15,
+   deploy edilmeyi bekliyor).**
+   - **Giriş kilidi:** `kullanici_dogrula` içinde (tek boğaz — ana giriş ve
+     ikinci parola aynı yoldan). 5 hatalı deneme → 15 dakika süreli kilit
+     (`kullanicilar.basarisiz_deneme` + `kilit_bitis`; süre
+     `KULLANICI_KILIT_DAKIKA` ile ezilir). Kilitliyken DOĞRU parola da
+     `HesapKilitli` fırlatır, ekran "hesap kilitli" der. Başarılı giriş
+     sayacı sıfırlar. Pasif kullanıcı sayacı artırmaz.
+   - **İkinci parola:** oturum çerezine imzalı `y` damgası (epoch). Girişte
+     admin rolüne otomatik verilir (parola az önce doğrulandı); `yonetici`
+     bağımlılığı damga süresi dolmuşsa `/yonetici-kilit` parola ekranına
+     atlar, doğru parola damgayı `YONETICI_DAMGA_DAKIKA` (varsayılan 30) dk
+     daha uzatır. Resepsiyonda açık ekran 30 dk sonra fiyat değiştiremez.
+     Demo izleyicisi damgadan muaf (GET'leri zaten açık).
+   - **`scripts/parola-sifirla.py <adı> <yeni parola>`:** parolayı değiştirir,
+     kilidi/sayacı açar, `islem_kaydi`'na "vendor sıfırladı (sunucudan)"
+     düşer. `docker exec <konteyner> python scripts/parola-sifirla.py ...`.
+   - Testler: `test_kullanici.py` 50 yeşil (11 yeni). Tam takımda 13 hata
+     VAR ama HEPsi bu değişiklikten önce de vardı: 4'ü demo-yönlendirme
+     drift'i (89c35f7, testler `/giris` bekliyor), 9'u saate bağımlı test
+     (akşam koşulunca 18:00 kapanışına takılıyor).
 5. **Demo için salt-okunur panel girişi.** ✅ YAZILDI VE CANLIDA (2026-08-14,
    `89c35f7`, 369 test yeşil, 11'i yeni). Detay yukarıda "2026-08-14"
    bölümünde — link, kararlar, kill-switch ve deploy-unutmaması orada.

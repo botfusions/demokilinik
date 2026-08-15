@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="tr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yönetici doğrulaması — {{ klinik_adi }}</title>
+<link rel="stylesheet" href="/static/panel.css">
+<style>
+  body { min-height:100vh; display:flex; align-items:center; justify-content:center;
+         padding:20px; background:var(--canvas-soft); }
+  .giris-kutu { width:340px; }
+</style>
+</head>
+<body>
+<form class="kart giris-kutu" method="post" action="/yonetici-kilit">
+  <div class="brand-mark" style="margin-bottom:2px"><span class="brand-name">{{ klinik_adi }}</span></div>
+  <div class="alt-baslik" style="margin-bottom:20px">Yönetici bölümleri için parolanızı yeniden doğrulayın.</div>
+
+  {% if hata == 'kilit' %}
+    <div class="hata">Çok sayıda hatalı deneme — hesap bir süre kilitli. 15 dakika sonra tekrar deneyin.</div>
+  {% elif hata %}
+    <div class="hata">Parola hatalı.</div>
+  {% endif %}
+
+  <label for="p">Parola</label>
+  <input id="p" type="password" name="parola" autofocus required>
+  <button style="width:100%; margin-top:20px">Doğrula</button>
+</form>
+<script src="/static/panel.js"></script>
+</body>
+</html>

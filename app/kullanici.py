@@ -30,6 +30,19 @@ class KullaniciVar(Exception):
     """Bu kullanıcı adı zaten alınmış."""
 
 
+class HesapKilitli(Exception):
+    """Art arda hatalı deneme sonrası hesap süreli kilitlendi."""
+
+
+# Giriş kilidi. Süreli — kalıcı kilit, paneli internete açıkken bilinen bir
+# kullanıcı adını kilitleyip kliniği dışarıda bırakmanın yolunu verir.
+MAX_DENEME = 5
+
+
+def _kilit_dakika() -> int:
+    return int(os.environ.get("KULLANICI_KILIT_DAKIKA", "15"))
+
+
 def parola_hash(parola: str) -> str:
     if len(parola) < 8:
         raise ParolaZayif("Parola en az 8 karakter olmalı")
@@ -83,20 +96,47 @@ def kullanici_dogrula(conn: psycopg.Connection, kullanici_adi: str,
                       parola: str) -> dict | None:
     """Doğru kullanıcı+parola ise kullanıcıyı döner, değilse None.
 
-    Pasifleştirilmiş kullanıcı doğru parolayla da giremez.
+    Pasifleştirilmiş kullanıcı doğru parolayla da giremez. Art arda
+    `MAX_DENEME` hatalı denemeden sonra hesap `_kilit_dakika()` dakika
+    kilitlenir; kilitliyken DOĞRU parola da `HesapKilitli` fırlatır —
+    kilidin sessiz "yanlış parola" gibi görünmesi kalan süreyi saklamaz,
+    personel ne olduğunu bilsin.
     """
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            "SELECT * FROM kullanicilar WHERE kullanici_adi = %s",
+            "SELECT *, now() AS simdiki FROM kullanicilar WHERE kullanici_adi = %s",
             (kullanici_adi.strip().lower(),),
         )
         k = cur.fetchone()
 
-    if not k or not k["aktif"] or not parola_dogrula(parola, k["parola_hash"]):
+    if not k:
+        return None
+
+    if k["kilit_bitis"] and k["kilit_bitis"] > k["simdiki"]:
+        raise HesapKilitli(str(k["kilit_bitis"]))
+
+    if not k["aktif"] or not parola_dogrula(parola, k["parola_hash"]):
+        with conn.cursor() as cur:
+            if k["basarisiz_deneme"] + 1 >= MAX_DENEME:
+                cur.execute(
+                    "UPDATE kullanicilar SET basarisiz_deneme = 0, kilit_bitis = now()"
+                    " + make_interval(mins => %s) WHERE id = %s",
+                    (_kilit_dakika(), k["id"]),
+                )
+            else:
+                cur.execute(
+                    "UPDATE kullanicilar SET basarisiz_deneme = %s WHERE id = %s",
+                    (k["basarisiz_deneme"] + 1, k["id"]),
+                )
+        conn.commit()
         return None
 
     with conn.cursor() as cur:
-        cur.execute("UPDATE kullanicilar SET son_giris = now() WHERE id = %s", (k["id"],))
+        cur.execute(
+            "UPDATE kullanicilar SET son_giris = now(), basarisiz_deneme = 0,"
+            " kilit_bitis = NULL WHERE id = %s",
+            (k["id"],),
+        )
     conn.commit()
     return k
 

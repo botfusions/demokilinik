@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main
 from app.kullanici import (
+    HesapKilitli,
     KullaniciVar,
     ParolaZayif,
     ilk_admin_kur,
@@ -252,3 +253,121 @@ def test_ic_api_panel_cookiesiyle_acilmaz(admin_istemci):
     """Yönetici oturumu bile ajanın iç API'sini açmamalı — iki ayrı yetki."""
     r = admin_istemci.get("/api/doktorlar")
     assert r.status_code == 401
+
+
+# ── giriş kilidi (5 hatalı deneme → süreli kilit) ──────────
+
+def test_bes_hatali_denemeden_sonra_kilit(conn):
+    kullanici_ekle(conn, "ayse", "resepsiyon123")
+    for _ in range(5):
+        assert kullanici_dogrula(conn, "ayse", "yanlisparola") is None
+
+    # Kilitliyken DOĞRU parola da kabul edilmez — kilidin varlığı görünür olsun
+    with pytest.raises(HesapKilitli):
+        kullanici_dogrula(conn, "ayse", "resepsiyon123")
+
+
+def test_dort_hatali_deneme_kilitlemez(conn):
+    """Kilit tam 5.'de; 4 yanlıştan sonra doğru parola hâlâ girer."""
+    kullanici_ekle(conn, "ayse", "resepsiyon123")
+    for _ in range(4):
+        assert kullanici_dogrula(conn, "ayse", "yanlisparola") is None
+    assert kullanici_dogrula(conn, "ayse", "resepsiyon123") is not None
+
+
+def test_basari_sayaci_sifirlanir(conn):
+    """3 yanlış + 1 doğru → sayaç sıfır; yeni 4 yanlış yine kilit vermez."""
+    kullanici_ekle(conn, "ayse", "resepsiyon123")
+    for _ in range(3):
+        kullanici_dogrula(conn, "ayse", "yanlisparola")
+    kullanici_dogrula(conn, "ayse", "resepsiyon123")
+    for _ in range(4):
+        assert kullanici_dogrula(conn, "ayse", "yanlisparola") is None
+    assert kullanici_dogrula(conn, "ayse", "resepsiyon123") is not None
+
+
+def test_kilit_sure_dolunca_duser(conn, monkeypatch):
+    """Kilit kalıcı değil: süre dolunca doğru parola yine girer."""
+    monkeypatch.setenv("KULLANICI_KILIT_DAKIKA", "0")   # kilit anında dolar
+    kullanici_ekle(conn, "ayse", "resepsiyon123")
+    for _ in range(5):
+        kullanici_dogrula(conn, "ayse", "yanlisparola")
+
+    assert kullanici_dogrula(conn, "ayse", "resepsiyon123") is not None
+
+
+def test_giris_kilitli_hesaba_hata_mesaji_verir(conn):
+    kullanici_ekle(conn, "ayse", "resepsiyon123")
+    c = TestClient(main.app, follow_redirects=False)
+    for _ in range(5):
+        c.post("/giris", data={"kullanici_adi": "ayse", "parola": "yanlis"})
+
+    r = c.post("/giris", data={"kullanici_adi": "ayse", "parola": "resepsiyon123"})
+    assert r.status_code == 303
+    assert "hata=kilit" in r.headers["location"]
+
+
+# ── yönetici ikinci parolası (damga) ────────────────────────
+
+def test_yonetici_giriste_damga_almis_admin_sayfayi_gorur(admin_istemci):
+    """Girişte parola az önce doğrulandı — /yonetici ekstra parola sormaz."""
+    assert admin_istemci.get("/yonetici").status_code == 200
+
+
+def test_damga_suresi_dolunce_parola_ekranina_duser(conn, monkeypatch):
+    kullanici_ekle(conn, "admin", "yoneticiparola", "admin")
+    monkeypatch.setenv("YONETICI_DAMGA_DAKIKA", "0")   # damga anında dolar
+    c = TestClient(main.app, follow_redirects=False)
+    c.post("/giris", data={"kullanici_adi": "admin", "parola": "yoneticiparola"})
+
+    r = c.get("/yonetici")
+    assert r.status_code == 303
+    assert r.headers["location"] == "/yonetici-kilit"
+
+
+def test_damga_yenileme_dogru_parolayla_calisir(conn, monkeypatch):
+    kullanici_ekle(conn, "admin", "yoneticiparola", "admin")
+    monkeypatch.setenv("YONETICI_DAMGA_DAKIKA", "0")
+    c = TestClient(main.app, follow_redirects=False)
+    c.post("/giris", data={"kullanici_adi": "admin", "parola": "yoneticiparola"})
+    assert c.get("/yonetici").status_code == 303
+
+    # Süreyi geri aç, doğrula → damga gelir, sayfa açılır
+    monkeypatch.setenv("YONETICI_DAMGA_DAKIKA", "30")
+    r = c.post("/yonetici-kilit", data={"parola": "yoneticiparola"})
+    assert r.status_code == 303
+    assert r.headers["location"] == "/yonetici"
+    assert c.get("/yonetici").status_code == 200
+
+
+def test_damga_yanlis_parola_ekranda_kalir(conn, monkeypatch):
+    kullanici_ekle(conn, "admin", "yoneticiparola", "admin")
+    monkeypatch.setenv("YONETICI_DAMGA_DAKIKA", "0")
+    c = TestClient(main.app, follow_redirects=False)
+    c.post("/giris", data={"kullanici_adi": "admin", "parola": "yoneticiparola"})
+
+    r = c.post("/yonetici-kilit", data={"parola": "yanlis"})
+    assert r.status_code == 303
+    assert "hata=1" in r.headers["location"]
+    assert c.get("/yonetici").status_code == 303, "yanlış parolayla damga gelmemeli"
+
+
+def test_kilit_ekrani_personel_goremez(personel_istemci):
+    assert personel_istemci.get("/yonetici-kilit").status_code == 403
+
+
+def test_damga_yanlis_denemeler_ana_kilide_yazilir(conn, monkeypatch):
+    """İkinci parola ekranı da aynı kullanici_dogrula'dan geçer — 5 yanlışta hesap kilitlenir."""
+    kullanici_ekle(conn, "admin", "yoneticiparola", "admin")
+    monkeypatch.setenv("YONETICI_DAMGA_DAKIKA", "0")
+    c = TestClient(main.app, follow_redirects=False)
+    c.post("/giris", data={"kullanici_adi": "admin", "parola": "yoneticiparola"})
+
+    for _ in range(5):
+        assert "hata=1" in c.post(
+            "/yonetici-kilit", data={"parola": "yanlis"}
+        ).headers["location"]
+
+    # 6. deneme DOĞRU parola bile artık kilitli hesaba çarpar
+    r = c.post("/yonetici-kilit", data={"parola": "yoneticiparola"})
+    assert "hata=kilit" in r.headers["location"]

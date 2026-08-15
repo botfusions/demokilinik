@@ -19,6 +19,8 @@
 
   {% if hata == 'oturum' %}
     <div class="hata">Oturumunuz kapandı. Yeniden giriş yapın.</div>
+  {% elif hata == 'kilit' %}
+    <div class="hata">Çok sayıda hatalı deneme — hesap bir süre kilitli. 15 dakika sonra tekrar deneyin.</div>
   {% elif hata %}
     <div class="hata">Kullanıcı adı veya parola hatalı.</div>
   {% endif %}

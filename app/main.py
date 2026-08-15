@@ -7,6 +7,7 @@ X-Ic-Anahtar (ajanın CRM'e yazması). Biri diğerini açmaz.
 
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -67,6 +68,7 @@ from app.hizmet import (  # noqa: E402
     kampanyalar_listele,
 )
 from app.kullanici import (  # noqa: E402
+    HesapKilitli,
     KullaniciVar,
     ParolaZayif,
     ilk_admin_kur,
@@ -192,6 +194,7 @@ def personel(request: Request):
     Pasifleştirilen kullanıcının açık oturumu bir sonraki istekte kapanır.
     """
     kurabiye = request.cookies.get(COOKIE_ADI)
+    veri = None
     if kurabiye:
         try:
             veri = imzalayici.loads(kurabiye)
@@ -204,7 +207,11 @@ def personel(request: Request):
             if request.method == "POST":
                 raise HTTPException(403, "Demo modunda değişiklik yapılamaz")
             request.state.kullanici = IZLEYICI
+            request.state.oturum = veri
             return
+
+    # İmzalı çerezin kendisi — yönetici damgası ("y") yonetici() okur.
+    request.state.oturum = veri if isinstance(veri, dict) else {}
 
     kid = _oturum_kullanici_id(request)
     if kid is None:
@@ -226,17 +233,27 @@ def personel(request: Request):
     request.state.kullanici = k
 
 
+def _damga_dakika() -> int:
+    return int(os.environ.get("YONETICI_DAMGA_DAKIKA", "30"))
+
+
 def yonetici(request: Request):
-    """Yalnız admin. Kullanıcı yönetimi ve doktor tanımı buradan geçer.
+    """Yalnız admin + ikinci parola damgası. Kullanıcı yönetimi ve doktor tanımı buradan geçer.
 
     Demo izleyicisi buradan da geçer (sayfaları görür); POST'ları personel
-    kestiği için yazma yolu yok.
+    kestiği için yazma yolu yok. Admin için ek şart: oturum çerezindeki "y"
+    damgası (parolayı az önce yeniden doğrulamanın imzalı kanıtı) geçerli
+    olmalı — resepsiyonda açık kalan ekranda fiyat değiştirilemesin diye.
+    Damga giriş ve /yonetici-kilit doğrulamalarında konur, süre dolunca
+    yönetici sayfaları küçük parola ekranına düşer.
     """
     personel(request)
     if request.state.kullanici["rol"] == "izleyici":
         return
     if request.state.kullanici["rol"] != "admin":
         raise HTTPException(403, "Bu sayfa yalnızca yöneticiler içindir")
+    if getattr(request.state, "oturum", {}).get("y", 0) < time.time():
+        raise HTTPException(status_code=303, headers={"Location": "/yonetici-kilit"})
 
 
 def _kim(request: Request) -> dict | None:
@@ -271,14 +288,57 @@ def giris_sayfasi(request: Request, hata: str = ""):
 
 @app.post("/giris")
 def giris(kullanici_adi: str = Form(...), parola: str = Form(...), conn=Depends(db)):
-    k = kullanici_dogrula(conn, kullanici_adi, parola)
+    try:
+        k = kullanici_dogrula(conn, kullanici_adi, parola)
+    except HesapKilitli:
+        return RedirectResponse("/giris?hata=kilit", status_code=303)
     if not k:
         # Kullanıcı adı mı parola mı yanlış, söylemiyoruz — hesap sayımına yardım etmez
         return RedirectResponse("/giris?hata=1", status_code=303)
 
     islem_yaz(conn, k, "giriş")
+    # Girişte parola az önce doğrulandı — admin oturumu damgayla açılır,
+    # yönetici ilk sayfada ikinci parola ekranına düşmez.
+    veri = {"k": k["id"]}
+    if k["rol"] == "admin":
+        veri["y"] = time.time() + _damga_dakika() * 60
     y = RedirectResponse("/", status_code=303)
-    y.set_cookie(COOKIE_ADI, imzalayici.dumps({"k": k["id"]}), httponly=True, samesite="lax")
+    y.set_cookie(COOKIE_ADI, imzalayici.dumps(veri), httponly=True, samesite="lax")
+    return y
+
+
+# ── yönetici ikinci parolası ────────────────────────────────
+
+@app.get("/yonetici-kilit", response_class=HTMLResponse, dependencies=[Depends(personel)])
+def yonetici_kilit_sayfasi(request: Request, hata: str = ""):
+    if request.state.kullanici["rol"] != "admin":
+        raise HTTPException(403, "Bu sayfa yalnızca yöneticiler içindir")
+    return sablonlar.TemplateResponse(request, "yonetici-kilit.html", {"hata": hata})
+
+
+@app.post("/yonetici-kilit", dependencies=[Depends(personel)])
+def yonetici_kilit(request: Request, parola: str = Form(...), conn=Depends(db)):
+    """Damga süresi dolunca yönetici KENDİ parolasını yeniden doğrular.
+
+    Aynı `kullanici_dogrula` geçer: hatalı denemeler burada da sayılıp
+    hesabı aynı şekilde kilitler.
+    """
+    k = request.state.kullanici
+    try:
+        d = kullanici_dogrula(conn, k["kullanici_adi"], parola)
+    except HesapKilitli:
+        return RedirectResponse("/yonetici-kilit?hata=kilit", status_code=303)
+    if not d:
+        islem_yaz(conn, k, "yönetici doğrulaması başarısız")
+        return RedirectResponse("/yonetici-kilit?hata=1", status_code=303)
+
+    islem_yaz(conn, k, "yönetici doğrulaması")
+    y = RedirectResponse("/yonetici", status_code=303)
+    y.set_cookie(
+        COOKIE_ADI,
+        imzalayici.dumps({"k": k["id"], "y": time.time() + _damga_dakika() * 60}),
+        httponly=True, samesite="lax",
+    )
     return y
 
 

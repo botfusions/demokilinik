@@ -109,6 +109,12 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
     olusturma    timestamptz NOT NULL DEFAULT now()
 );
 
+-- Giriş kilidi: 5 hatalı denemeden sonra süreli kilit (kullanicilar sonradan
+-- eklendiği için kolonlar ALTER ile geliyor; kalıcı kilit değil, süreli —
+-- yoksa panel internete açıkken biri bilinen adı kilitler, klinik dışarı kalır).
+ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS basarisiz_deneme integer NOT NULL DEFAULT 0;
+ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS kilit_bitis timestamptz;
+
 -- Kim ne yaptı. Randevu değiştiren, bilgi silen, kullanıcı ekleyen hep buraya düşer.
 CREATE TABLE IF NOT EXISTS islem_kaydi (
     id           serial PRIMARY KEY,
