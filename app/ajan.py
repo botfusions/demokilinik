@@ -42,6 +42,10 @@ def _sistem_promptu(kanal: str) -> str:
     if temel is None:
         raise CevapUretilemedi("SOUL.md ya da .hermes.md okunamadı")
 
+    # Gelen mesajın dili neyse cevap o dilde — hastanın dilinde karşılamak,
+    # ayrı bir çeviri katmanı yazmaktan ucuz ve her kanala aynı anda dokunuyor.
+    temel += "\n\nHer zaman hastanın mesaj yazdığı dilde cevap ver (Türkçe yazana Türkçe, İngilizce yazana İngilizce vb.)."
+
     if kanal != "instagram":
         return temel
 
