@@ -104,7 +104,12 @@ Kodun okuduğu tüm değişkenleri çıkarmak için: `app/*.py` içinde `environ
 ## 2026-08-11: WhatsApp canlıya alındı + Google Takvim
 
 VPS'te OpenWA kuruldu (Coolify dışında, `coolify` ağında manuel container), QR
-okutuldu, hat **905323314569**. Uçtan uca doğrulandı: hasta yazıyor → kural/hafif/
+okutuldu, hat **905323314569**. Env kaynağı sunucuda `/root/openwa.env` —
+konteyneri yaratırken `--env-file` ile veriliyor; Coolify deploy'u openwa'yı
+dokunmaz, env değişikliği = `docker rm -f openwa` + `docker run` (aynı bayraklarla,
+volume `demokilinik_openwa`). 2026-08-14: WhatsApp "başka pencerede açık"
+diyaloğu oturumu 2 gün kilitledi; `WWEBJS_ONBOARDING_CONTINUE_LABELS=Use here`
+eklendi, konteyner yeniden yaratıldı, oturum QR'sız geri geldi. Uçtan uca doğrulandı: hasta yazıyor → kural/hafif/
 tam ajan → randevu → Google Takvim etkinliği → iptalde etkinlik siliniyor.
 
 **Canlıda çıkan beş hata — hepsi dış dünyayla temas noktasında, hiçbiri testle
@@ -253,6 +258,19 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    bölümünde — link, kararlar, kill-switch ve deploy-unutmaması orada.
 6. *(sonraya)* İptalden sonra yeniden randevu teklifi — `GELISIM-PLANI.md`.
 7. *(sonraya)* Meta reklam modülü — PRD Faz 8.
+8. **Ölçek yolu olarak Unipile (karar: 2026-08-15, kullanıcı onayı).**
+   Tek birleşik mesajlaşma API'si: WhatsApp + Instagram + Telegram +
+   LinkedIn + Gmail/Outlook + takvimler, hepsinde gerçek zamanlı webhook
+   (`new_message`) — Composio'nun IG trigger'ı yokluğu ve openwa self-host
+   derdi ikisi de kalkar. Fiyat: min €49/ay (10 hesap), sonrası hesap başı
+   €5, 7 gün ücretsiz deneme, kullanım bazlı ücret yok. WhatsApp tarafı
+   resmi Cloud API DEĞİL (session-based) — ban riski openwa ile aynı sınıf,
+   bakımı Unipile'da. **Karar: 3+ müşteri olunca değerlendirilir** —
+   alternatif Meta Graph API webhooks (bedava ama App Review + webhook
+   altyapısını kendimiz yazarız). Denemeyle WhatsApp+IG bir haftada
+   test edilir, `openwa` konteyneri kaldırılır. MCP sunucuları
+   (`developer.unipile.com/mcp`) yalnız dokümantasyon erişimi, botla ilgisi yok.
+   Bugün elleşilmiyor: mevcut yığın çalışıyor, aylık gider €0.
 
 ## Çalıştırma
 
