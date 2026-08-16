@@ -1,8 +1,27 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-14 · **Durum:** **canlıda çalışıyor** —
+**Son güncelleme:** 2026-08-16 · **Durum:** **canlıda çalışıyor** —
 `demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
-edildi, Google Takvim'e düşüyor. 369 test yeşil.
+edildi, Google Takvim'e düşüyor. 391 test yeşil (4 bilinen demo-drift hariç).
+
+## 2026-08-16: Giriş güvenliği + insan devri — PUSH EDİLDİ, DEPLOY BEKLİYOR
+
+Origin `main` = `1ee39b9`; canlı hâlâ `357b86c`'te (`/openapi.json`'da
+`/yonetici-kilit` ve `/hastalar/{id}/mesaj` yok → Redeploy tıklanmadı).
+Dikkat: **commit push edilmeden Redeploy eski commit'i kurar** (bugün bir
+kez oldu). Push'u doğrula, sonra Redeploy, sonra rotaları curl'la.
+
+Bu oturumda yapılanlar (hepsi origin'de):
+- **Giriş güvenliği** (`7a7da2d`): 5 hatalı denemede 15 dk süreli kilit +
+  yönetici ikinci parolası (imzalı `y` damgası, 30 dk) +
+  `scripts/parola-sifirla.py`. Detay: aşağıda madde 4.
+- **İnsan devri** (`0c6ca96` + `1ee39b9`): PRD
+  `16-08-2026-PRD-insan-devri.md` tamamen kodda — ajan susar, personel
+  panelden yazar, 2 saat cevapsızsa otomatik geri alma. Detay: madde 9.
+  **Telegram bildirimi bilinçli YOK** — Telegram yalnız vendor teknik
+  kanalıdır, klinik işine karıştırılmaz (kullanıcı kararı).
+- **Rakip kıyas föyü** (repo kökünde `rakip-kiyas-foyu.html`, commit dışı):
+  satış için tek sayfa; rakip ADLARI YOK (etik değil, kullanıcı kararı).
 
 ## 2026-08-14: Demo izleyici girişi canlıda (89c35f7)
 
