@@ -293,8 +293,10 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    devri düşürüp hastaya bilgi mesajı yollar, asistan döner. K2: mesai
    dışı devir talebine "pazartesi 09:00'den itibaren" eki (`ayarlar`
    tablosundan). Panel: hasta sayfasında cevap kutusu + Devral/Devri bitir
-   düğmeleri + "İnsan devrede" rozeti; ana sayfada bekleyen devir sayacı;
-   devir başlarken Telegram bildirimi (`saglik.uyari_telegram_gonder`).
+   düğmeleri + "İnsan devrede" rozeti; ana sayfada bekleyen devir sayacı.
+   Telegram bildirimi BİLİNÇLİ YOK (kullanıcı kararı 2026-08-16): Telegram
+   yalnız vendor'a giden teknik kanaldır (sağlık uyarıları, haftalık rapor),
+   klinik işine karışmaz. PRD 4.6'daki Telegram maddesi bu kararla düşüldü.
    Rotalar: `POST /hastalar/{id}/mesaj|devri-baslat|devri-bitir`.
    Not: panel personeli gönderdiği mesaj "giden" kaydolur; ajan ile
    personel mesajı tabloda ayrılmaz (PRD şemayı tek kolonla sınırladı) —

@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 import app.ajan as ajan
 import app.devri as devri
 import app.openwa as openwa
-import app.saglik as saglik
 import app.main as main
 from app.crm import devir_yaz, devirdekiler, gorusme_gecmisi, kisi_bul, kisi_upsert
 from app.kural import devir_istedi_mi
@@ -39,7 +38,7 @@ def _govde(mesaj: str, wamid: str):
 
 @pytest.fixture
 def istemci(conn, monkeypatch):
-    """Webhook istemcisi: ajan, OpenWA ve Telegram sahte."""
+    """Webhook istemcisi: ajan ve OpenWA gönderimi sahte."""
     gonderilenler = []
     monkeypatch.setattr(
         ajan, "cevap_uret",
@@ -47,7 +46,6 @@ def istemci(conn, monkeypatch):
     )
     monkeypatch.setattr(openwa, "mesaj_gonder",
                         lambda tel, metin: gonderilenler.append((tel, metin)) or "wamid.OUT")
-    monkeypatch.setattr(saglik, "uyari_telegram_gonder", lambda m: None)
 
     c = TestClient(main.app)
     c.gonderilenler = gonderilenler

@@ -1178,7 +1178,7 @@ async def whatsapp_webhook(request: Request, arka_plan: BackgroundTasks):
 
 
 def _devri_baslat(conn, kisi: dict) -> None:
-    """Devri açar, hastaya aktarım mesajı yollar, personeli Telegram'dan uyarır."""
+    """Devri açar, hastaya aktarım mesajı yollar. Görünürlük panelde: rozet + sayaç."""
     simdi = datetime.now()
     devir_yaz(conn, kisi["id"], simdi)
 
@@ -1188,10 +1188,6 @@ def _devri_baslat(conn, kisi: dict) -> None:
         devri.gonder("whatsapp", kisi["telefon"], metin)
     except Exception as e:
         log.warning("Devir aktarım mesajı gitmedi (%s): %s", kisi["telefon"], e)
-
-    saglik.uyari_telegram_gonder(
-        f"Hasta {kisi.get('ad') or kisi['telefon']} insan devri istedi — panel/hastalar/{kisi['id']}"
-    )
 
 
 def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) -> None:
