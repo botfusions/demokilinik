@@ -3,7 +3,9 @@
 {% block icerik %}
 
 <div class="kart">
-  <h2>{{ kisi.ad or 'İsimsiz' }} — {{ kisi.telefon }}</h2>
+  <h2>{{ kisi.ad or 'İsimsiz' }} — {{ kisi.telefon }}
+    {% if kisi.insan_devri_at %}<span class="rozet acil">İnsan devrede</span>{% endif %}
+  </h2>
   <p class="bos" style="margin-top:-8px">
     İlk temas {{ kisi.ilk_temas.strftime('%d.%m.%Y') }} ·
     son temas {{ kisi.son_temas.strftime('%d.%m.%Y %H:%M') }}
@@ -29,6 +31,19 @@
     {% endfor %}
   </table></div>
   {% else %}<p class="bos">Yazışma yok.</p>{% endif %}
+
+  <form method="post" action="/hastalar/{{ kisi.id }}/mesaj" style="margin-top:16px">
+    <label for="m">Hastaya yaz (WhatsApp'ına gider)</label>
+    <textarea id="m" name="metin" required></textarea>
+    <div style="margin-top:10px; display:flex; gap:8px">
+      <button>Gönder</button>
+      {% if kisi.insan_devri_at %}
+      <button formaction="/hastalar/{{ kisi.id }}/devri-bitir" formmethod="post">Devri bitir (asistan döner)</button>
+      {% else %}
+      <button formaction="/hastalar/{{ kisi.id }}/devri-baslat" formmethod="post">Devral (asistan susar)</button>
+      {% endif %}
+    </div>
+  </form>
 </div>
 
 {% endblock %}

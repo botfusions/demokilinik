@@ -29,6 +29,26 @@ _MAKS_UZUNLUK = 80
 _ONAY_KELIMELERI = {"evet", "tamam", "olur", "geliyorum", "onaylıyorum"}
 _IPTAL_KELIMELERI = {"iptal", "gelemiyorum", "gelemeyeceğim"}
 
+# İnsan devri isteyen ifadeler — alt dizgi eşleşmesi (Türkçe ekleri yakalar:
+# "yetkili" → "yetkiliyle", "yetkiliye"). Bilinçli olarak kısa ve riskli
+# kelimeler ("insan", "human") TEK BAŞINA yok: "insan gibi konuşuyorsun"
+# devri tetiklememeli (PRD T8). Kısa kelime ancak "insanla görüş" gibi
+# birleşik ifadede geçer.
+_DEVIR_IFADELERI = tuple(hafif._turkce_kucult(x) for x in (
+    "yetkili", "temsilci", "canlı destek", "gerçek kişi", "biriyle görüş",
+    "biriyle konuş", "insanla görüş", "insanla konuş", "personelle görüş",
+    "personelle konuş", "personel çağır", "yöneticiyle görüş",
+    "talk to a person", "speak to a human", "speak to a person",
+    "talk to someone", "real person", "human agent", "representative",
+    "customer service",
+))
+
+
+def devir_istedi_mi(mesaj: str) -> bool:
+    """Mesaj insan devri istiyor mu — LLM yok, alt dizgi bakar (PRD sınır 3)."""
+    m = hafif._turkce_kucult(mesaj)
+    return any(ifade in m for ifade in _DEVIR_IFADELERI)
+
 
 def cevap_dene(conn, mesaj: str) -> str | None:
     """Bilgi tabanındaki bir başlıkla net eşleşen mesajı LLM'siz cevaplar."""

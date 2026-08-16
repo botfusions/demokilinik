@@ -15,7 +15,8 @@
     <tr><th>Ad</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th><th>Not</th></tr>
     {% for k in kisiler %}
     <tr>
-      <td><a href="/hastalar/{{ k.id }}">{{ k.ad or '—' }}</a></td>
+      <td><a href="/hastalar/{{ k.id }}">{{ k.ad or '—' }}</a>
+        {% if k.insan_devri_at %}<span class="rozet acil">devir</span>{% endif %}</td>
       <td>{{ k.telefon }}</td>
       <td>{{ k.ilk_temas.strftime('%d.%m.%Y') }}</td>
       <td>{{ k.son_temas.strftime('%d.%m.%Y %H:%M') }}</td>

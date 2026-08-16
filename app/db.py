@@ -22,6 +22,12 @@ CREATE TABLE IF NOT EXISTS kisiler (
     personel_notu text
 );
 
+-- İnsan devri (PRD 16-08-2026). NULL = asistan cevaplıyor; dolu = insan
+-- devrede, asistan susuyor. Kolon aynı zamanda K1 sayacıdır: panel mesajı
+-- gönderen personel bu değeri now() ile tazeler, "son personel teması"
+-- ayrı bir kolonla taşınmaz.
+ALTER TABLE kisiler ADD COLUMN IF NOT EXISTS insan_devri_at timestamptz;
+
 CREATE TABLE IF NOT EXISTS gorusmeler (
     id             serial PRIMARY KEY,
     kisi_id        integer NOT NULL REFERENCES kisiler(id) ON DELETE CASCADE,

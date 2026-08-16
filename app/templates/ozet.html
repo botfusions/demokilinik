@@ -32,6 +32,13 @@
     <div class="not">son 7 gün</div>
   </div>
 </div>
+{% if devir_sayisi %}
+<div class="kart" style="margin-bottom:14px; padding:10px 16px">
+  <span class="rozet acil">İnsan devrede: {{ devir_sayisi }} hasta</span>
+  <span class="etiket" style="margin-left:8px">asistan bu hastalara cevap yazmıyor —
+    <a href="/hastalar">panelden yazın</a></span>
+</div>
+{% endif %}
 
 {# ── hangi gün daha dolu ───────────────────────────────── #}
 <div class="izgara k2" style="margin-bottom:14px">

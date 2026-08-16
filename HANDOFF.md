@@ -280,6 +280,27 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    3) `UNIPILE_*` env'leri + `/webhook/unipile` rotası (Composio yolu durur,
    env ile seçilir), 4) WhatsApp openwa'da kalır.
 
+9. **İnsan devri (Human Handover) — ✅ YAZILDI (2026-08-16, PRD:
+   `16-08-2026-PRD-insan-devri.md`, deploy edilmeyi bekliyor).**
+   Hasta "yetkiliyle görüşmek istiyorum" deyince ajan susar, konuşmayı
+   personel devralır. Kanal-bağımsız (`app/devri.py:gonder` — bugün yalnız
+   WhatsApp), kelime listesi `kural.py:devir_istedi_mi` (LLM yok; kısa
+   "insan"/"human" tek başına YOK — "insan gibi konuşuyorsun" tetiklemez).
+   `kisiler.insan_devri_at` tek kolon: NULL = asistan cevaplar; dolu = susar.
+   Kolon aynı zamanda K1 sayacı — personel panelden mesaj atınca now()
+   tazelenir; 2 saat cevapsız kalınca `devri.nobetci` (doktor supervisor'ına
+   kayıtlı, `DEVRI_NOBETCISI=0` ile kapanır, saat `DEVRI_OTOMATIK_SAAT`)
+   devri düşürüp hastaya bilgi mesajı yollar, asistan döner. K2: mesai
+   dışı devir talebine "pazartesi 09:00'den itibaren" eki (`ayarlar`
+   tablosundan). Panel: hasta sayfasında cevap kutusu + Devral/Devri bitir
+   düğmeleri + "İnsan devrede" rozeti; ana sayfada bekleyen devir sayacı;
+   devir başlarken Telegram bildirimi (`saglik.uyari_telegram_gonder`).
+   Rotalar: `POST /hastalar/{id}/mesaj|devri-baslat|devri-bitir`.
+   Not: panel personeli gönderdiği mesaj "giden" kaydolur; ajan ile
+   personel mesajı tabloda ayrılmaz (PRD şemayı tek kolonla sınırladı) —
+   ayrım gerekirse ileride `kaynak` kolonu eklenir. Testler:
+   `tests/test_devri.py` 15 yeşil (T1-T8 + K1/K2).
+
 ## Çalıştırma
 
 ```bash

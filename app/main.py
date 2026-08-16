@@ -23,7 +23,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, bildirim, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, rapor, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, devri, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, rapor, saglik  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -31,6 +31,8 @@ from app.crm import (  # noqa: E402
     DoktorYok,
     _calisma_penceresi,
     ayar_yaz,
+    devir_yaz,
+    devirdekiler,
     ayarlari_yukle,
     dolu_araliklar,
     doktor_bazli_doluluk,
@@ -136,6 +138,8 @@ async def yasam(app: FastAPI):
     doktor.baglan_fn_ayarla(baglan)
     doktor.kayit("saglik", saglik.nobetci, os.environ.get("SAGLIK_NOBETCISI", "1") == "1")
     doktor.kayit("hatirlatma", hatirlatma.nobetci, os.environ.get("HATIRLATMA_NOBETCISI", "1") == "1")
+    # İnsan devri geri alması: personel 2 saat cevap vermezse asistan geri döner
+    doktor.kayit("devri", devri.nobetci, os.environ.get("DEVRI_NOBETCISI", "1") == "1")
     # Instagram yapılandırılmamışsa nöbetçi hiç başlamaz — boşa Composio çağrısı
     # yapmaz, sağlık nöbetçisi de bu kanal için alarm çalmaz.
     ig_acik = os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1" and instagram.yapilandirildi_mi()
@@ -384,6 +388,7 @@ def ozet(request: Request, conn=Depends(db)):
         "kullanici": _kim(request),
         "bugun": f"{b.day} {AYLAR_TR[b.month - 1]} {b.year}, {GUNLER_TR[b.weekday()]}",
         "sayilar": ozet_sayilar(conn),
+        "devir_sayisi": len(devirdekiler(conn)),
         "gunler": gunler,
         "saatler": saatler,
         "yogun_gun": yogun_gun if yogun_gun and yogun_gun["adet"] else None,
@@ -784,8 +789,7 @@ def hastalar(request: Request, conn=Depends(db)):
     })
 
 
-@app.get("/hastalar/{kisi_id}", response_class=HTMLResponse, dependencies=[Depends(personel)])
-def hasta_detay(request: Request, kisi_id: int, conn=Depends(db)):
+def _kisi_ya_404(conn, kisi_id: int) -> dict:
     from psycopg.rows import dict_row
 
     with conn.cursor(row_factory=dict_row) as cur:
@@ -793,6 +797,12 @@ def hasta_detay(request: Request, kisi_id: int, conn=Depends(db)):
         kisi = cur.fetchone()
     if not kisi:
         raise HTTPException(404, "Hasta bulunamadı")
+    return kisi
+
+
+@app.get("/hastalar/{kisi_id}", response_class=HTMLResponse, dependencies=[Depends(personel)])
+def hasta_detay(request: Request, kisi_id: int, conn=Depends(db)):
+    kisi = _kisi_ya_404(conn, kisi_id)
 
     return sablonlar.TemplateResponse(request, "hasta.html", {
         "sayfa": "hastalar",
@@ -807,6 +817,49 @@ def hasta_detay(request: Request, kisi_id: int, conn=Depends(db)):
 def hasta_notu(request: Request, kisi_id: int, personel_notu: str = Form(""), conn=Depends(db)):
     personel_notu_yaz(conn, kisi_id, personel_notu)
     islem_yaz(conn, _kim(request), "hasta notu yazdı", f"hasta #{kisi_id}")
+    return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
+
+
+# ── insan devri — panel tarafı (PRD 4.4, 4.5) ───────────────
+
+@app.post("/hastalar/{kisi_id}/mesaj", dependencies=[Depends(personel)])
+def hasta_mesaj(request: Request, kisi_id: int, metin: str = Form(...), conn=Depends(db)):
+    """Panelden hastaya yazma. Önce kaydet sonra gönder (`_mesaji_isle`'deki
+    sıra): WhatsApp'a ulaşılamasa da personel ne yazdığını görür.
+
+    Gönderim K1 sayacını da tazeler — personel yazdıysa asistan 2 saat daha
+    susar. Personel yazınca devir zaten açık sayılır.
+    """
+    kisi = _kisi_ya_404(conn, kisi_id)
+    metin = metin.strip()
+    if not metin:
+        return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
+
+    gorusme_ekle(conn, kisi_id, "giden", metin)
+    try:
+        devri.gonder(devri.son_kanal(conn, kisi_id), kisi["telefon"], metin)
+    except Exception as e:
+        log.warning("Personel mesajı gitmedi (%s): %s", kisi["telefon"], e)
+    devir_yaz(conn, kisi_id, datetime.now())
+
+    islem_yaz(conn, _kim(request), "hastaya mesaj yazdı", f"hasta #{kisi_id}")
+    return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
+
+
+@app.post("/hastalar/{kisi_id}/devri-baslat", dependencies=[Depends(personel)])
+def hasta_devri_baslat(request: Request, kisi_id: int, conn=Depends(db)):
+    """Personel kendi başına devralır — hasta istemese de araya girebilmeli."""
+    _kisi_ya_404(conn, kisi_id)
+    devir_yaz(conn, kisi_id, datetime.now())
+    islem_yaz(conn, _kim(request), "insan devrini başlattı", f"hasta #{kisi_id}")
+    return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
+
+
+@app.post("/hastalar/{kisi_id}/devri-bitir", dependencies=[Depends(personel)])
+def hasta_devri_bitir(request: Request, kisi_id: int, conn=Depends(db)):
+    _kisi_ya_404(conn, kisi_id)
+    devir_yaz(conn, kisi_id, None)
+    islem_yaz(conn, _kim(request), "insan devrini bitirdi", f"hasta #{kisi_id}")
     return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
 
 
@@ -1124,6 +1177,23 @@ async def whatsapp_webhook(request: Request, arka_plan: BackgroundTasks):
     return {"durum": "alindi"}
 
 
+def _devri_baslat(conn, kisi: dict) -> None:
+    """Devri açar, hastaya aktarım mesajı yollar, personeli Telegram'dan uyarır."""
+    simdi = datetime.now()
+    devir_yaz(conn, kisi["id"], simdi)
+
+    metin = devri.aktarim_mesaji(simdi)   # K2: mesai dışındaysa dönüş saati eklenir
+    gorusme_ekle(conn, kisi["id"], "giden", metin)
+    try:
+        devri.gonder("whatsapp", kisi["telefon"], metin)
+    except Exception as e:
+        log.warning("Devir aktarım mesajı gitmedi (%s): %s", kisi["telefon"], e)
+
+    saglik.uyari_telegram_gonder(
+        f"Hasta {kisi.get('ad') or kisi['telefon']} insan devri istedi — panel/hastalar/{kisi['id']}"
+    )
+
+
 def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) -> None:
     """Webhook'un arka plan işi. Kayıt → ajan → gönderim."""
     conn = baglan()
@@ -1132,6 +1202,15 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
 
         if gorusme_ekle(conn, kid, "gelen", mesaj, wa_message_id=wa_id) is None:
             log.info("Tekrar teslimat yoksayıldı: %s", wa_id)
+            return
+
+        # İnsan devri (PRD 16-08-2026): mesaj HER durumda kaydedilir; devri
+        # açıkken ajan çağrılmaz, cevap yok — konuşmayı personel devralır.
+        kisi = kisi_bul(conn, telefon)
+        if kisi["insan_devri_at"]:
+            return
+        if kural.devir_istedi_mi(mesaj):
+            _devri_baslat(conn, kisi)
             return
 
         gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]  # yeni mesajı prompt ayrıca ekler

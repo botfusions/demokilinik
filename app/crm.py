@@ -71,6 +71,27 @@ def personel_notu_yaz(conn: psycopg.Connection, kisi_id: int, not_: str) -> None
     conn.commit()
 
 
+# ── insan devri ─────────────────────────────────────────────
+
+def devir_yaz(conn: psycopg.Connection, kisi_id: int, zaman) -> None:
+    """`None` devri bitirir; `now()` başlatır ya da K1 sayacını tazeler.
+
+    Kolon tek başına hem "devir açık mı" hem "son personel teması ne zaman"
+    sorusunu taşır — panel mesaj gönderince değeri now() yapılır, otomatik
+    geri alma sayacı oradan işler.
+    """
+    with conn.cursor() as cur:
+        cur.execute("UPDATE kisiler SET insan_devri_at = %s WHERE id = %s", (zaman, kisi_id))
+    conn.commit()
+
+
+def devirdekiler(conn: psycopg.Connection) -> list[dict]:
+    """Devri açık kişiler — panel sayacı ve otomatik geri alma aynı listeyi tarar."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT * FROM kisiler WHERE insan_devri_at IS NOT NULL ORDER BY insan_devri_at")
+        return cur.fetchall()
+
+
 # ── görüşmeler ──────────────────────────────────────────────
 
 def gorusme_ekle(
