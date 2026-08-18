@@ -1,15 +1,24 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-16 · **Durum:** **canlıda çalışıyor** —
+**Son güncelleme:** 2026-08-18 · **Durum:** **canlıda çalışıyor** —
 `demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
 edildi, Google Takvim'e düşüyor. 391 test yeşil (4 bilinen demo-drift hariç).
 
-## 2026-08-16: Giriş güvenliği + insan devri — PUSH EDİLDİ, DEPLOY BEKLİYOR
+## 2026-08-18: Güvenlik + insan devri DEPLOY EDİLDİ ve canlıda test edildi
 
-Origin `main` = `1ee39b9`; canlı hâlâ `357b86c`'te (`/openapi.json`'da
-`/yonetici-kilit` ve `/hastalar/{id}/mesaj` yok → Redeploy tıklanmadı).
-Dikkat: **commit push edilmeden Redeploy eski commit'i kurar** (bugün bir
-kez oldu). Push'u doğrula, sonra Redeploy, sonra rotaları curl'la.
+Canlı `SOURCE_COMMIT=60c2d6a` (en son commit); `/yonetici-kilit`,
+`/hastalar/{kisi_id}/mesaj|devri-baslat|devri-bitir` rotalarının hepsi
+canlı openapi'de (**parametre adı `{kisi_id}`**, `{id}` değil — curl
+kontrolünde yanlış negatif verme). İnsan devri uçtan uca canlıda test
+edildi, 5/5 geçti: (1) "yetkiliyle görüşmek istiyorum" → `insan_devri_at`
+dolar + aktarım mesajı; (2) K2 mesai eki doğru ("çarşamba 09:00'den
+itibaren"); (3) devri açıkken gelen mesaj kaydedilir, ajan susar; (4) panel
+personel mesajı K1'i tazeler, Devri bitir → NULL; (5) devri kapandıktan
+sonra ajan cevap vermeye döner (kural katmanından, LLM'siz). Yöntem:
+sahte numara `905000000009` + konteyner içinden HMAC-imzalı webhook +
+panel girişi. Test kişisi kisi_id=90 olarak yaratıldı. K1'in 2 saatlik
+otomatik geri alması canlıda bekleyerek denenmedi (birim testlerde yeşil;
+nöbetçi döngüsü loglarda hatasız). 48 saatlik canlı log: 0 error.
 
 Bu oturumda yapılanlar (hepsi origin'de):
 - **Giriş güvenliği** (`7a7da2d`): 5 hatalı denemede 15 dk süreli kilit +
@@ -290,9 +299,10 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    test edilir, `openwa` konteyneri kaldırılır. MCP sunucuları
    (`developer.unipile.com/mcp`) yalnız dokümantasyon erişimi, botla ilgisi yok.
    Bugün elleşilmiyor: mevcut yığın çalışıyor, aylık gider €0.
-   **GÜNCELLEME (2026-08-15): karar öne alındı — pazartesi 2026-08-17'de
-   kuruluyor, ödeme planına geçilecek (kullanıcı kararı: "ödEyeceğiz,
-   pazartesi kuralım").** Deneme dönüştürme/kaçırma yok; IG vitrini
+   **GÜNCELLEME (2026-08-15): karar öne alındı — kuruluyor, ödeme planına
+   geçilecek (kullanıcı kararı: "ödEyeceğiz, pazartesi kuralım").**
+   **GÜNCELLEME (2026-08-18): kurulum 2026-08-19 sabahına alındı —
+   Instagram orada bağlanacak.** Deneme dönüştürme/kaçırma yok; IG vitrini
    piyasa günü Unipile'da açılır. Ana demo (WhatsApp+panel) Unipile'dan
    bağımsız, Unipile gitse de akmaya devam eder. Kurulum sırası:
    1) Unipile hesabı + ödeme, 2) IG hesabını bağla (account_id gelir),
@@ -300,7 +310,8 @@ açar, Google Takvim'e yazar; personel Türkçe panelden yönetir.
    env ile seçilir), 4) WhatsApp openwa'da kalır.
 
 9. **İnsan devri (Human Handover) — ✅ YAZILDI (2026-08-16, PRD:
-   `16-08-2026-PRD-insan-devri.md`, deploy edilmeyi bekliyor).**
+   `16-08-2026-PRD-insan-devri.md`) ve 2026-08-18'de canlıda uçtan uca
+   test edildi (5/5, bkz. en üst bölüm).**
    Hasta "yetkiliyle görüşmek istiyorum" deyince ajan susar, konuşmayı
    personel devralır. Kanal-bağımsız (`app/devri.py:gonder` — bugün yalnız
    WhatsApp), kelime listesi `kural.py:devir_istedi_mi` (LLM yok; kısa
