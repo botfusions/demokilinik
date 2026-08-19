@@ -12,7 +12,8 @@
   <h2>Kayıtlı hastalar</h2>
   {% if kisiler %}
   <div class="kaydir"><table>
-    <tr><th>Ad</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th><th>Not</th></tr>
+    <tr><th>Ad</th><th>Telefon</th><th>İlk temas</th><th>Son temas</th><th>Not</th>
+      {% if kullanici and kullanici.rol == 'admin' %}<th></th>{% endif %}</tr>
     {% for k in kisiler %}
     <tr>
       <td><a href="/hastalar/{{ k.id }}">{{ k.ad or '—' }}</a>
@@ -21,6 +22,16 @@
       <td>{{ k.ilk_temas.strftime('%d.%m.%Y') }}</td>
       <td>{{ k.son_temas.strftime('%d.%m.%Y %H:%M') }}</td>
       <td>{{ k.personel_notu or '' }}</td>
+      {% if kullanici and kullanici.rol == 'admin' %}
+      <td>
+        <!-- Silme geri alınamaz: görüşmeler, randevular ve takvim etkinlikleri
+             birlikte gider. Onay kutusu tek savunma. -->
+        <form method="post" action="/hastalar/{{ k.id }}/sil"
+              onsubmit="return confirm('{{ k.ad or k.telefon }} ve tüm kayıtları silinsin mi? Geri alınamaz.')">
+          <button class="sade">Sil</button>
+        </form>
+      </td>
+      {% endif %}
     </tr>
     {% endfor %}
   </table></div>

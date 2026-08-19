@@ -50,6 +50,7 @@ from app.crm import (  # noqa: E402
     saat_bazli_doluluk,
     gorusme_gecmisi,
     kisi_bul,
+    kisi_sil,
     kisi_upsert,
     kisiler_listele,
     personel_notu_yaz,
@@ -829,6 +830,16 @@ def hasta_notu(request: Request, kisi_id: int, personel_notu: str = Form(""), co
     personel_notu_yaz(conn, kisi_id, personel_notu)
     islem_yaz(conn, _kim(request), "hasta notu yazdı", f"hasta #{kisi_id}")
     return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
+
+
+@app.post("/hastalar/{kisi_id}/sil", dependencies=[Depends(yonetici)])
+def hasta_sil(request: Request, kisi_id: int, conn=Depends(db)):
+    """Hastayı tüm kayıtlarıyla siler (KVKK silme talebi). Yalnız yönetici;
+    personel satırı görür, butonu görmez."""
+    ad = kisi_sil(conn, kisi_id)
+    if ad is not None:
+        islem_yaz(conn, _kim(request), "hasta sildi", ad)
+    return RedirectResponse("/hastalar", status_code=303)
 
 
 # ── insan devri — panel tarafı (PRD 4.4, 4.5) ───────────────

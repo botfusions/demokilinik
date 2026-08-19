@@ -239,6 +239,35 @@ def test_personel_doktor_epostasi_degistiremez(personel_istemci, conn):
     assert doktorlar_listele(conn)[0]["eposta"] == "eski@ornek.com"
 
 
+def test_yonetici_hastayi_siler(admin_istemci, conn):
+    from app.crm import kisi_upsert, kisiler_listele
+    kid = kisi_upsert(conn, "905000000099", "Test Hasta")
+    r = admin_istemci.post(f"/hastalar/{kid}/sil")
+    assert r.status_code in (302, 303)
+    assert kisiler_listele(conn) == []
+
+
+def test_hasta_silince_randevulari_da_gider(admin_istemci, conn):
+    from datetime import datetime, timedelta
+    from app.crm import kisi_upsert, randevu_olustur
+    kid = kisi_upsert(conn, "905000000099", "Test Hasta")
+    rid = randevu_olustur(conn, kid, "Kontrol",
+                          datetime.now() + timedelta(days=1),
+                          datetime.now() + timedelta(days=1, minutes=30))
+    admin_istemci.post(f"/hastalar/{kid}/sil")
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM randevular WHERE id = %s", (rid,))
+        assert cur.fetchone()[0] == 0
+
+
+def test_personel_hasta_silemez(personel_istemci, conn):
+    from app.crm import kisi_upsert, kisiler_listele
+    kid = kisi_upsert(conn, "905000000099", "Test Hasta")
+    r = personel_istemci.post(f"/hastalar/{kid}/sil")
+    assert r.status_code == 403
+    assert len(kisiler_listele(conn)) == 1
+
+
 def test_personel_kullanici_acamaz(personel_istemci, conn):
     r = personel_istemci.post("/kullanicilar", data={
         "kullanici_adi": "sahte", "parola": "sahteparola", "rol": "admin"})

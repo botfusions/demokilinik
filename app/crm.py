@@ -65,6 +65,30 @@ def kisiler_listele(conn: psycopg.Connection) -> list[dict]:
         return cur.fetchall()
 
 
+def kisi_sil(conn: psycopg.Connection, kisi_id: int) -> str | None:
+    """Hastayı ve tüm izini (görüşmeler, randevular, hatırlatmalar) siler.
+
+    Gelecek randevuların takvim etkinlikleri de silinir; DB satırları kisi
+    cascade'iyle gider. Silinen hastanın adını döner (işlem kaydı için),
+    hasta yoksa None.
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT ad, telefon FROM kisiler WHERE id = %s", (kisi_id,))
+        k = cur.fetchone()
+        if k is None:
+            return None
+        cur.execute(
+            "SELECT id FROM randevular WHERE kisi_id = %s AND baslangic > now() "
+            "AND google_event_id IS NOT NULL", (kisi_id,))
+        ridler = [r["id"] for r in cur.fetchall()]
+    for rid in ridler:
+        gtakvim.randevuyu_takvimden_sil(conn, rid)
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM kisiler WHERE id = %s", (kisi_id,))
+    conn.commit()
+    return k["ad"] or k["telefon"]
+
+
 def personel_notu_yaz(conn: psycopg.Connection, kisi_id: int, not_: str) -> None:
     with conn.cursor() as cur:
         cur.execute("UPDATE kisiler SET personel_notu = %s WHERE id = %s", (not_, kisi_id))
