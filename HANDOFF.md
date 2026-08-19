@@ -1,8 +1,34 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-19 · **Durum:** **canlıda çalışıyor** —
-`demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
-edildi, Google Takvim'e düşüyor. 402 test yeşil (4 bilinen demo-drift hariç).
+**Son güncelleme:** 2026-08-19 (öğleden sonra) · **Durum:** **canlıda çalışıyor** —
+`demoklinik.botfusions.com`, WhatsApp bağlı, Unipile IG canlı, takvim
+**Berk'in Composio'sunda** (berkresepta@gmail.com). 412 test yeşil (4 bilinen
+demo-drift hariç). Yeni müşteri kurulum adımları: `MUSTERI-KURULUM.md`.
+
+## 2026-08-19 (öğleden sonra): takvim Berk'e geçti + panel araçları
+
+- **Takvim swap:** Composio hesabı değişti — Berk'in hesabı
+  (`ak_A61eN3kqynt2MoZwDAKD`), connected account `ca_bY5Kq4VOUVNO`, user_id
+  `pg-test-79a12647-8c03-4f08-990d-4d7faabfa052` (dashboard'dan bağlandığı
+  için user_id otomatik üretildi; `klinik-takvim` linki ölümüne EXPIRED, önemi
+  yok). Canlı env: `COMPOSIO_API_KEY` + `TAKVIM_KULLANICI` bunlar. Test
+  randevusu (id 78) Berk'in takvimine düştü, davet maili doktora gitti.
+- **Doktor e-postaları** panelde satır içi düzenlenebilir (yalnız yönetici):
+  `POST /doktorlar/{id}/eposta`. Demo doktorların maili berkresepta@gmail.com
+  yapıldı (hepsinebirden SQL ile).
+- **Hasta silme** (yalnız yönetici): `POST /hastalar/{id}/sil` — görüşmeler,
+  randevular, gelecek takvim etkinlikleri cascade gider; onay kutulu buton
+  Hastalar sayfasında.
+- **Randevuda ad soyad:** ajan teyit adımında hastanın gerçek adını soyadını
+  sorar (SOUL.md + ajan.py prompt); `randevu_olustur` kaydına WhatsApp adı
+  değil hastanın söylediği geçer.
+- **Admin parolası** sunucuda sıfırlandı (`scripts/parola-sifirla.py`,
+  `klinik2026`). Demo izleyici (QR linki) değişmedi — oturumsuz gelen `/demo`
+  çerezi alır, POST yapamaz; `DEMO_KAPALI=1` ile kapatılır.
+- **Demo verisi** temizlendi: 42 tekrar eden demo randevu silindi, ilk tur
+  (17–24) + önümüzdeki 10 güne 10 yeni demo bırakıldı (takvim dolu görünsün).
+- KVKK onay metni/butonu YOK — sonraya ertelendi (müşteri talebi).
+- Canlı deploy: `e14b40a`'ya kadar her şey push edildi; redeploy manuel.
 
 ## 2026-08-19: Unipile kuruldu (adım 1-2 tamam, adım 3 kodda)
 
