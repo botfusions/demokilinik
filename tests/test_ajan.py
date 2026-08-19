@@ -149,6 +149,8 @@ def test_telefon_sistem_promptuna_girer(monkeypatch):
     assert "905326111749" in sistem
     assert "Cenk Tokgöz" in sistem
     assert "İSTEME" in sistem
+    # WhatsApp adına güvenilmez: randevuda gerçek ad soyad sorulur (2026-08-19)
+    assert "soyadını SOR" in sistem
 
 
 def test_telefon_verilmezse_prompt_bolumu_eklenmez(monkeypatch):

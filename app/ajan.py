@@ -120,9 +120,11 @@ def cevap_uret(gecmis: list[dict], mesaj: str,
         sistem += (
             "\n\n# Bu hasta\n\n"
             f"Bu mesajı yazan hastanın telefonu: {telefon}\n"
-            + (f"WhatsApp'taki adı: {ad}\n" if ad else "")
-            + "Araç çağrılarında `telefon` (ve varsa `ad`) alanına bunları koy. "
-            "Hastadan telefon numarası ya da ad İSTEME, zaten sende."
+            + (f"WhatsApp profil adı (tahmin, resmi kayıt değil): {ad}\n" if ad else "")
+            + "Araç çağrılarında `telefon` alanına bu numarayı koy; hastadan "
+            "telefon numarası İSTEME. Ad için: randevu açarken hastaya gerçek "
+            "adını ve soyadını SOR — WhatsApp adı takma ad olabilir, kayda "
+            "hastanın söylediği tam ad geçer (`ad` alanına onu yaz)."
         )
     taban, anahtar = _saglayici_ayarlari()
 
