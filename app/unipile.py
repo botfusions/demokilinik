@@ -65,12 +65,14 @@ def _istek(yontem: str, yol: str, **ek) -> dict:
 
 
 def hesap_durumu() -> tuple[bool, str | None]:
-    """Bağlı IG hesabı sağlıklı mı? (OK → sağlıklı; CONNECTING/STOPPED → değil)"""
+    """Bağlı IG hesabı sağlıklı mı? (sources[].status OK → sağlıklı)"""
     veri = _istek("GET", f"/api/v1/accounts/{os.environ.get('UNIPILE_HESAP', '')}")
-    durum = veri.get("status", "?")
-    if durum == "OK":
+    durumlar = [s.get("status", "?") for s in veri.get("sources", []) if isinstance(s, dict)]
+    if durumlar and all(d == "OK" for d in durumlar):
         return True, None
-    return False, f"hesap durumu {durum}"
+    if not durumlar:
+        return False, "hesap durumu okunamadı (sources boş)"
+    return False, "hesap durumu " + ", ".join(sorted(set(durumlar)))
 
 
 def mesaj_gonder(chat_id: str, metin: str) -> str:

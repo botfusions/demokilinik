@@ -42,6 +42,27 @@ def test_yapilandirildi_mi_uc_env_ister(monkeypatch):
     assert unipile.yapilandirildi_mi() is True
 
 
+# ── hesap durumu (kalp atışının kaynağı) ─────────────────────
+
+def test_hesap_durumu_sources_alanindan_okunur(monkeypatch):
+    monkeypatch.setattr(unipile, "_istek",
+                        lambda y, yol: {"sources": [{"status": "OK"}]})
+    assert unipile.hesap_durumu() == (True, None)
+
+
+def test_hesap_durumu_dusukse_bozuk(monkeypatch):
+    monkeypatch.setattr(unipile, "_istek",
+                        lambda y, yol: {"sources": [{"status": "CREDENTIALS"}]})
+    basarili, hata = unipile.hesap_durumu()
+    assert basarili is False and "CREDENTIALS" in hata
+
+
+def test_hesap_durumu_sources_bossa_bozuk(monkeypatch):
+    monkeypatch.setattr(unipile, "_istek", lambda y, yol: {})
+    basarili, hata = unipile.hesap_durumu()
+    assert basarili is False and "okunamadı" in hata
+
+
 # ── olay ayıklama ────────────────────────────────────────────
 
 def test_mesaj_olayi_ayiklanir():
