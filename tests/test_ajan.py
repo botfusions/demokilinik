@@ -121,6 +121,20 @@ def test_anahtar_yoksa_hata_firlatir(monkeypatch):
         ajan.cevap_uret([], "Merhaba")
 
 
+def test_ilk_temas_karsilama_kurali_promptta(monkeypatch):
+    """İlk kez yazan hasta klinik adıyla karşılanır (kullanıcı talebi 2026-08-19)."""
+    _ortam(monkeypatch)
+    yakalanan = []
+    monkeypatch.setattr(ajan.httpx, "post", _sahte_post(
+        [{"role": "assistant", "content": "Tabii.", "tool_calls": None}], yakalanan))
+
+    ajan.cevap_uret([], "Merhaba", telefon="905326111749", ad="Test")
+
+    sistem = yakalanan[0]["messages"][0]["content"]
+    assert "hoş geldiniz" in sistem.lower()
+    assert "yardımcı olabilirim" in sistem.lower()
+
+
 def test_telefon_sistem_promptuna_girer(monkeypatch):
     """Numara webhook'ta elimizde; verilmezse ajan hastadan numara istiyor."""
     _ortam(monkeypatch)
