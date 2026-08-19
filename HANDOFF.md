@@ -1,8 +1,57 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-18 · **Durum:** **canlıda çalışıyor** —
+**Son güncelleme:** 2026-08-19 · **Durum:** **canlıda çalışıyor** —
 `demoklinik.botfusions.com`, WhatsApp bağlı, gerçek randevu açıldı ve iptal
-edildi, Google Takvim'e düşüyor. 391 test yeşil (4 bilinen demo-drift hariç).
+edildi, Google Takvim'e düşüyor. 402 test yeşil (4 bilinen demo-drift hariç).
+
+## 2026-08-19: Unipile kuruldu (adım 1-2 tamam, adım 3 kodda)
+
+Unipile hesabı açıldı (`api60.unipile.com:19063`, min €49/ay planına geçilecek),
+IG hesabı **Reseptaai** dashboard'dan bağlandı: account_id
+`1eEYo25CSw-Th2inJS1wgQ`, kendi IG kullanıcı id `37551172832`, durum OK.
+WhatsApp openwa'da KALDI (karar değişmedi).
+
+Kod tarafı yazıldı, canlı deploy BEKLİYOR:
+- **`app/unipile.py`:** ince istemci — hesap durumu yoklaması, DM gönderimi
+  (`POST /api/v1/chats/{chat_id}/messages`), `message_received` olay ayıklama,
+  hesap durumu nöbetçisi (sonucu mevcut `instagram_yoklama` kalp atışına yazar;
+  saglik.py değişmedi — webhook'ta "mesaj gelmedi" hata olmadığı için canlılık
+  hesap durumundan gelir).
+- **`app/instagram.py`:** cevaplama mantığı yoklama döngüsünden `cevapla()`
+  fonksiyonuna çıkarıldı — Composio yoklaması ve Unipile webhook'u aynı iş
+  mantığını paylaşır. Kapsam kilidi değişmedi: yalnız bilgilendirme, randevu
+  açmaz, hatırlatma göndermez (`test_bu_kanaldan_randevu_olusmaz` iki yolda da
+  denetliyor).
+- **`app/main.py`:** `INSTAGRAM_SAGLAYICI=unipile` seçince Composio IG nöbetçisi
+  durur, Unipile nöbetçisi başlar. Yeni rota `POST /webhook/unipile` — kimlik:
+  Unipile webhook kaydına ekletilen `X-Unipile-Anahtar` başlığı
+  (`UNIPILE_WEBHOOK_ANAHTAR` env'i ile karşılaştırılır; Unipile'da HMAC imza
+  mekanizması yok, başlık gizlisi tek seçenek).
+- **Env (canlıya Coolify'dan girilmeli):** `INSTAGRAM_SAGLAYICI=unipile`,
+  `UNIPILE_URL`, `UNIPILE_ANAHTAR`, `UNIPILE_HESAP`,
+  `UNIPILE_WEBHOOK_ANAHTAR`, `INSTAGRAM_HESAP_ID=37551172832` (yerel `.env`'de
+  duruyor, oradan kopyalanır).
+- Testler: `tests/test_unipile.py` 11 yeşil.
+
+**Kalan adımlar (deploy sonrası):**
+1. Coolify'ya 6 env satırı + Redeploy (push otomatik deploy etmiyor).
+2. Unipile'a webhook kaydı (aşağıdaki curl; `headers` alanı başlık gizlisini
+   taşır):
+   ```
+   curl -X POST https://api60.unipile.com:19063/api/v1/webhooks \
+     -H "X-API-KEY: <UNIPILE_ANAHTAR>" -H 'content-type: application/json' \
+     -d '{"request_url":"https://demoklinik.botfusions.com/webhook/unipile",
+          "source":"messaging","events":["message_received"],"format":"json",
+          "account_ids":["1eEYo25CSw-Th2inJS1wgQ"],
+          "headers":[{"key":"X-Unipile-Anahtar","value":"<UNIPILE_WEBHOOK_ANAHTAR>"}]}'
+   ```
+   (Unipile webhook'ları kayıt silinmedikçe durmaz; yanlış kayıt silme ucu
+   `DELETE /api/v1/webhooks/{id}`, liste `GET /api/v1/webhooks`.)
+3. Canlı doğrulama: Reseptaai hesabına başka bir IG'den DM → panelde
+   `gorusmeler.kanal='instagram'` kaydı + cevap DM'i. Unipile mesaj gövdesi
+   sürümle oynayabilir; ilk gerçek webhook'ta `olay_ayikla`'nın anahtar
+   varsayımları (`name`, `message.sender_id`, `message.text`) doğrulanmalı —
+   tanınmayan biçim sessizce yoksayılır.
 
 ## 2026-08-18: Güvenlik + insan devri DEPLOY EDİLDİ ve canlıda test edildi
 

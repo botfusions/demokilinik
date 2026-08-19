@@ -176,6 +176,11 @@ Açmak için:
 değişmez. `INSTAGRAM_KULLANICI` boşken kanal tamamen kapalıdır: nöbetçi hiç
 başlamaz, Composio çağrısı yapılmaz, sağlık uyarısı çıkmaz.
 
+**Taşıma seçimi (2026-08-19):** `INSTAGRAM_SAGLAYICI=unipile` ile Composio
+yoklaması yerine Unipile webhook'u kullanılır (`POST /webhook/unipile`,
+`UNIPILE_*` env'leri; kurulum ve webhook kaydı için HANDOFF 2026-08-19
+bölümü). Kapsam kilidi iki yolda da aynıdır.
+
 **İki kanalın bütçesi ayrıdır.** Giden mesaj tavanları (`GIDEN_SAATLIK_TAVAN`)
 yalnız WhatsApp mesajlarını sayar — amacı WhatsApp numarasının kapanmasını
 önlemek, ve Instagram cevapları o numaradan çıkmıyor. Yoğun bir Instagram günü

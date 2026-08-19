@@ -211,11 +211,57 @@ def yeni_mesajlar() -> list[dict]:
     return bulunan
 
 
-def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
-    """Bir yoklama turu. Cevaplanan mesaj sayısını döner."""
+def cevapla(conn: psycopg.Connection, m: dict, gonder_fn) -> bool:
+    """Tek gelen IG mesajını işler: kayıt → kural/ajan → gönderim.
+
+    İki taşıma yolu aynı iş mantığını paylaşır: Composio yoklaması
+    (tur_calistir, aşağıda) ve Unipile webhook'u (app/main.py). True =
+    cevap gönderildi; tekrar teslimat, ajan hatası ve gönderim hatası False.
+    """
     from app import ajan, kural
     from app.crm import gorusme_ekle, gorusme_gecmisi, kisi_upsert
 
+    kid = kisi_upsert(conn, kisi_anahtari(m["igsid"]), m["ad"])
+
+    # Tekrar teslimat kilidi: aynı mesaj id'si ikinci kez None döner.
+    if gorusme_ekle(conn, kid, "gelen", m["metin"],
+                    wa_message_id=m["mesaj_id"], kanal="instagram") is None:
+        return False
+
+    gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]
+
+    if (yanit := kural.cevap_dene(conn, m["metin"])) is not None:
+        kullanim = None
+    else:
+        try:
+            yanit, kullanim = ajan.cevap_uret(gecmis, m["metin"], kanal="instagram")
+        except ajan.CevapUretilemedi as e:
+            log.error("Ajan cevap üretemedi (%s): %s", m["igsid"], e)
+            return False   # WhatsApp'taki gibi hazır metin göndermiyoruz: bu kanalda
+                           # sessiz kalmak, yanlış beklenti yaratmaktan iyi
+
+    # Instagram'da konum iğnesi yok; işaret yine de ayıklanmalı, yoksa hastaya
+    # ham "[KONUM]" yazısı gider.
+    yanit, _ = ajan.konum_ayikla(yanit)
+
+    # Önce kaydet sonra gönder — Instagram'a ulaşılamasa da personel panelde görür
+    gorusme_ekle(
+        conn, kid, "giden", yanit, kanal="instagram",
+        giris_token=(kullanim or {}).get("prompt_tokens"),
+        cikis_token=(kullanim or {}).get("completion_tokens"),
+    )
+    try:
+        # Alıcı taşımaya göre değişir: Unipile chat_id ister, Composio igsid.
+        gonder_fn(m.get("chat_id") or m["igsid"], yanit)
+    except InstagramHatasi as e:
+        log.error("Instagram mesajı gönderilemedi (%s): %s", m["igsid"], e)
+        return False
+    okundu_isaretle(m["igsid"])
+    return True
+
+
+def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
+    """Bir yoklama turu. Cevaplanan mesaj sayısını döner."""
     gonder_fn = gonder_fn or mesaj_gonder
     cevaplanan = 0
 
@@ -223,43 +269,8 @@ def tur_calistir(conn: psycopg.Connection, gonder_fn=None) -> int:
         if cevaplanan >= TUR_TAVANI:
             log.info("Tur tavanı (%d) doldu, kalanlar sonraki tura", TUR_TAVANI)
             break
-
-        kid = kisi_upsert(conn, kisi_anahtari(m["igsid"]), m["ad"])
-
-        # Tekrar teslimat kilidi: aynı mesaj id'si ikinci kez None döner.
-        if gorusme_ekle(conn, kid, "gelen", m["metin"],
-                        wa_message_id=m["mesaj_id"], kanal="instagram") is None:
-            continue
-
-        gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]
-
-        if (yanit := kural.cevap_dene(conn, m["metin"])) is not None:
-            kullanim = None
-        else:
-            try:
-                yanit, kullanim = ajan.cevap_uret(gecmis, m["metin"], kanal="instagram")
-            except ajan.CevapUretilemedi as e:
-                log.error("Ajan cevap üretemedi (%s): %s", m["igsid"], e)
-                continue     # WhatsApp'taki gibi hazır metin göndermiyoruz: bu kanalda
-                             # sessiz kalmak, yanlış beklenti yaratmaktan iyi
-
-        # Instagram'da konum iğnesi yok (Composio araç setinde karşılığı yok);
-        # işaret yine de ayıklanmalı, yoksa hastaya ham "[KONUM]" yazısı gider.
-        yanit, _ = ajan.konum_ayikla(yanit)
-
-        # Önce kaydet sonra gönder — Instagram'a ulaşılamasa da personel panelde görür
-        gorusme_ekle(
-            conn, kid, "giden", yanit, kanal="instagram",
-            giris_token=(kullanim or {}).get("prompt_tokens"),
-            cikis_token=(kullanim or {}).get("completion_tokens"),
-        )
-        try:
-            gonder_fn(m["igsid"], yanit)
-        except InstagramHatasi as e:
-            log.error("Instagram mesajı gönderilemedi (%s): %s", m["igsid"], e)
-            continue
-        okundu_isaretle(m["igsid"])
-        cevaplanan += 1
+        if cevapla(conn, m, gonder_fn):
+            cevaplanan += 1
 
     return cevaplanan
 

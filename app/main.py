@@ -23,7 +23,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, bildirim, devri, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, rapor, saglik  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, devri, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, rapor, saglik, unipile  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -140,12 +140,22 @@ async def yasam(app: FastAPI):
     doktor.kayit("hatirlatma", hatirlatma.nobetci, os.environ.get("HATIRLATMA_NOBETCISI", "1") == "1")
     # İnsan devri geri alması: personel 2 saat cevap vermezse asistan geri döner
     doktor.kayit("devri", devri.nobetci, os.environ.get("DEVRI_NOBETCISI", "1") == "1")
-    # Instagram yapılandırılmamışsa nöbetçi hiç başlamaz — boşa Composio çağrısı
-    # yapmaz, sağlık nöbetçisi de bu kanal için alarm çalmaz.
-    ig_acik = os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1" and instagram.yapilandirildi_mi()
-    doktor.kayit("instagram", instagram.nobetci, ig_acik)
-    if ig_acik:
-        log.info("Instagram bilgilendirme kanalı açık (%d sn aralık)", instagram.ARALIK_SN)
+    # Instagram taşıma katmanı env ile seçilir (HANDOFF madde 8): varsayılan
+    # Composio yoklaması, `INSTAGRAM_SAGLAYICI=unipile` ile Unipile webhook'una
+    # geçilir — Composio IG nöbetçisi o an durur, ikisi yan yana çalışmaz.
+    if os.environ.get("INSTAGRAM_SAGLAYICI") == "unipile" and unipile.yapilandirildi_mi():
+        ig_acik = os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1"
+        doktor.kayit("instagram", unipile.nobetci, ig_acik)
+        if ig_acik:
+            log.info("Instagram bilgilendirme kanalı Unipile'da (webhook + hesap durumu)")
+    else:
+        # Composio yolunda yapılandırılmamışsa nöbetçi hiç başlamaz — boşa
+        # Composio çağrısı yapmaz, sağlık nöbetçisi de alarm çalmaz.
+        ig_acik = (os.environ.get("INSTAGRAM_NOBETCISI", "1") == "1"
+                   and instagram.yapilandirildi_mi())
+        doktor.kayit("instagram", instagram.nobetci, ig_acik)
+        if ig_acik:
+            log.info("Instagram bilgilendirme kanalı açık (%d sn aralık)", instagram.ARALIK_SN)
     # Telegram yapılandırılmamışsa haftalık rapor da atlanır — göndereceği yer yok.
     rapor_acik = (os.environ.get("RAPOR_NOBETCISI", "1") == "1"
                   and bool(os.environ.get("TELEGRAM_BOT_TOKEN")))
@@ -1175,6 +1185,36 @@ async def whatsapp_webhook(request: Request, arka_plan: BackgroundTasks):
         (veri.get("contact") or {}).get("name"),
     )
     return {"durum": "alindi"}
+
+
+# ── Unipile webhook (Instagram DM) ───────────────────────────
+
+@app.post("/webhook/unipile")
+async def unipile_webhook(request: Request, arka_plan: BackgroundTasks):
+    """Unipile `message_received` olayları. Bu uç da internete açık; kimlik
+    Unipile'ın webhook kaydına eklettiğimiz başlık gizlisinden (POST
+    /api/v1/webhooks `headers` alanı) gelir — imza mekanizması yok.
+    """
+    gizli = os.environ.get("UNIPILE_WEBHOOK_ANAHTAR", "")
+    if gizli and request.headers.get("X-Unipile-Anahtar") != gizli:
+        raise HTTPException(401, "Geçersiz anahtar")
+
+    m = unipile.olay_ayikla(await request.json())
+    if m is None:
+        return {"durum": "yoksayildi"}
+    arka_plan.add_task(_unipile_mesaji_isle, m)
+    return {"durum": "alindi"}
+
+
+def _unipile_mesaji_isle(m: dict) -> None:
+    """Unipile webhook'unun arka plan işi. Kayıt → ajan → gönderim instagram.py'de."""
+    conn = baglan()
+    try:
+        instagram.cevapla(conn, m, unipile.mesaj_gonder)
+    except Exception as e:
+        log.exception("Unipile mesajı işlenemedi (%s): %s", m.get("igsid"), e)
+    finally:
+        conn.close()
 
 
 def _devri_baslat(conn, kisi: dict) -> None:
