@@ -67,7 +67,18 @@
           <td style="color:var(--murekkep)">{{ d.ad }}</td>
           <td>{{ d.uzmanlik or '—' }}</td>
           <td>{{ d.telefon or '—' }}</td>
-          <td>{{ d.eposta or '—' }}</td>
+          <td>
+            {% if kullanici and kullanici.rol == 'admin' %}
+            <!-- Satır içi düzenleme: davet adresi değişince yeni randevular yeni
+                 adrese gider; eskilerin davetiyeleri gönderildiği adreste kalır. -->
+            <form method="post" action="/doktorlar/{{ d.id }}/eposta"
+                  style="display:flex; gap:6px; align-items:center">
+              <input name="eposta" type="email" value="{{ d.eposta or '' }}"
+                     placeholder="davet gitmez" size="20">
+              <button class="sade">Kaydet</button>
+            </form>
+            {% else %}{{ d.eposta or '—' }}{% endif %}
+          </td>
           <td style="font-variant-numeric:tabular-nums">{{ d.gelecek_randevu }}</td>
           <td><span class="rozet {{ 'aktif' if d.aktif else 'pasif' }}">{{ 'aktif' if d.aktif else 'pasif' }}</span></td>
           {% if kullanici and kullanici.rol == 'admin' %}

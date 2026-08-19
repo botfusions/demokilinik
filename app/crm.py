@@ -481,6 +481,14 @@ def doktor_ekle(conn: psycopg.Connection, ad: str, uzmanlik: str | None = None,
     return did
 
 
+def doktor_eposta_guncelle(conn: psycopg.Connection, doktor_id: int,
+                           eposta: str | None) -> None:
+    """Randevu davetleri bu adrese gider; boş gönderilirse davet eklenmez."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE doktorlar SET eposta = %s WHERE id = %s", (eposta, doktor_id))
+    conn.commit()
+
+
 def doktor_durum_yaz(conn: psycopg.Connection, doktor_id: int, aktif: bool) -> None:
     """Pasifleştirilen doktora yeni randevu açılamaz; mevcut randevuları durur."""
     with conn.cursor() as cur:

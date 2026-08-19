@@ -214,6 +214,31 @@ def test_personel_doktor_ekleyemez(personel_istemci, conn):
     assert doktorlar_listele(conn) == []
 
 
+def test_yonetici_doktor_epostasi_degistirir(admin_istemci, conn):
+    from app.crm import doktor_ekle, doktorlar_listele
+    did = doktor_ekle(conn, "Dr. Deniz Kaya", eposta="eski@ornek.com")
+    r = admin_istemci.post(f"/doktorlar/{did}/eposta",
+                           data={"eposta": "yeni@ornek.com"})
+    assert r.status_code in (302, 303)
+    assert doktorlar_listele(conn)[0]["eposta"] == "yeni@ornek.com"
+
+
+def test_doktor_epostasi_bosaltilirsa_davet_gitmez(admin_istemci, conn):
+    from app.crm import doktor_ekle, doktorlar_listele
+    did = doktor_ekle(conn, "Dr. Deniz Kaya", eposta="eski@ornek.com")
+    admin_istemci.post(f"/doktorlar/{did}/eposta", data={"eposta": ""})
+    assert doktorlar_listele(conn)[0]["eposta"] is None
+
+
+def test_personel_doktor_epostasi_degistiremez(personel_istemci, conn):
+    from app.crm import doktor_ekle, doktorlar_listele
+    did = doktor_ekle(conn, "Dr. Deniz Kaya", eposta="eski@ornek.com")
+    r = personel_istemci.post(f"/doktorlar/{did}/eposta",
+                              data={"eposta": "sahte@ornek.com"})
+    assert r.status_code == 403
+    assert doktorlar_listele(conn)[0]["eposta"] == "eski@ornek.com"
+
+
 def test_personel_kullanici_acamaz(personel_istemci, conn):
     r = personel_istemci.post("/kullanicilar", data={
         "kullanici_adi": "sahte", "parola": "sahteparola", "rol": "admin"})

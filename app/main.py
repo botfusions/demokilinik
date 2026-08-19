@@ -37,6 +37,7 @@ from app.crm import (  # noqa: E402
     dolu_araliklar,
     doktor_bazli_doluluk,
     doktor_durum_yaz,
+    doktor_eposta_guncelle,
     doktor_ekle,
     doktorlar_listele,
     en_bos_doktor,
@@ -904,6 +905,14 @@ def doktor_durum(request: Request, doktor_id: int, aktif: str = Form(""), conn=D
     doktor_durum_yaz(conn, doktor_id, yeni)
     islem_yaz(conn, _kim(request), "doktor " + ("aktifleştirdi" if yeni else "pasifleştirdi"),
               f"#{doktor_id}")
+    return RedirectResponse("/doktorlar", status_code=303)
+
+
+@app.post("/doktorlar/{doktor_id}/eposta", dependencies=[Depends(yonetici)])
+def doktor_eposta(request: Request, doktor_id: int, eposta: str = Form(""),
+                  conn=Depends(db)):
+    doktor_eposta_guncelle(conn, doktor_id, eposta.strip() or None)
+    islem_yaz(conn, _kim(request), "doktor e-postası güncelledi", f"#{doktor_id}")
     return RedirectResponse("/doktorlar", status_code=303)
 
 
