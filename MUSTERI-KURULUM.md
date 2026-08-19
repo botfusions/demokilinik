@@ -12,7 +12,7 @@ yapan taraf: **biz** = Botfusions (vendor), **klinik** = müşteri personeli.
 | 5 | Bilgi tabanı | klinik (panel `/bilgi`) | 1. adımdaki form panelden girilir: hizmet/fiyat/süre, çalışma saatleri, adres. Konum koordinatı env/ayar tarafında biz | Ajan "fiyat ne kadar"ı tabandan cevaplıyor |
 | 6 | Doktorlar | klinik (panel `/doktorlar`) | Doktorlar eklenir; **e-posta zorunlu** — randevu davetleri bu adrese gider | Kayıtlı doktorlar listesi dolu |
 | 7 | WhatsApp hattı | klinik + biz | Müşterinin kendi klinik numarası: OpenWA ekranında QR okutulur (telefonda WhatsApp → Bağlı cihazlar) | Bizim test numarasından mesaj → cevap geliyor |
-| 8 | Klinik takvimi | klinik + biz | Kliniğin Google hesabı (tercih: klinik açtığı yeni Gmail) bizim Composio hesabına connected account olarak bağlanır; `TAKVIM_KULLANICI` = o kliniğin user_id'si | Takvim sayfasında `takvim bağlı` rozeti |
+| 8 | Klinik takvimi | biz | Klinikte Gmail açacak IT yoksa **biz açarız** (klinik adına: `klinikadi.klinik@gmail.com` gibi) ve **şifreyi kliniğe teslim ederiz**: klinik şifreyi değiştirir, kurtarma telefonunu kendine bağlar — sahiplik onda, bize yalnız OAuth yetkisi lazım. Kliniğin kurumsal (Workspace) hesabı varsa onu kullan, yeni açma. Hesap bizim Composio'ya connected account olarak bağlanır; `TAKVIM_KULLANICI` = o kliniğin user_id'si | Takvim sayfasında `takvim bağlı` rozeti; davet maili klinik adından gidiyor |
 | 9 | Uçtan uca test | biz | Bilinmeyen numaradan: karşılama → fiyat sorusu → randevu (ajan **ad soyad soruyor mu**) → onay → takvimde etkinlik + doktora davet maili → hatırlatma | Tümü tek turda geçti |
 | 10 | Devreye alma | biz | Kalan demo verisi temizlenir (kisiler/randevular), haftalık rapor kanalı açılır, 1 hafta boyunca log izlenir | İlk gerçek hafta hatasız |
 
