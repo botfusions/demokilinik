@@ -50,7 +50,11 @@ def _sistem_promptu(kanal: str) -> str:
     # bu kanalda `tools=[]` gider — model tool çağırmayı deneyip reddedilmekten
     # daha kesin bir sınır.
     hat = _whatsapp_hatti()
-    nereye = f"WhatsApp hattımıza ({hat})" if hat else "WhatsApp hattımıza"
+    if hat:
+        rakam = "".join(c for c in hat if c.isdigit())
+        nereye = f"WhatsApp hattımıza ({hat}, https://wa.me/{rakam})"
+    else:
+        nereye = "WhatsApp hattımıza"
     return temel + (
         "\n\n# Bu kanalda\n\n"
         "Bu mesaj Instagram'dan geldi. Instagram yalnızca bilgilendirme kanalıdır:\n"
