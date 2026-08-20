@@ -1,9 +1,35 @@
 # Devir Notu
 
-**Son güncelleme:** 2026-08-19 (öğleden sonra) · **Durum:** **canlıda çalışıyor** —
+**Son güncelleme:** 2026-08-20 · **Durum:** **canlıda çalışıyor** —
 `demoklinik.botfusions.com`, WhatsApp bağlı, Unipile IG canlı, takvim
 **Berk'in Composio'sunda** (berkresepta@gmail.com). 412 test yeşil (4 bilinen
 demo-drift hariç). Yeni müşteri kurulum adımları: `MUSTERI-KURULUM.md`.
+
+## 2026-08-20: Unipile canlı doğrulandı (bir şüpheli kalsın) + IG cevap içeriği
+
+- **Deploy yapıldı** (`e31f33d`): yeni kod canlıda — `/webhook/unipile` yanlış
+  anahtarla 401, doğrusuyla 200; `UNIPILE_WEBHOOK_ANAHTAR` env girilmiş.
+- **Webhook kayıtlı** (id `PBpH0VbZR2aeBWPOfoqUtQ`, enabled, Reseptaai hesabına);
+  kayıtlı gizli ile canlı env eşleşiyor. Unipile'da teslim kaydı API'si yok
+  (deliveries/logs uçları 404).
+- **Uçtan uca:** cenktk1'den gerçek DM geldi; cevap **elle replay edilince**
+  gitti ("Kliniğimize hoş geldiniz… WhatsApp hattımızdan…"). Yani uygulama
+  tarafı (webhook → ajan → DM) sağlam. **ŞÜPHELİ:** orijinal DM kendiliğinden
+  tetiklemedi — Unipile→sunucu teslimatı mı kırık, DM mi erken geldi ayrışmadı.
+  Sonraki gerçek DM tetiklenirse konu kapandı; tetiklenmezse Coolify loglarında
+  `POST /webhook/unipile` izine bak. Replay yöntemi: gerçek mesajı
+  `GET /chats/{id}/messages`'tan al, `{event_name:"message_received",
+  account_id, chat_id, message}` sarmalayıp doğru başlıkla POST et.
+- **IG cevap içeriği düzeltildi** (`be151e0`): SOUL.md kimliği "Demo Klinik"
+  adını söylüyor (belirsiz "kliniğimize" gitti — WhatsApp kanalı da etkilenir);
+  IG promptu `https://wa.me/<numara>` linki taşıyor (`KLINIK_WHATSAPP_NUMARASI`
+  env'i, demo hattı 905323314569). **Coolify'ya bu env + Redeploy bekliyor.**
+- Güvenlik: `egitim/sunucu.py` COOKIE_SECRET fallback'i kaldırıldı, ana uygulama
+  gibi hard-fail (`e821429`). Eğitim konsolu ayrı çalışıyorsa env artık zorunlu.
+- `buliddin30.rtf` bilinçli olarak commit edilmedi — içinde Bearer token'lı MCP
+  komutu var; repo dışında tutulmalı.
+- Tuzak notu: Unipile X-API-KEY değerinde `=` geçiyor; shell'de `cut -d= -f2-`
+  gerekir.
 
 ## 2026-08-19 (öğleden sonra): takvim Berk'e geçti + panel araçları
 
