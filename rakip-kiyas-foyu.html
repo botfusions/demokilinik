@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rakip Kıyas Föyü</title>
+<style>
+:root {
+  --zemin: #f6f8f9;
+  --yuzey: #ffffff;
+  --murekkep: #1b2630;
+  --murekkep-2: #4c5b66;
+  --cizgi: #dde4e8;
+  --vurgu: #0e7c66;
+  --vurgu-urdug: #e2f1ed;
+  --iyi: #0e7c66;
+  --yarim: #a86a00;
+  --yok: #b3403a;
+  --kart-abi: #f0f3f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --zemin: #10181d;
+    --yuzey: #1a242b;
+    --murekkep: #e8eef1;
+    --murekkep-2: #9db0b9;
+    --cizgi: #2c3942;
+    --vurgu: #4cc4ab;
+    --vurgu-urdug: #17332d;
+    --iyi: #4cc4ab;
+    --yarim: #e0aa4e;
+    --yok: #e08079;
+    --kart-abi: #212e36;
+  }
+}
+:root[data-theme="dark"] {
+  --zemin: #10181d;
+  --yuzey: #1a242b;
+  --murekkep: #e8eef1;
+  --murekkep-2: #9db0b9;
+  --cizgi: #2c3942;
+  --vurgu: #4cc4ab;
+  --vurgu-urdug: #17332d;
+  --iyi: #4cc4ab;
+  --yarim: #e0aa4e;
+  --yok: #e08079;
+  --kart-abi: #212e36;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--zemin); color: var(--murekkep);
+  font: 15px/1.6 -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+}
+.sayfa { max-width: 960px; margin: 0 auto; padding: 40px 24px 64px; }
+ust-bilgi h1 { font-size: 30px; line-height: 1.2; margin: 0; text-wrap: balance; }
+.alt-satir { color: var(--murekkep-2); margin-top: 6px; font-size: 14px; }
+grafik-adi, h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--vurgu); margin: 40px 0 14px; font-weight: 700;
+}
+h2 { border-top: 1px solid var(--cizgi); padding-top: 28px; }
+
+.kartlar { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.kart { background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: 10px; padding: 16px; }
+.kart.biz { background: var(--vurgu-urdug); border-color: var(--vurgu); }
+.kart .tur { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--murekkep-2); }
+.kart .ad { font-size: 17px; font-weight: 700; margin: 4px 0 2px; }
+.kart .fiyat { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--murekkep); font-weight: 600; }
+.kart .ozet { font-size: 13px; color: var(--murekkep-2); margin-top: 8px; }
+
+.karsilasma-kapsayici { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--cizgi); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--murekkep-2); font-weight: 600; }
+td:first-child { color: var(--murekkep); }
+th.sutun-biz, td.sutun-biz { background: var(--vurgu-urdug); font-weight: 600; }
+td:not(:first-child) { text-align: center; color: var(--murekkep-2); font-variant-numeric: tabular-nums; }
+td.sutun-biz { color: var(--murekkep); }
+td .dur { display: inline-block; min-width: 20px; }
+.dur-tam { color: var(--iyi); }
+.dur-yol { color: var(--yarim); }
+.dur-yok { color: var(--yok); }
+td kucuk-not { display: block; }
+.not-eki { display: block; font-size: 12px; font-weight: 400; color: var(--murekkep-2); }
+
+.arganlar { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.argan { background: var(--yuzey); border: 1px solid var(--cizgi); border-left: 3px solid var(--vurgu); border-radius: 8px; padding: 14px 16px; font-size: 14px; }
+.argan strong { display: block; margin-bottom: 4px; }
+
+.bosluk { background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: 10px; padding: 4px 0; }
+.bosluk-satir { display: flex; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--cizgi); flex-wrap: wrap; align-items: baseline; }
+.bosluk-satir:last-child { border-bottom: 0; }
+.bosluk .kalem { font-weight: 600; min-width: 150px; }
+.bosluk .plan { color: var(--murekkep-2); font-size: 13.5px; flex: 1; min-width: 240px; }
+.etiket { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.etiket.yakinda { background: var(--vurgu-urdug); color: var(--vurgu); }
+.etiket.planli { background: var(--kart-abi); color: var(--murekkep-2); }
+.etiket.yapilmiyor { background: var(--kart-abi); color: var(--murekkep-2); }
+
+.dip-not { margin-top: 40px; font-size: 12.5px; color: var(--murekkep-2); border-top: 1px solid var(--cizgi); padding-top: 14px; }
+</style>
+</head>
+<body>
+<div class="sayfa">
+  <ust-bilgi>
+    <h1>Rakip Kıyas Föyü</h1>
+    <div class="alt-satir">Klinik AI asistanı — piyasa çıkışı için üç rakibin özellik ve fiyat karşılaştırması. Ağustos 2026 ekran görüntülerinden derlendi.</div>
+  </ust-bilgi>
+
+  <h2>Piyasadaki üç oyuncu</h2>
+  <div class="kartlar">
+    <div class="kart">
+      <div class="tur">Randevu sayfası SaaS'ı</div>
+      <div class="ad">Rakip 1 — Başlangıç</div>
+      <div class="fiyat">₺899 / ay</div>
+      <div class="ozet">Form doldurulan online randevu sayfası satıyor. AI yok; hasta kendi saatini seçiyor, kimse konuşmuyor.</div>
+    </div>
+    <div class="kart">
+      <div class="tur">Operatörlü mesaj merkezi</div>
+      <div class="ad">Rakip 2 — Operatörlü</div>
+      <div class="fiyat">₺2.999 – ₺5.999 / ay</div>
+      <div class="ozet">Mesajları insan operatör cevaplıyor (1–3 operatör). Çok kanallı ama cevabın hızı mesai saatine bağlı.</div>
+    </div>
+    <div class="kart">
+      <div class="tur">AI müşteri temsilcisi</div>
+      <div class="ad">Rakip 3 — Business / Pro</div>
+      <div class="fiyat">₺1.999 – ₺4.999 / ay</div>
+      <div class="ozet">Bizimle aynı arenada: AI chatbot + AI telefon. Ayda 1.000–5.000 AI mesajı ve 200–2.000 AI çağrı tavanıyla.</div>
+    </div>
+    <div class="kart biz">
+      <div class="tur">Biz — Botfusions</div>
+      <div class="ad">Klinik AI Asistanı</div>
+      <div class="fiyat">Fiyatlandırma bizde</div>
+      <div class="ozet">Konuşarak randevu açan AI + personel paneli + CRM + hatırlatma + Google Takvim. Mesaj tavanı yok.</div>
+    </div>
+  </div>
+
+  <h2>Özellik matrisi</h2>
+  <div class="karsilasma-kapsayici">
+  <table>
+    <thead>
+      <tr>
+        <th>Özellik</th>
+        <th>Rakip 1 · ₺899</th>
+        <th>Rakip 2 · Operatörlü</th>
+        <th>Rakip 3 · AI SaaS</th>
+        <th class="sutun-biz">Biz</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>WhatsApp'ta AI cevap</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span> operatör</td>
+        <td><span class="dur dur-tam">✓</span> 1.000 mesaj</td>
+        <td class="sutun-biz"><span class="dur dur-tam">✓</span> sınırsız</td></tr>
+      <tr><td>Instagram DM'de AI</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-tam">✓</span> operatör</td>
+        <td><span class="dur dur-tam">✓</span></td>
+        <td class="sutun-biz"><span class="dur dur-yol">⏳</span> 17 Ağustos'ta açılıyor</td></tr>
+      <tr><td>Telegram / Messenger</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-tam">✓</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td class="sutun-biz"><span class="dur dur-yol">⏳</span> altyapı Unipile ile hazır</td></tr>
+      <tr><td>Siteye gömülü sohbet (widget)</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-tam">✓</span> 1 kanal</td>
+        <td><span class="dur dur-tam">✓</span></td>
+        <td class="sutun-biz"><span class="dur dur-yol">⏳</span> planda (IG'den sonra)</td></tr>
+      <tr><td>AI telefon (sesli arama)</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-tam">✓</span> 200–2.000 çağrı</td>
+        <td class="sutun-biz"><span class="dur dur-yok">✗</span> kapsamda değil</td></tr>
+      <tr><td>Konuşarak randevu açma</td>
+        <td><span class="dur dur-yok">—</span> form</td>
+        <td><span class="dur dur-yol">△</span> operatör varsa</td>
+        <td><span class="dur dur-yol">△</span> kanala bağlı</td>
+        <td class="sutun-biz"><span class="dur dur-tam">✓</span> canlıda</td></tr>
+      <tr><td>Randevu yönetimi + CRM + personel paneli</td>
+        <td><span class="dur dur-yol">△</span> takvim var, CRM yok</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td class="sutun-biz"><span class="dur dur-tam">✓</span> tam</td></tr>
+      <tr><td>Randevu hatırlatmaları</td>
+        <td><span class="dur dur-tam">✓</span> 24 saat + 1 saat</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td class="sutun-biz"><span class="dur dur-tam">✓</span></td></tr>
+      <tr><td>Google Takvim entegrasyonu</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td class="sutun-biz"><span class="dur dur-tam">✓</span> canlıda</td></tr>
+      <tr><td>Çoklu dil (TR / EN / RU / AR)</td>
+        <td><span class="dur dur-yol">△</span> TR/EN/RU</td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td><span class="dur dur-yok">—</span></td>
+        <td class="sutun-biz"><span class="dur dur-tam">✓</span> hasta ne yazarsa o dilde</td></tr>
+      <tr><td>Aylık mesaj tavanı</td>
+        <td>150 randevu</td>
+        <td>paketle sınırlı</td>
+        <td>1.000 – 5.000 AI mesajı</td>
+        <td class="sutun-biz"><span class="dur dur-tam">yok</span></td></tr>
+      <tr><td>İnsan operatör gerektirir mi</td>
+        <td>hayır</td>
+        <td><span class="dur dur-yok">evet</span></td>
+        <td>hayır</td>
+        <td class="sutun-biz">hayır</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Satış argümanları — bizden yana</h2>
+  <div class="arganlar">
+    <div class="argan"><strong>Mesaj tavanı yok</strong>Rakip 3'ün ₺1.999 planı ayda 1.000 AI mesajında bitiyor — yoğun bir klinik bunu aşar ve ek ücrete girer. Bizde sınır yok, fiyat öngörülebilir.</div>
+    <div class="argan"><strong>Sadece chatbot değil, komple ön Büro</strong>Rakiplerin hiçbirinde randevu + CRM + hatırlatma + Google Takvim + personel paneli bir arada yok. Bizim AI randevuyu kendisi açıyor, sekreter panelde görüyor.</div>
+    <div class="argan"><strong>Operatör maliyeti sıfır</strong>Helo'nun özü insan: mesai dışı, bayramda, gece cevap yok. AI asistan 7/24, tatil yok, maaş yok.</div>
+    <div class="argan"><strong>Hastanın dilinde konuşur</strong>Hasta İngilizce, Rusça ya da Arapça yazarsa aynı sohbet o dilde devam eder — rakiplerin çoğunda TR/EN/RU sabit seçim, hiçbirinde Arapça yok.</div>
+  </div>
+
+  <h2>Açık boşluklar ve plan</h2>
+  <div class="bosluk">
+    <div class="bosluk-satir"><span class="kalem">Instagram DM</span><span class="etiket yakinda">17 Ağustos</span><span class="plan">Unipile ile açılıyor (€49/ay, ödeme onaylı). Gerçek zamanlı; rakipteki 30 saniyelik gecikme sorunu bizde olmayacak.</span></div>
+    <div class="bosluk-satir"><span class="kalem">Telegram / Messenger</span><span class="etiket planli">Planda</span><span class="plan">Aynı Unipile hattından tek hamleyle açılır; müşteri talebi gelince aktive edilir.</span></div>
+    <div class="bosluk-satir"><span class="kalem">Siteye gömülü sohbet</span><span class="etiket planli">Planda</span><span class="plan">Aynı ajanda konuşan küçük sohbet kutusu; Instagram açıldıktan sonra ~2-3 günlük iş.</span></div>
+    <div class="bosluk-satir"><span class="kalem">AI telefon (ses)</span><span class="etiket yapilmiyor">Kapsamda değil</span><span class="plan">Ses ajanı haftalarce süren ayrı bir iş; pazara çıkışı geciktirmemek için bilinçli olarak kapsam dışı. Talep ölçülürse değerlendirilir.</span></div>
+  </div>
+
+  <div class="dip-not">Kaynaklar: üç rakipin Ağustos 2026 fiyat/özellik sayfaları ekran görüntüleri. Rakip 1: ₺899 Başlangıç planı (150 randevu/ay). Rakip 2: ₺2.999 / ₺5.999 operatör paketleri. Rakip 3: Business ₺1.999 (1.000 AI mesaj + 200 AI çağrı) / Professional ₺4.999 (5.000 mesaj + 2.000 çağrı, 3 işletme, analitik dashboard).</div>
+</div>
+</body>
+</html>
