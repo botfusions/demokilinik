@@ -46,7 +46,10 @@ log = logging.getLogger("egitim")
 
 HERMES_MD = PROJE_KOKU / ".hermes.md"
 COOKIE_ADI = "egitim_oturum"
-imzalayici = URLSafeSerializer(os.environ.get("COOKIE_SECRET", "gelistirme"), salt="egitim")
+_cookie_secret = os.environ.get("COOKIE_SECRET")
+if not _cookie_secret:
+    raise RuntimeError("COOKIE_SECRET env değişkeni zorunlu (eğitim oturum çerezlerini imzalar)")
+imzalayici = URLSafeSerializer(_cookie_secret, salt="egitim")
 sablonlar = Jinja2Templates(directory=str(Path(__file__).parent))
 
 
