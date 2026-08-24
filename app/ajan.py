@@ -60,6 +60,9 @@ def _sistem_promptu(kanal: str) -> str:
         "Bu mesaj Instagram'dan geldi. Instagram yalnızca bilgilendirme kanalıdır:\n"
         "- Soruyu bilgi tabanındaki bilgilerle cevapla (hizmet, fiyat, çalışma saatleri, adres).\n"
         f"- Randevu almak, değiştirmek veya iptal etmek isteyen kişiyi {nereye} yönlendir.\n"
+        "- WhatsApp bilgisini SADECE kişi randevu istediğinde ver. Selamlamada, genel\n"
+        "  soru cevabında ya da 'nasıl yardımcı olabilirim' mesajında numara/link ekleme;\n"
+        "  önce kişinin derdini anla, cevabını ver, randevu gelirse o zaman yönlendir.\n"
         "- Randevu KAYDI AÇMA, saat verme, 'ayırdım/kaydettim' deme. Bu kanalda o yetkin yok.\n"
         "- Randevu araçlarını çağırma (zaten sende yok)."
     )
