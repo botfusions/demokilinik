@@ -79,9 +79,19 @@ def test_mesaj_json_dizesi_olarak_gelirse_cozulur():
     assert m is not None and m["mesaj_id"] == "ig:m1"
 
 
-def test_mesaj_dizesi_json_degilse_yoksayilir():
+def test_mesaj_duz_metin_ust_duzey_alanlarla_cozulur():
     o = _olay()
-    o["message"] = "düz metin"
+    o["message"] = "Merhaba dolgu hakkında bilgi istiyorum"
+    o["message_id"] = "m9"
+    o["sender_id"] = GONDEREN
+    m = unipile.olay_ayikla(o)
+    assert m is not None and m["mesaj_id"] == "ig:m9"
+    assert m["metin"] == "Merhaba dolgu hakkında bilgi istiyorum"
+
+
+def test_mesaj_duz_metin_kimliksizse_yoksayilir():
+    o = _olay()
+    o["message"] = "düz metin"          # message_id/sender_id yok üst düzeyde
     assert unipile.olay_ayikla(o) is None
 
 

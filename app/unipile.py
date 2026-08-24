@@ -101,12 +101,18 @@ def olay_ayikla(olay: dict) -> dict | None:
 
     m = olay.get("message") or {}
     if isinstance(m, str):
-        # Canlıda görüldü (2026-08-24): Unipile mesajı JSON dizesi olarak yollar.
+        # Canlıda görüldü (2026-08-24): Unipile 'message' alanını düz metin
+        # yollar; kimlik alanları gövdenin üst düzeyinde gelir. Ham gövdeyi
+        # logla — üst düzey ad tahmini tutmazsa bir sonraki olayda görünür.
+        log.info("unipile webhook düz metinli gövde: %.1000r", olay)
         try:
-            m = json.loads(m)
+            m = json.loads(m)              # bazı olaylarda JSON dizesi de gelebilir
         except ValueError:
-            log.warning("unipile webhook 'message' dizesi JSON değil: %.200r", m)
-            return None
+            m = {"text": m,
+                 "id": olay.get("message_id") or olay.get("id"),
+                 "sender_id": olay.get("sender_id") or olay.get("sender") or "",
+                 "chat_id": olay.get("chat_id"),
+                 "sender_name": olay.get("sender_name")}
     if not isinstance(m, dict):
         return None
     metin = str(m.get("text") or "").strip()
