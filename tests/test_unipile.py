@@ -30,7 +30,7 @@ def unipile_env(monkeypatch):
 def _olay(metin="fiyat ne kadar", mid="m1", gonderen=GONDEREN, name="message_received"):
     return {"name": name, "account_id": HESAP, "chat_id": CHAT,
             "message": {"id": mid, "sender_id": gonderen, "text": metin,
-                        "chat_id": CHAT}}
+                        "chat_id": CHAT, "is_sender": 0}}
 
 
 # ── yapılandırma kapısı ──────────────────────────────────────
@@ -75,24 +75,36 @@ def test_mesaj_json_dizesi_olarak_gelirse_cozulur():
     import json
     o = _olay()
     o["message"] = json.dumps(o["message"])
-    m = unipile.olay_ayikla(o)
+    # zarf tam obje değilse message_id ile geri çekilir
+    o["message_id"] = "m1"
+    getirilen = {"id": "m1", "sender_id": GONDEREN, "text": "fiyat ne kadar",
+                 "chat_id": CHAT, "is_sender": 0}
+    m = unipile.olay_ayikla(o, getir=lambda mid: getirilen)
     assert m is not None and m["mesaj_id"] == "ig:m1"
 
 
-def test_mesaj_duz_metin_ust_duzey_alanlarla_cozulur():
+def test_zarfta_duz_metin_varsa_id_yoksa_yoksayilir():
+    o = _olay()
+    o["message"] = "düz metin"          # message_id yok — çekme yolu da yok
+    assert unipile.olay_ayikla(o, getir=lambda mid: {}) is None
+
+
+def test_kendi_mesajimiz_is_sender_ile_yoksayilir():
+    o = _olay()
+    o["message"]["is_sender"] = 1       # tam obje geldi ama bizim gönderdiğimiz
+    assert unipile.olay_ayikla(o, getir=lambda mid: {}) is None
+
+
+def test_zarf_eksikse_mesaj_id_ile_geriden_cekilir():
     o = _olay()
     o["message"] = "Merhaba dolgu hakkında bilgi istiyorum"
     o["message_id"] = "m9"
-    o["sender_id"] = GONDEREN
-    m = unipile.olay_ayikla(o)
+    getirilen = {"id": "m9", "sender_id": GONDEREN,
+                 "text": "Merhaba dolgu hakkında bilgi istiyorum",
+                 "chat_id": CHAT, "is_sender": 0}
+    m = unipile.olay_ayikla(o, getir=lambda mid: getirilen)
     assert m is not None and m["mesaj_id"] == "ig:m9"
     assert m["metin"] == "Merhaba dolgu hakkında bilgi istiyorum"
-
-
-def test_mesaj_duz_metin_kimliksizse_yoksayilir():
-    o = _olay()
-    o["message"] = "düz metin"          # message_id/sender_id yok üst düzeyde
-    assert unipile.olay_ayikla(o) is None
 
 
 def test_baska_olay_yoksayilir():

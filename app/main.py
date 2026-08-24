@@ -5,6 +5,7 @@ uygulama personelin paneli. İki ayrı yetki var — panel cookie'si (personel) 
 X-Ic-Anahtar (ajanın CRM'e yazması). Biri diğerini açmaz.
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -1219,7 +1220,8 @@ async def unipile_webhook(request: Request, arka_plan: BackgroundTasks):
     if gizli and request.headers.get("X-Unipile-Anahtar") != gizli:
         raise HTTPException(401, "Geçersiz anahtar")
 
-    m = unipile.olay_ayikla(await request.json())
+    m = await asyncio.to_thread(unipile.olay_ayikla, await request.json(),
+                                getir=unipile.mesaj_getir)
     if m is None:
         return {"durum": "yoksayildi"}
     arka_plan.add_task(_unipile_mesaji_isle, m)

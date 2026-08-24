@@ -22,7 +22,6 @@ Env:
 """
 
 import asyncio
-import json
 import logging
 import os
 
@@ -82,14 +81,25 @@ def mesaj_gonder(chat_id: str, metin: str) -> str:
     return str(veri.get("id", ""))
 
 
-def olay_ayikla(olay: dict) -> dict | None:
+def mesaj_getir(mid: str) -> dict:
+    """Mesajı Unipile'dan id ile çeker — webhook zarfı eksikse gerçek kaynak."""
+    return _istek("GET", f"/api/v1/messages/{mid}")
+
+
+def olay_ayikla(olay: dict, getir=None) -> dict | None:
     """`message_received` webhook gövdesinden cevaplanacak mesajı çıkarır.
 
     Dönüş: {igsid, chat_id, mesaj_id, metin, ad} ya da None (yoksay).
     Yoksayma sebepleri: başka olay, başka hesap, kendi gönderdiğimiz mesaj,
-    boş metin. Unipile gövde biçimi sürümle oynayabilir; anahtar adları
-    savunmacı denenir, tanınmayan şekil None döner ve webhook 200 cevaplanır
-    (Unipile yeniden denemesin — kötü biçimli olay tekrar da kötü olur).
+    boş metin.
+
+    Canlıda görüldü (2026-08-24): zarf `message` alanını düz metin yollar ve
+    üst düzey `sender` alanı gerçek göndereni değil hesap sahibini taşır —
+    zarftan öz-filtre yapılamaz; yapılırsa kendi cevabımız yeni olay üretip
+    sonsuz döngüye girer (336 olay/2 dk). Bu yüzden `message` tam Message
+    objesi değilse (ya da is_sender yoksa) mesaj zarftaki message_id ile
+    Unipile'dan geri çekilir: gerçek objedeki `is_sender` bayrağı kendi
+    mesajımızı ayıran tek güvenilir alan.
     """
     ad_ = olay.get("name") or olay.get("event") or olay.get("event_name")
     if ad_ != "message_received":
@@ -100,32 +110,26 @@ def olay_ayikla(olay: dict) -> dict | None:
         return None                    # başka hesabın trafiği (tüm hesaplara webhook olsa bile)
 
     m = olay.get("message") or {}
-    if isinstance(m, str):
-        # Canlıda görüldü (2026-08-24): Unipile 'message' alanını düz metin
-        # yollar; kimlik alanları gövdenin üst düzeyinde gelir. Ham gövdeyi
-        # logla — üst düzey ad tahmini tutmazsa bir sonraki olayda görünür.
-        log.info("unipile webhook düz metinli gövde: %.1000r", olay)
-        try:
-            m = json.loads(m)              # bazı olaylarda JSON dizesi de gelebilir
-        except ValueError:
-            m = {"text": m,
-                 "id": olay.get("message_id") or olay.get("id"),
-                 "sender_id": olay.get("sender_id") or olay.get("sender") or "",
-                 "chat_id": olay.get("chat_id"),
-                 "sender_name": olay.get("sender_name")}
-    if not isinstance(m, dict):
+    if not isinstance(m, dict) or "is_sender" not in m:
+        mid_ = (olay.get("message_id") or olay.get("id")
+                or (m.get("id") if isinstance(m, dict) else None))
+        if not mid_ or getir is None:
+            log.warning("unipile webhook zarfı mesaj taşımıyor, id de yok: %.500r", olay)
+            return None
+        m = getir(str(mid_))
+
+    if m.get("is_sender"):            # kendi gönderdiğimiz mesaj — döngünün kaynağı
         return None
     metin = str(m.get("text") or "").strip()
     mid = m.get("id")
     gonderen = str(m.get("sender_id") or "")
     if not metin or not mid or not gonderen:
         return None
-    # Kendi gönderdiğimiz mesaj: gönderen hesabın kendi IG id'si.
     if gonderen == os.environ.get("INSTAGRAM_HESAP_ID", ""):
         return None
 
     return {"igsid": gonderen,
-            "chat_id": str(olay.get("chat_id") or m.get("chat_id") or ""),
+            "chat_id": str(m.get("chat_id") or olay.get("chat_id") or ""),
             "mesaj_id": f"ig:{mid}",
             "metin": metin,
             "ad": m.get("sender_name") or None}
