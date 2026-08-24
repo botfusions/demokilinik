@@ -22,6 +22,7 @@ Env:
 """
 
 import asyncio
+import json
 import logging
 import os
 
@@ -99,6 +100,15 @@ def olay_ayikla(olay: dict) -> dict | None:
         return None                    # başka hesabın trafiği (tüm hesaplara webhook olsa bile)
 
     m = olay.get("message") or {}
+    if isinstance(m, str):
+        # Canlıda görüldü (2026-08-24): Unipile mesajı JSON dizesi olarak yollar.
+        try:
+            m = json.loads(m)
+        except ValueError:
+            log.warning("unipile webhook 'message' dizesi JSON değil: %.200r", m)
+            return None
+    if not isinstance(m, dict):
+        return None
     metin = str(m.get("text") or "").strip()
     mid = m.get("id")
     gonderen = str(m.get("sender_id") or "")

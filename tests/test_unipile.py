@@ -71,6 +71,20 @@ def test_mesaj_olayi_ayiklanir():
                  "metin": "fiyat ne kadar", "ad": None}
 
 
+def test_mesaj_json_dizesi_olarak_gelirse_cozulur():
+    import json
+    o = _olay()
+    o["message"] = json.dumps(o["message"])
+    m = unipile.olay_ayikla(o)
+    assert m is not None and m["mesaj_id"] == "ig:m1"
+
+
+def test_mesaj_dizesi_json_degilse_yoksayilir():
+    o = _olay()
+    o["message"] = "düz metin"
+    assert unipile.olay_ayikla(o) is None
+
+
 def test_baska_olay_yoksayilir():
     assert unipile.olay_ayikla(_olay(name="message_read")) is None
 
