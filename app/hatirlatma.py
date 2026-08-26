@@ -42,6 +42,10 @@ class TavanAsildi(Exception):
     """Saatlik/günlük giden mesaj tavanı doldu."""
 
 
+class SessizSaat(Exception):
+    """Sessiz saat (21:00–09:00) — kendiliğinden mesaj gitmez."""
+
+
 def sessiz_saatte_mi(an: datetime) -> bool:
     """Gece yarısını kapsayan aralık (21:00–09:00) doğru değerlendirilir."""
     t = an.time()
@@ -117,18 +121,23 @@ def hatirlatmalari_iptal_et(conn: psycopg.Connection, randevu_id: int) -> None:
 # ── tavanlar ────────────────────────────────────────────────
 
 def giden_sayisi(conn: psycopg.Connection, saat: int = 1) -> int:
-    """Son N saatte WhatsApp'tan giden mesajlar — hatırlatma + ajan cevapları.
+    """Son N saatte WhatsApp'tan giden mesajlar — hatırlatma + ajan cevapları
+    + personel devir bildirimleri (İK-2: bildirim de numaradan çıktığı için
+    'sistem' satırı olarak kaydedilir ve burada sayılır).
 
     Yalnız `kanal='whatsapp'` sayılır. Tavanın amacı WhatsApp numarasının
     kapanmasını önlemek; Instagram cevapları o numaradan çıkmıyor. Kanal filtresi
     olmasaydı yoğun bir Instagram günü saatlik tavanı doldurur ve gerçek randevu
-    hatırlatmalarını durdururdu.
+    hatırlatmalarını durdururdu. 'devir açıldı:' kayıt satırları mesaj değildir,
+    sayılmaz.
     """
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT count(*) FROM gorusmeler
-             WHERE yon = 'giden' AND kanal = 'whatsapp'
+             WHERE kanal = 'whatsapp'
+               AND (yon = 'giden'
+                    OR (yon = 'sistem' AND mesaj LIKE 'devir bildirimi: %%'))
                AND olusturma >= now() - make_interval(hours => %s)
             """,
             (saat,),
@@ -142,6 +151,17 @@ def tavan_kontrol(conn: psycopg.Connection) -> None:
         raise TavanAsildi(f"saatlik tavan doldu ({s}/{SAATLIK_TAVAN})")
     if (g := giden_sayisi(conn, 24)) >= GUNLUK_TAVAN:
         raise TavanAsildi(f"günlük tavan doldu ({g}/{GUNLUK_TAVAN})")
+
+
+def gonderilebilir_mi(conn: psycopg.Connection) -> None:
+    """Ortak giden kilidi (İK-2): sessiz saat + tavanlar. Uygun değilse fırlatır.
+
+    Hatırlatma turu yakalayıp kalanını sonraki tura bırakır; devir bildirimi
+    düşürür — ertelenmez, ertesi sabahın bildiriminin operasyonel değeri yok.
+    """
+    if sessiz_saatte_mi(datetime.now()):
+        raise SessizSaat("sessiz saat — giden kapalı")
+    tavan_kontrol(conn)
 
 
 # ── mesaj metni ─────────────────────────────────────────────
@@ -221,12 +241,11 @@ def tur_calistir(conn: psycopg.Connection, gonder_fn=None, bekle_fn=None) -> int
 
     gonderilen = 0
     for h in bekleyenler(conn):
-        if sessiz_saatte_mi(datetime.now()):
+        try:
+            gonderilebilir_mi(conn)
+        except SessizSaat:
             log.info("Sessiz saat — hatırlatma ertelendi")
             break
-
-        try:
-            tavan_kontrol(conn)
         except TavanAsildi as e:
             log.warning("Hatırlatma durdu: %s", e)
             break

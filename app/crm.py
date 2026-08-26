@@ -163,13 +163,20 @@ def gorusme_ekle(
     return satir[0] if satir else None
 
 
-def gorusme_gecmisi(conn: psycopg.Connection, kisi_id: int, limit: int = 10) -> list[dict]:
-    """Son `limit` görüşme, eskiden yeniye — prompt'a bu sırayla girer."""
+def gorusme_gecmisi(conn: psycopg.Connection, kisi_id: int, limit: int = 10,
+                    sistem_dahil: bool = False) -> list[dict]:
+    """Son `limit` görüşme, eskiden yeniye — prompt'a bu sırayla girer.
+
+    `sistem_dahil=False` (varsayılan) ajan bağlamı içindir (İK-3): 'sistem'
+    satırları (devir kaydı, bildirim) prompt'a girmez. Panel bu satırları
+    göstermek için `True` verir.
+    """
+    sart = "" if sistem_dahil else " AND yon <> 'sistem'"
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            """
+            f"""
             SELECT * FROM (
-                SELECT * FROM gorusmeler WHERE kisi_id = %s ORDER BY id DESC LIMIT %s
+                SELECT * FROM gorusmeler WHERE kisi_id = %s{sart} ORDER BY id DESC LIMIT %s
             ) s ORDER BY id
             """,
             (kisi_id, limit),

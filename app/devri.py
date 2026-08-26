@@ -12,11 +12,14 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from app import crm, openwa, kullanici
+from app import crm, hatirlatma, openwa, kullanici
 
 log = logging.getLogger(__name__)
 
 ARALIK_SN = 60   # dakika hassasiyeti yeterli; saniye başına tarama gereksiz
+
+# İK-2: aynı hasta için bu süre içinde ikinci bildirim gitmez (ilk gider).
+BILDIRIM_ARALIK_DK = float(os.environ.get("DEVIR_BILDIRIM_ARALIK_DK", "15"))
 
 GUN_ADLARI = ["pazartesi", "salı", "çarşamba", "perşembe", "cuma", "cumartesi", "pazar"]
 
@@ -42,31 +45,54 @@ def bildirim_numaralari(conn) -> list[str]:
     return kullanici.bildirim_numaralari(conn)
 
 
+def _son_bildirim(conn, kisi_id: int, simdi: datetime) -> bool:
+    """Bu hasta için son bildirim debounce aralığının içinde mi (İK-2)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT olusturma FROM gorusmeler WHERE kisi_id = %s AND yon = 'sistem' "
+            "AND mesaj LIKE 'devir bildirimi: %%' ORDER BY id DESC LIMIT 1",
+            (kisi_id,),
+        )
+        satir = cur.fetchone()
+    return satir is not None and satir[0] > simdi - timedelta(minutes=BILDIRIM_ARALIK_DK)
+
+
 def personel_bildir(conn, kisi: dict, neden: str) -> int:
     """Devir başlarken personel WhatsApp numaralarına haber yollar.
 
     Tek yönlü uyarıdır: personel bildirime cevap yazamaz, devralmayı
     panelden yapar. Bir numara hatalıysa diğerleri yine alır — bildirim
     hatası devir akışını asla düşürmez.
+
+    Bildirim metnine hasta serbest metni asla girmez (İK-1, KVKK). Giden
+    kilitleri (İK-2): tavan doluysa gönderilmez; sessiz saatte ertelenmez,
+    düşürülür. Hasta başına debounce: son bildirimden `BILDIRIM_ARALIK_DK`
+    içinde ikinci bildirim gitmez. Gönderilen bildirim 'sistem' satırı
+    olarak kayda geçer — ajan bağlamına girmez, giden sayacı onu görür.
     """
     numaralar = bildirim_numaralari(conn)
     if not numaralar:
         return 0
 
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT mesaj FROM gorusmeler WHERE kisi_id = %s AND yon = 'gelen' "
-            "ORDER BY id DESC LIMIT 1",
-            (kisi["id"],),
-        )
-        satir = cur.fetchone()
-    son_mesaj = (satir[0][:80] + "…") if satir and len(satir[0]) > 80 else (satir[0] if satir else "")
+    simdi = datetime.now().astimezone()
+    if _son_bildirim(conn, kisi["id"], simdi):
+        log.info("Devir bildirimi atlandı (hasta %s): son %.0f dk içinde gidildi",
+                 kisi["id"], BILDIRIM_ARALIK_DK)
+        return 0
+
+    try:
+        hatirlatma.gonderilebilir_mi(conn)
+    except hatirlatma.SessizSaat:
+        log.warning("Sessiz saat — devir bildirimi düşürüldü (hasta %s)", kisi["id"])
+        return 0
+    except hatirlatma.TavanAsildi as e:
+        log.warning("Devir bildirimi gitmedi (hasta %s): %s", kisi["id"], e)
+        return 0
 
     metin = (
         "İnsan müdahalesi gerekli.\n"
         f"Hasta: {kisi['ad'] or 'İsimsiz'} ({kisi['telefon']})\n"
         f"Neden: {neden}\n"
-        f"Son mesaj: {son_mesaj or '-'}\n"
         "Panelden devralın."
     )
     giden = 0
@@ -76,6 +102,8 @@ def personel_bildir(conn, kisi: dict, neden: str) -> int:
             giden += 1
         except Exception as e:   # bildirim hatası devri bozmaz
             log.warning("Personel bildirimi gitmedi (%s): %s", no, e)
+    if giden:
+        crm.gorusme_ekle(conn, kisi["id"], "sistem", f"devir bildirimi: {giden} numara")
     return giden
 
 

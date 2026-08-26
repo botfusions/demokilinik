@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 import app.ajan as ajan
 import app.devri as devri
+import app.hatirlatma as hatirlatma
 import app.openwa as openwa
 import app.main as main
 from app.crm import devir_yaz, devirdekiler, gorusme_gecmisi, kisi_bul, kisi_upsert
@@ -38,7 +39,11 @@ def _govde(mesaj: str, wamid: str):
 
 @pytest.fixture
 def istemci(conn, monkeypatch):
-    """Webhook istemcisi: ajan ve OpenWA gönderimi sahte."""
+    """Webhook istemcisi: ajan ve OpenWA gönderimi sahte.
+
+    Giden kilitleri (İK-2) de açılır: bildirim testleri gece de koşabilsin,
+    tavan dolu olmasın. Kilitlerin kendisi ayrı testlerde kapatılır.
+    """
     gonderilenler = []
     monkeypatch.setattr(
         ajan, "cevap_uret",
@@ -46,6 +51,9 @@ def istemci(conn, monkeypatch):
     )
     monkeypatch.setattr(openwa, "mesaj_gonder",
                         lambda tel, metin: gonderilenler.append((tel, metin)) or "wamid.OUT")
+    monkeypatch.setattr(hatirlatma, "sessiz_saatte_mi", lambda an: False)
+    monkeypatch.setattr(hatirlatma, "SAATLIK_TAVAN", 9999)
+    monkeypatch.setattr(hatirlatma, "GUNLUK_TAVAN", 9999)
 
     c = TestClient(main.app)
     c.gonderilenler = gonderilenler
@@ -276,7 +284,6 @@ def test_t9_devir_baslayinca_personel_numaralarina_bildirim_gider(istemci, conn)
     assert {tel for tel, _ in bildirimler} == {"+905551112233", "+905334445566"}
     metin = bildirimler[0][1]
     assert TELEFON in metin and "Neden: " + devri.NEDEN_HASTA in metin
-    assert "yetkiliyle görüşmek istiyorum" in metin, "son mesaj önizlemesi girmeli"
 
 
 def test_t9_bir_numara_hataliysa_digeri_yine_alir_devir_dusmez(istemci, conn, monkeypatch):
@@ -335,7 +342,7 @@ def test_t10_hasta_tetiginde_neden_kaydedilir_sistem_satiri_duser(istemci, panel
     kid = _kisi(conn)["id"]
 
     assert _kisi(conn)["devir_nedeni"] == devri.NEDEN_HASTA
-    kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kid, limit=10)]
+    kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kid, limit=10, sistem_dahil=True)]
     assert f"devir açıldı: {devri.NEDEN_HASTA}" in kayitlar
 
     panel.post(f"/hastalar/{kid}/devri-bitir")
@@ -376,3 +383,71 @@ def test_t11_rapor_devir_dokumunu_icerir(istemci, conn):
     from app.crm import kullanim_ozeti
     m = rapor._mesaj(kullanim_ozeti(conn, 3600))
     assert f"Devir: 1 ({devri.NEDEN_HASTA} 1)" in m
+
+
+# ── PRD 26-08-2026 İK-1/İK-2: bildirim içeriği ve giden kilitleri ──
+
+def _bildirimler(c):
+    return [g for g in c.gonderilenler if "İnsan müdahalesi gerekli" in g[1]]
+
+
+def test_ik1_bildirimde_hasta_mesaji_gecmez(istemci, conn):
+    """T1: bildirim metninde gorusmeler.mesaj içeriği geçmez (KVKK)."""
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I1")
+
+    metin = _bildirimler(istemci)[0][1]
+    assert "yetkiliyle görüşmek istiyorum" not in metin, "hasta serbest metni bildirime girmez"
+    assert "Son mesaj" not in metin
+    assert TELEFON in metin and "Panelden devralın." in metin
+
+
+def test_ik2_tavan_doluysa_bildirim_gitmez_devir_acilir(istemci, conn, monkeypatch):
+    """T2: saatlik tavan dolu — bildirim gönderilmez, loglanır, devir açılır."""
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    monkeypatch.setattr(hatirlatma, "SAATLIK_TAVAN", 0)
+
+    onceki = len(istemci.gonderilenler)
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I2")
+
+    assert _kisi(conn)["insan_devri_at"] is not None, "devir yine açılır"
+    assert len(istemci.gonderilenler) == onceki + 1, "yalnız hastaya aktarım mesajı gitti"
+
+
+def test_ik2_sessiz_saatte_bildirim_dusurulur(istemci, conn, monkeypatch):
+    """T3: sessiz saat — bildirim ertelenmez, düşürülür; devir kaydı panelde durur."""
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    monkeypatch.setattr(hatirlatma, "sessiz_saatte_mi", lambda an: True)
+
+    onceki = len(istemci.gonderilenler)
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I3")
+
+    assert len(istemci.gonderilenler) == onceki + 1, "personel bildirimi gitmedi"
+    assert _kisi(conn)["insan_devri_at"] is not None, "devir kaydı durur"
+
+
+def test_ik2_ayni_hasta_kisa_arayla_tek_bildirim(istemci, conn, monkeypatch):
+    """T4: aynı hasta 5 dk içinde iki kez devre girerse tek bildirim gider."""
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I4")
+    assert len(_bildirimler(istemci)) == 1
+
+    devir_yaz(conn, _kisi(conn)["id"], None)   # devri bitir, hemen yeniden aç
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I5")
+    assert len(_bildirimler(istemci)) == 1, "debounce: 15 dk içinde ikinci bildirim gitmez"
+
+    monkeypatch.setattr(devri, "BILDIRIM_ARALIK_DK", 0)   # aralık doldu say
+    devir_yaz(conn, _kisi(conn)["id"], None)
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I6")
+    assert len(_bildirimler(istemci)) == 2, "aralık dolduğunda bildirim yeniden gider"
+
+
+def test_ik2_bildirim_sayaca_girer(istemci, conn):
+    """Bildirim 'sistem' satırı olarak yazılır — giden tavanı onu görür."""
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I7")
+
+    kid = _kisi(conn)["id"]
+    kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kid, limit=10, sistem_dahil=True)]
+    assert any(m.startswith("devir bildirimi: 1 numara") for m in kayitlar)
+    assert hatirlatma.giden_sayisi(conn, 1) >= 1

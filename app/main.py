@@ -823,7 +823,7 @@ def hasta_detay(request: Request, kisi_id: int, conn=Depends(db)):
         "sayfa": "hastalar",
         "kullanici": _kim(request),
         "kisi": kisi,
-        "gorusmeler": gorusme_gecmisi(conn, kisi_id, limit=200),
+        "gorusmeler": gorusme_gecmisi(conn, kisi_id, limit=200, sistem_dahil=True),
         "saglik": saglik.saglik_ozeti(conn),
     })
 
@@ -1296,8 +1296,9 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
             _devri_baslat(conn, kisi)
             return
 
-        # 'sistem' satırları (devir kaydı) prompt'a girmez; yeni mesajı prompt ayrıca ekler
-        gecmis = [g for g in gorusme_gecmisi(conn, kid, limit=20) if g["yon"] != "sistem"][-10:-1]
+        # 'sistem' satırları gorusme_gecmisi'nde filtrelenir (İK-3); yeni mesajı
+        # prompt ayrıca eklediğinden son satır atılır
+        gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]
 
         # Kural (LLM'siz) → hatırlatma kısayolu (LLM'siz) → hafif yol (araçsız
         # LLM) → tam ajan (araçlı LLM). Sıralama en ucuzdan en pahalıya:

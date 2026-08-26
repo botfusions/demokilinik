@@ -248,3 +248,20 @@ def test_toplu_gonderim_fonksiyonu_yok():
     assert "def toplu" not in kaynak
     imza = inspect.signature(instagram.mesaj_gonder)
     assert list(imza.parameters) == ["igsid", "metin"]
+
+
+# ── İK-3: ajan bağlamında sistem satırı yok ────────────────
+
+def test_ajan_baglaminda_sistem_satiri_yok(conn, monkeypatch, sahte_ajan):
+    """PRD 26-08-2026 İK-3/T5: Instagram yolunda 'devir açıldı' gibi sistem
+    satırları ajan prompt'una girmez — filtre artık gorusme_gecmisi'de."""
+    kid = kisi_upsert(conn, "ig:17841400000000009")
+    gorusme_ekle(conn, kid, "sistem", "devir açıldı: Hasta personel talep etti",
+                 wa_message_id="ig:s1", kanal="instagram")
+    gorusme_ekle(conn, kid, "gelen", "merhaba", wa_message_id="ig:s2", kanal="instagram")
+
+    m = _sahte_mesaj(mid="s3", metin="fiyat ne kadar", igsid="17841400000000009")
+    assert instagram.cevapla(conn, m, lambda ig, txt: "x1")
+    assert sahte_ajan, "ajan çağrılmış olmalı"
+    assert all(g["yon"] != "sistem" for g in sahte_ajan[-1]["gecmis"]), \
+        "sistem satırı ajan bağlamına girmemeli"
