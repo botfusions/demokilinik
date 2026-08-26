@@ -60,6 +60,7 @@ from app.crm import (  # noqa: E402
     randevu_olustur,
     randevular_araliginda,
     randevular_listele,
+    isaretlenmeyen_randevular,
 )
 from app.db import baglan, sema_kur  # noqa: E402
 from app.hizmet import (  # noqa: E402
@@ -115,7 +116,7 @@ sablonlar = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 # yalnız daha açıklayıcı görünsün diye eşleniyor. CSS sınıfı hâlâ ham değeri
 # kullanıyor (rozet.aktif/pasif gibi renk sınıfları bundan etkilenmez).
 DURUM_ETIKETLERI = {"bekliyor": "Planlandı", "onayli": "Teyit Edildi",
-                    "geldi": "Geldi", "iptal": "İptal Edildi"}
+                    "geldi": "Geldi", "gelmedi": "Gelmedi", "iptal": "İptal Edildi"}
 sablonlar.env.filters["durum_etiketi"] = lambda d: DURUM_ETIKETLERI.get(d, d)
 
 # Coolify konteynere deploy edilen commit'i `SOURCE_COMMIT` ile veriyor. Panelin
@@ -410,6 +411,7 @@ def ozet(request: Request, conn=Depends(db)):
         "yogun_saat": yogun_saat if yogun_saat and yogun_saat["adet"] else None,
         "hizmetler": hizmet_dagilimi(conn),
         "randevular": randevular_listele(conn, gun=b),
+        "isaretlenmeyen": isaretlenmeyen_randevular(conn),
         "doktor_yuk": doktor_bazli_doluluk(conn),
         "kisiler": kisiler_listele(conn)[:8],
         "saglik": saglik.saglik_ozeti(conn),
@@ -794,6 +796,18 @@ def randevu_geldi(request: Request, randevu_id: int, conn=Depends(db)):
     return RedirectResponse("/randevular", status_code=303)
 
 
+@app.post("/randevular/{randevu_id}/gelmedi", dependencies=[Depends(personel)])
+def randevu_gelmedi(request: Request, randevu_id: int, conn=Depends(db)):
+    """Hasta gelmediğinde personel ELLE işaretler. "Saati geçti → gelmedi"
+    otomasyonu bilinçli yok: personel butona basmayı unuttuğunda gelen hastayı
+    gelmedi sayar, no-show raporu yalan olur. Slot geçerli kalır — gelmeyen
+    hasta o saati işgal etmişti, dolulukta sayılmaya devam eder."""
+    randevu_durum_yaz(conn, randevu_id, "gelmedi")
+    hatirlatma.hatirlatmalari_iptal_et(conn, randevu_id)
+    islem_yaz(conn, _kim(request), "randevuyu gelmedi işaretledi", f"#{randevu_id}")
+    return RedirectResponse("/randevular", status_code=303)
+
+
 @app.get("/hastalar", response_class=HTMLResponse, dependencies=[Depends(personel)])
 def hastalar(request: Request, conn=Depends(db)):
     return sablonlar.TemplateResponse(request, "hastalar.html", {
@@ -1079,7 +1093,7 @@ def randevu_api(govde: dict, conn=Depends(db)):
 
         rid = randevu_olustur(
             conn, kid, govde["hizmet"], bas, bit, govde.get("notlar"),
-            doktor_id=doktor_id, acil=bool(govde.get("acil")),
+            doktor_id=doktor_id, acil=bool(govde.get("acil")), kaynak="ajan",
         )
     except RandevuCakismasi as e:
         raise HTTPException(409, f"O saat dolu: {e}")

@@ -65,8 +65,9 @@
         {% else %}—{% endif %}
       </td>
       <td style="display:flex; gap:6px">
-        {% if r.durum not in ('iptal', 'geldi') %}
+        {% if r.durum not in ('iptal', 'geldi', 'gelmedi') %}
         <form method="post" action="/randevular/{{ r.id }}/geldi"><button class="sade">Geldi</button></form>
+        <form method="post" action="/randevular/{{ r.id }}/gelmedi"><button class="sade">Gelmedi</button></form>
         {% endif %}
         {% if r.durum != 'iptal' %}
         <form method="post" action="/randevular/{{ r.id }}/iptal"><button class="sade">İptal et</button></form>

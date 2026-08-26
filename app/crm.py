@@ -253,6 +253,7 @@ def randevu_olustur(
     notlar: str | None = None,
     doktor_id: int | None = None,
     acil: bool = False,
+    kaynak: str = "panel",
 ) -> int:
     """Randevu açar. Çakışma **doktor bazında** ölçülür.
 
@@ -293,10 +294,10 @@ def randevu_olustur(
 
         cur.execute(
             """
-            INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, notlar, doktor_id, acil)
-            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+            INSERT INTO randevular (kisi_id, hizmet, baslangic, bitis, notlar, doktor_id, acil, kaynak)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """,
-            (kisi_id, hizmet, baslangic, bitis, notlar, doktor_id, acil),
+            (kisi_id, hizmet, baslangic, bitis, notlar, doktor_id, acil, kaynak),
         )
         rid = cur.fetchone()[0]
     conn.commit()
@@ -379,6 +380,31 @@ def randevular_listele(conn: psycopg.Connection, gun=None) -> list[dict]:
                 """,
                 (gun,),
             )
+        return cur.fetchall()
+
+
+def isaretlenmeyen_randevular(conn: psycopg.Connection) -> list[dict]:
+    """Tarihi geçmiş ama hâlâ 'bekliyor'/'onayli' duran randevular.
+
+    Ana sayfadaki bekleyen işaretleme kutusunun verisi: personel tek ekrandan
+    Geldi/Gelmedi işaretler. "Saati geçti → gelmedi" KURALI BİLİNÇLİ YOK —
+    personel butona basmayı unuttuğunda gelen hastayı gelmedi sayar, rapor
+    yalan olur. Son 30 günle sınırlı: kutu birikmiş yıllık veriyi değil,
+    işaretlenecekleri gösterir.
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT r.*, k.ad, k.telefon, d.ad AS doktor_ad
+              FROM randevular r
+              JOIN kisiler k ON k.id = r.kisi_id
+              LEFT JOIN doktorlar d ON d.id = r.doktor_id
+             WHERE r.bitis < now() AND r.durum IN ('bekliyor', 'onayli')
+               AND r.baslangic > now() - interval '30 days'
+             ORDER BY r.baslangic DESC
+             LIMIT 20
+            """
+        )
         return cur.fetchall()
 
 

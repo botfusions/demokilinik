@@ -9,6 +9,7 @@ from app.crm import (
     GecmisTarih,
     RandevuCakismasi,
     calisma_saati_icinde,
+    randevu_durum_yaz,
     randevu_iptal,
     randevu_olustur,
     randevular_listele,
@@ -137,3 +138,62 @@ def test_saat_kaymasi_yok(conn, kisi_id):
     r = randevular_listele(conn, gun=bas.date())[0]
     assert r["baslangic"].strftime("%H:%M") == "14:00"
     assert r["bitis"].strftime("%H:%M") == "14:30"
+
+
+def test_gelmedi_isaretleme_slotu_isgal_eder(conn, kisi_id):
+    """T6: 'gelmedi' yazılır ama slot dolu kalır — gelmeyen hasta o saati
+    işgal etmişti, dolulukta sayılmaya devam etmeli."""
+    bas = _yarin(10)
+    rid = randevu_olustur(conn, kisi_id, "Kontrol", bas, bas + timedelta(minutes=60))
+    randevu_durum_yaz(conn, rid, "gelmedi")
+
+    assert randevular_listele(conn, gun=bas.date())[0]["durum"] == "gelmedi"
+
+    with pytest.raises(RandevuCakismasi):
+        randevu_olustur(
+            conn, kisi_id, "Dolgu",
+            bas + timedelta(minutes=30), bas + timedelta(minutes=90),
+        )
+
+
+def test_randevu_kaynagi_ajan_ve_panel(conn, kisi_id):
+    """T7: /api/randevu 'ajan', panel formu 'panel' yazar."""
+    from fastapi.testclient import TestClient
+
+    import app.main as main
+    from app.kullanici import kullanici_ekle
+
+    kullanici_ekle(conn, "admin", "test-parola", "admin")
+    c = TestClient(main.app, follow_redirects=False)
+    c.post("/giris", data={"kullanici_adi": "admin", "parola": "test-parola"})
+
+    gun = datetime.now() + timedelta(days=2)
+    if gun.isoweekday() == 7:
+        gun += timedelta(days=1)
+    bas = gun.replace(hour=10, minute=0, second=0, microsecond=0)
+
+    r = c.post(
+        "/api/randevu",
+        json={
+            "telefon": "905321112233", "hizmet": "Kontrol",
+            "baslangic": bas.isoformat(),
+            "bitis": (bas + timedelta(minutes=30)).isoformat(),
+        },
+        headers={"X-Ic-Anahtar": "test-ic-anahtar"},
+    )
+    assert r.status_code in (200, 201)
+
+    bas2 = bas + timedelta(minutes=30)  # sınır teması — çakışmaz
+    r = c.post("/randevular", data={
+        "telefon": "905321112233", "hizmet": "Dolgu",
+        "baslangic": bas2.isoformat(),
+        "bitis": (bas2 + timedelta(minutes=30)).isoformat(),
+        "doktor_id": "", "acil": "",
+    })
+    assert r.status_code == 303
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT kaynak FROM randevular WHERE hizmet = 'Kontrol'")
+        assert cur.fetchone()[0] == "ajan"
+        cur.execute("SELECT kaynak FROM randevular WHERE hizmet = 'Dolgu'")
+        assert cur.fetchone()[0] == "panel"

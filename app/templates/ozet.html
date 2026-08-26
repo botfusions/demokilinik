@@ -44,6 +44,29 @@
 </div>
 {% endif %}
 
+{# ── bekleyen işaretleme: tarihi geçmiş ama hâlâ açık randevular ── #}
+{% if isaretlenmeyen %}
+<div class="kart" style="margin-bottom:14px">
+  <h2>Bekleyen işaretleme</h2>
+  <p class="ipucu">Tarihi geçmiş ama sonucu girilmemiş randevular — geldi mi, gelmedi mi?
+    Otomatik "gelmedi" sayılmaz; işaretleme personelin eli.</p>
+  <div class="kaydir"><table>
+    <tr><th>Tarih</th><th>Hasta</th><th>Hizmet</th><th></th></tr>
+    {% for r in isaretlenmeyen %}
+    <tr>
+      <td style="font-variant-numeric:tabular-nums">{{ r.baslangic.strftime('%d.%m.%Y %H:%M') }}</td>
+      <td><a href="/hastalar/{{ r.kisi_id }}">{{ r.ad or r.telefon }}</a></td>
+      <td>{{ r.hizmet }}</td>
+      <td style="display:flex; gap:6px">
+        <form method="post" action="/randevular/{{ r.id }}/geldi"><button class="sade">Geldi</button></form>
+        <form method="post" action="/randevular/{{ r.id }}/gelmedi"><button class="sade">Gelmedi</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
 {# ── hangi gün daha dolu ───────────────────────────────── #}
 <div class="izgara k2" style="margin-bottom:14px">
   <div class="kart">

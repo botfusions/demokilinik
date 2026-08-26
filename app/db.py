@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS randevular (
     baslangic       timestamptz NOT NULL,
     bitis           timestamptz NOT NULL,
     durum           text NOT NULL DEFAULT 'bekliyor'
-                    CHECK (durum IN ('bekliyor', 'onayli', 'geldi', 'iptal')),
+                    CHECK (durum IN ('bekliyor', 'onayli', 'geldi', 'gelmedi', 'iptal')),
+    -- Randevuyu kim açtı: 'panel' (personel formu) veya 'ajan' (/api/randevu).
+    kaynak          text NOT NULL DEFAULT 'panel',
     google_event_id text,
     notlar          text,
     olusturma       timestamptz NOT NULL DEFAULT now(),
@@ -93,10 +95,13 @@ ALTER TABLE randevular ADD COLUMN IF NOT EXISTS doktor_id integer REFERENCES dok
 ALTER TABLE randevular ADD COLUMN IF NOT EXISTS acil boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS randevular_doktor_idx ON randevular (doktor_id, baslangic);
 
--- 'geldi' sonradan eklendi; mevcut kurulumlarda CHECK eski üç değeri taşıyor.
+-- 'geldi' ve 'gelmedi' sonradan eklendi; mevcut kurulumlarda CHECK eski
+-- değerleri taşıyor. 'gelmedi' ölçüm katmanının temeli — geciken kısıt
+-- genişletmesi canlıda INSERT'i reddederdi.
 ALTER TABLE randevular DROP CONSTRAINT IF EXISTS randevular_durum_check;
 ALTER TABLE randevular ADD CONSTRAINT randevular_durum_check
-    CHECK (durum IN ('bekliyor', 'onayli', 'geldi', 'iptal'));
+    CHECK (durum IN ('bekliyor', 'onayli', 'geldi', 'gelmedi', 'iptal'));
+ALTER TABLE randevular ADD COLUMN IF NOT EXISTS kaynak text NOT NULL DEFAULT 'panel';
 
 -- Giden hatırlatmalar. UNIQUE(randevu_id, tur): aynı randevu için aynı tür
 -- hatırlatma ikinci kez gönderilemez — nöbetçi iki kez çalışsa bile.
