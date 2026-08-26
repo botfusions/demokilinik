@@ -44,6 +44,7 @@ from app.crm import (  # noqa: E402
     en_bos_doktor,
     en_erken_uygun,
     gorusme_ekle,
+    gorusme_wa_id_yaz,
     hastanin_doktoru,
     gun_bazli_doluluk,
     hizmet_dagilimi,
@@ -1249,7 +1250,10 @@ async def whatsapp_webhook(request: Request, arka_plan: BackgroundTasks):
         raise HTTPException(401, "Geçersiz imza")
 
     olay = await request.json()
-    if olay.get("event") != "message.received":
+    # "message.received" yalnız gelen mesajları verir; "message" gidenleri de
+    # (fromMe) verir — personel WhatsApp Desktop'tan cevap yazabilsin diye
+    # webhook artık "message" kayıtlı, eski ad da kabul edilir.
+    if olay.get("event") not in ("message", "message.received"):
         return {"durum": "yoksayildi"}
 
     veri = olay.get("data", {})
@@ -1260,6 +1264,18 @@ async def whatsapp_webhook(request: Request, arka_plan: BackgroundTasks):
     mesaj = (veri.get("body") or "").strip()
     if not mesaj:
         return {"durum": "bos"}
+
+    # Bağlı cihazdan (masaüstü/telefon) manuel gönderilen personel cevabı:
+    # giden kaydı düşer, devri açıksa K1 sayacı tazelenir — personel panel'e
+    # girip "Devri bitir"e basmak zorunda değil.
+    if veri.get("fromMe"):
+        arka_plan.add_task(
+            _giden_mesaji_isle,
+            openwa.telefon_ayikla(veri.get("to", "")),
+            mesaj,
+            veri.get("id"),
+        )
+        return {"durum": "giden"}
 
     arka_plan.add_task(
         _mesaji_isle,
@@ -1371,14 +1387,17 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
         yanit, konum_istendi = ajan.konum_ayikla(yanit)
 
         # Önce kaydet, sonra gönder: WhatsApp'a ulaşılamazsa bile personel
-        # panelde ajanın ne dediğini görebilmeli.
-        gorusme_ekle(
+        # panelde ajanın ne dediğini görebilmeli. wa id sonradan yazılır ki
+        # "message" webhook'unun giden kopyası ikinci satır açmasın.
+        satir = gorusme_ekle(
             conn, kid, "giden", yanit,
             maliyet_usd=maliyet,
             giris_token=(kullanim or {}).get("prompt_tokens"),
             cikis_token=(kullanim or {}).get("completion_tokens"),
         )
-        openwa.mesaj_gonder(telefon, yanit)
+        wamid = openwa.mesaj_gonder(telefon, yanit)
+        if satir and wamid:
+            gorusme_wa_id_yaz(conn, satir, wamid)
 
         # Konum iğnesi metinden SONRA gider: hasta önce adresi okur, sonra
         # haritayı görür. Konum tanımlı değilse sessizce atlanır — adres zaten
@@ -1390,5 +1409,32 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
                 log.warning("Konum gönderilemedi (%s): %s", telefon, e)
     except Exception as e:
         log.exception("Mesaj işlenemedi (%s): %s", telefon, e)
+    finally:
+        conn.close()
+
+
+def _giden_mesaji_isle(telefon: str, mesaj: str, wa_id: str | None) -> None:
+    """Bağlı cihazdan (WhatsApp Desktop/telefon) manuel gönderilen cevap.
+
+    Personelin tembel akışı: bildirim WhatsApp'a düşer, cevabı masaüstünden
+    yazar, panel'e hiç girmez. Burada giden kaydı düşer ve devri açıksa K1
+    sayacı tazelenir — ajan susmaya devam eder, personel sessiz kalırsa 2
+    saat sonunda geri döner. Yalnız bilinen hastaya kaydedilir; personel
+    bilinmeyen numaraya yazarsa hasta kaydı açılmaz.
+    """
+    conn = baglan()
+    try:
+        kisi = kisi_bul(conn, telefon)
+        if kisi is None:
+            return
+        # Ajanın kendi gönderiminin webhook kopyası da buraya düşer; tekil
+        # wa_message_id indeksi ikinci satırı engeller (id _mesaji_isle'de
+        # sonradan yazılır).
+        if gorusme_ekle(conn, kisi["id"], "giden", mesaj, wa_message_id=wa_id) is None:
+            return
+        if kisi["insan_devri_at"]:
+            devir_yaz(conn, kisi["id"], datetime.now(), None)
+    except Exception as e:
+        log.exception("Giden mesaj işlenemedi (%s): %s", telefon, e)
     finally:
         conn.close()

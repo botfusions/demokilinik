@@ -455,3 +455,72 @@ def test_ik2_bildirim_sayaca_girer(istemci, conn):
     kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kid, limit=10, sistem_dahil=True)]
     assert any(m.startswith("devir bildirimi: 1 numara") for m in kayitlar)
     assert hatirlatma.giden_sayisi(conn, 1) >= 1
+
+
+# ── T9: personel WhatsApp Desktop'tan cevaplar (panel'e girmez) ──
+
+KLINIK_NO = "905321112299"
+
+
+def _govde_giden(mesaj: str, wamid: str):
+    return json.dumps({
+        "event": "message",
+        "data": {"id": wamid, "from": f"{KLINIK_NO}@c.us", "to": f"{TELEFON}@c.us",
+                 "fromMe": True, "body": mesaj, "isGroup": False},
+    }).encode()
+
+
+def _gonder_giden(c, mesaj: str, wamid: str):
+    g = _govde_giden(mesaj, wamid)
+    return c.post("/webhook/whatsapp", content=g,
+                  headers={"X-OpenWA-Signature": _imzala(g)})
+
+
+def test_t9_masaustu_cevabi_sayaci_tazeler(istemci, conn):
+    """Devir açıkken bağlı cihazdan cevap: giden kaydı düşer, K1 sayacı
+    now() olur, neden korunur — personel panel'e girmek zorunda değil."""
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.T9a")
+    eski = _kisi(conn)["insan_devri_at"]
+    assert eski is not None
+
+    y = _gonder_giden(istemci, "Hocam hemen bakıyorum", "wamid.T9b")
+    assert y.status_code == 200 and y.json()["durum"] == "giden"
+
+    kisi = _kisi(conn)
+    assert kisi["insan_devri_at"] > eski, "sayac tazelenmedi"
+    assert kisi["devir_nedeni"], "neden silindi"
+
+    kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kisi["id"], limit=5)]
+    assert "Hocam hemen bakıyorum" in kayitlar, "giden kaydı düşmedi"
+
+
+def test_t9_masaustu_cevabi_ajani_calistirmaz(istemci, conn):
+    """fromMe mesajı ajan görmüyor: cevap üretilmez, gönderim yok."""
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.T9c")
+    onceki = len(istemci.gonderilenler)
+
+    _gonder_giden(istemci, "personel cevabı", "wamid.T9d")
+    assert len(istemci.gonderilenler) == onceki, "ajan masaüstü cevabına cevap yazdı"
+
+
+def test_t9_ajan_cevabinin_webhook_kopyasi_ikinci_satir_acmaz(istemci, conn):
+    """Ajan gönderdikten sonra "message" eventi onun mesajını da iter; wa id
+    sonradan yazıldığı için kopya tekil indekste çakışır."""
+    _gonder(istemci, "merhaba", "wamid.T9e")          # ajan cevaplar
+    kid = _kisi(conn)["id"]
+    yanit_satiri = [g for g in gorusme_gecmisi(conn, kid, limit=5)
+                    if g["yon"] == "giden" and g["mesaj"] == "Test yanıtı"]
+    assert len(yanit_satiri) == 1
+
+    y = _gonder_giden(istemci, "Test yanıtı", "wamid.OUT")   # webhook kopyası
+    assert y.json()["durum"] == "giden"
+    yanit_satiri = [g for g in gorusme_gecmisi(conn, kid, limit=5)
+                    if g["yon"] == "giden" and g["mesaj"] == "Test yanıtı"]
+    assert len(yanit_satiri) == 1, "kopya ikinci satır açtı"
+
+
+def test_t9_bilinmeyen_numaraya_yazilinca_kisi_acilmaz(istemci, conn):
+    y = _gonder_giden(istemci, "selam", "wamid.T9f")
+    assert y.status_code == 200
+    # giden kaydı yalnız bilinen hastaya düşer; yeni kisi açılmaz
+    assert kisi_bul(conn, TELEFON) is None

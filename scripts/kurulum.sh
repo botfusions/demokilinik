@@ -79,7 +79,7 @@ if [ "$VARSA" = "0" ]; then
   curl -s -X POST "${OPENWA_URL}/api/sessions/${SID}/webhooks" \
     -H "X-Api-Key: ${OPENWA_API_KEY}" -H "Content-Type: application/json" \
     -d "{\"url\":\"${KOPRU_WEBHOOK_URL:-http://host.docker.internal:8000/webhook/whatsapp}\",
-         \"events\":[\"message.received\"],
+         \"events\":[\"message\"],
          \"secret\":\"${WEBHOOK_SECRET}\",
          \"filters\":{\"conditions\":[{\"field\":\"isGroup\",\"operator\":\"is\",\"value\":false}]}}" \
     >/dev/null

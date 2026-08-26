@@ -163,6 +163,19 @@ def gorusme_ekle(
     return satir[0] if satir else None
 
 
+def gorusme_wa_id_yaz(conn: psycopg.Connection, gorusme_id: int, wa_message_id: str) -> None:
+    """Ajan gönderiminin wa idsini kayıt sonrası yazar.
+
+    Ajan önce kaydeder sonra gönderir (WhatsApp düşse de panel görsün); id
+    ancak gönderimden sonra bilinir. Yazılınca "message" webhook'unun giden
+    kopyası tekil indekste çakışır, ikinci satır açılmaz.
+    """
+    with conn.cursor() as cur:
+        cur.execute("UPDATE gorusmeler SET wa_message_id = %s WHERE id = %s",
+                    (wa_message_id, gorusme_id))
+    conn.commit()
+
+
 def gorusme_gecmisi(conn: psycopg.Connection, kisi_id: int, limit: int = 10,
                     sistem_dahil: bool = False) -> list[dict]:
     """Son `limit` görüşme, eskiden yeniye — prompt'a bu sırayla girer.
