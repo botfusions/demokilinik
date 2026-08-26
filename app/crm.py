@@ -531,10 +531,13 @@ def kullanim_ozeti(conn: psycopg.Connection, pencere_saniye: int) -> dict:
         )
         giden, giris, cikis = cur.fetchone()
 
-        # Devir dökümü — 'devir açıldı: {neden}' sistem satırlarından
+        # Devir dökümü — 'devir açıldı: {neden}' sistem satırlarından.
+        # substring+position: neden içinde ':' olursa ilk 'den sonrası
+        # olduğu gibi korunur (split_part baştan sayar, yanlış keser).
         cur.execute(
             """
-            SELECT split_part(mesaj, ': ', 2), count(*) FROM gorusmeler
+            SELECT substring(mesaj from position(': ' in mesaj) + 2), count(*)
+            FROM gorusmeler
             WHERE yon = 'sistem' AND mesaj LIKE 'devir açıldı: %%'
               AND olusturma >= now() - make_interval(secs => %s)
             GROUP BY 1

@@ -270,11 +270,18 @@ def test_toplu_gonderim_fonksiyonu_yok():
     """Alıcı listesi alan bir fonksiyon eklenirse bu test kırılır — kasıtlı."""
     import inspect
 
+    import app.devri as devri
     import app.openwa as openwa
 
-    for modul in (hatirlatma, openwa):
+    # Meşru istisna: personel bildirimi numara listesinde döngü kurar.
+    # Hasta listesi döngüsü eklenirse bu kümenin dışına çıkarılmalı.
+    ISTISNALAR = {("devri", "personel_bildir")}
+
+    for modul in (hatirlatma, openwa, devri):
         for ad, nesne in inspect.getmembers(modul, inspect.isfunction):
             if nesne.__module__ != modul.__name__:
+                continue
+            if (modul.__name__.split(".")[-1], ad) in ISTISNALAR:
                 continue
             imza = str(inspect.signature(nesne)).lower()
             assert "telefonlar" not in imza and "alicilar" not in imza, (

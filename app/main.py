@@ -393,6 +393,7 @@ AYLAR_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
 def ozet(request: Request, conn=Depends(db)):
     gunler = gun_bazli_doluluk(conn)
     saatler = saat_bazli_doluluk(conn)
+    d = devirdekiler(conn)
     b = date.today()
 
     # Grafiğin başlığında "en yoğun gün" yazılır; hiç randevu yoksa bir gün seçilmez
@@ -404,8 +405,8 @@ def ozet(request: Request, conn=Depends(db)):
         "kullanici": _kim(request),
         "bugun": f"{b.day} {AYLAR_TR[b.month - 1]} {b.year}, {GUNLER_TR[b.weekday()]}",
         "sayilar": ozet_sayilar(conn),
-        "devir_sayisi": len(devirdekiler(conn)),
-        "devirdekiler": devirdekiler(conn),
+        "devir_sayisi": len(d),
+        "devirdekiler": d,
         "gunler": gunler,
         "saatler": saatler,
         "yogun_gun": yogun_gun if yogun_gun and yogun_gun["adet"] else None,
@@ -1305,8 +1306,9 @@ def _devri_baslat(conn, kisi: dict, neden: str = devri.NEDEN_HASTA) -> None:
     """Devri açar, hastaya aktarım mesajı yollar, personele haber verir.
 
     Görünürlük: panelde rozet + sayaç, personel WhatsApp'ına bildirim
-    (DEVRI_BILDIRIM_NUMARALARI boşsa bildirim atlanır). 'sistem' satırı
-    haftalık raporun devir sayımı için.
+    (numaralar DB'den: kullanicilar.telefon — numarası girili aktif
+    personel yoksa bildirim atlanır). 'sistem' satırı haftalık raporun
+    devir sayımı için.
     """
     simdi = datetime.now()
     devir_yaz(conn, kisi["id"], simdi, neden)

@@ -101,3 +101,14 @@ def test_kullanim_ozeti_pencere_disini_saymaz(conn, kisi_id):
 
     ozet = kullanim_ozeti(conn, 3600)  # 1 saatlik pencere
     assert ozet == {"giden_mesaj": 0, "giris_token": 0, "cikis_token": 0, "devir": {}}
+
+
+def test_kullanim_ozeti_devir_nedeninde_iki_nokta_kalmali(conn, kisi_id):
+    # Neden içinde ikinci ': ' olursa ilkinden sonrası olduğu gibi kalmalı —
+    # split_part baştan sayar ve yanlış yerden keserdi.
+    gorusme_ekle(conn, kisi_id, "sistem", "devir açıldı: Panel: saat 15:00 devraldı")
+    gorusme_ekle(conn, kisi_id, "sistem", "devir açıldı: Hasta personel talep etti")
+
+    ozet = kullanim_ozeti(conn, 3600)
+    assert ozet["devir"] == {"Panel: saat 15:00 devraldı": 1,
+                             "Hasta personel talep etti": 1}
