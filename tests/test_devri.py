@@ -402,16 +402,20 @@ def test_ik1_bildirimde_hasta_mesaji_gecmez(istemci, conn):
     assert TELEFON in metin and "Panelden devralın." in metin
 
 
-def test_ik2_tavan_doluysa_bildirim_gitmez_devir_acilir(istemci, conn, monkeypatch):
+def test_ik2_tavan_doluysa_bildirim_gitmez_devir_acilir(istemci, conn, monkeypatch, caplog):
     """T2: saatlik tavan dolu — bildirim gönderilmez, loglanır, devir açılır."""
+    import logging
+
     _personel_ekle(conn, "sekreter", "+905551112233")
     monkeypatch.setattr(hatirlatma, "SAATLIK_TAVAN", 0)
 
     onceki = len(istemci.gonderilenler)
-    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I2")
+    with caplog.at_level(logging.WARNING, logger="app.devri"):
+        _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.I2")
 
     assert _kisi(conn)["insan_devri_at"] is not None, "devir yine açılır"
     assert len(istemci.gonderilenler) == onceki + 1, "yalnız hastaya aktarım mesajı gitti"
+    assert "Devir bildirimi gitmedi" in caplog.text, "tavan nedeniyle log düşmeli"
 
 
 def test_ik2_sessiz_saatte_bildirim_dusurulur(istemci, conn, monkeypatch):

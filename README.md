@@ -230,7 +230,7 @@ Klinik iki otomatik mesaj gönderir: randevudan **24 saat önce** teyit isteği,
 
 | Kilit | Nasıl |
 |---|---|
-| Alıcı listesi alan fonksiyon yok | `app/hatirlatma.py` ve `app/openwa.py`'de tek alıcılı imza; `test_toplu_gonderim_fonksiyonu_yok` bunu her koşuda denetler |
+| Alıcı listesi alan fonksiyon yok | `app/hatirlatma.py`, `app/openwa.py` ve `app/devri.py`'de tek alıcılı imza; `test_toplu_gonderim_fonksiyonu_yok` bunu her koşuda denetler. Tek beyaz listeli istisna `devri.personel_bildir` — numaraları panelden yönetilen personel devir bildirimi; oraya hasta listesi eklenirse test kırılır |
 | Her mesaj bir randevuya bağlı | Randevusu olmayan numaraya buradan mesaj gidemez |
 | Randevu başına en çok 2 mesaj | `UNIQUE(randevu_id, tur)` — nöbetçi iki kez çalışsa da tekrar gitmez |
 | Saatlik / günlük tavan | `GIDEN_SAATLIK_TAVAN=20`, `GIDEN_GUNLUK_TAVAN=100`; dolunca gönderim durur, kuyruk sonraki tura kalır |
@@ -240,6 +240,14 @@ Klinik iki otomatik mesaj gönderir: randevudan **24 saat önce** teyit isteği,
 
 Ajanın kimliği de bunu biliyor: personel toplu mesaj isterse "Bu panelden
 yapılamıyor" der.
+
+**Devir bildirimi aynı kilitlerden geçer** (`app/devri.py:personel_bildir`).
+Hasta yetkili isterse, telefonu kayıtlı aktif personele WhatsApp bildirimi gider.
+Bildirimde yalnız hasta adı, telefon, devir nedeni ve "Panelden devralın." vardır —
+hastanın serbest metni (KVKK) asla girmez. Saatlik/günlük tavan doluysa bildirim
+gönderilmez ve loglanır; sessiz saatte ertelenmez, **düşürülür** (devir kaydı
+panelde durur). Aynı hasta için `DEVIR_BILDIRIM_ARALIK_DK=15` içinde ikinci
+bildirim gitmez.
 
 ## Ajanın sınırları
 
@@ -299,12 +307,25 @@ Ortodonti, Estetik, Çocuk diş), ilgili fiyat listesi, birkaç genel bilgi kayd
 Tekrar çalıştırılabilir (aynı isim varsa atlanır). Doktorların hepsine aynı
 telefon yazılır — hangi doktor seçilirse seçilsin bildirim aynı telefona gider.
 
-## Panelde durum etiketleri
+## Panelde durum etiketleri ve /rapor
 
-Randevu durumu DB'de hâlâ 3 değer (`bekliyor`/`onayli`/`iptal`); panelde
-"Planlandı"/"Teyit Edildi"/"İptal Edildi" olarak gösterilir (`durum_etiketi`
-Jinja filtresi, `app/main.py`). Daha ince ayrım (Teyit Bekliyor, Geldi,
-Gelmedi gibi) istenirse DB migration gerekir — bilinçli olarak ertelendi.
+Randevu durumu DB'de beş değer (`bekliyor`/`onayli`/`geldi`/`gelmedi`/`iptal`);
+panelde `durum_etiketi` Jinja filtresiyle etiketlenir (`app/main.py`).
+**`gelmedi` işaretlemesi elle yapılır** — "saati geçti, geldi denmedi → gelmedi"
+otomasyonu bilerek yok: personel butona basmayı unuttuğunda gelen hasta gelmedi
+sayılır ve raporun tamamı yalan olur. Ana sayfadaki **bekleyen işaretleme kutusu**
+tarihi geçmiş ama hâlâ `bekliyor`/`onayli` duran randevuları tek ekranda listeler.
+Gelmeyen randevu slotu işlemeye devam eder — çakışma sorgusunda ve dolulukta sayılır.
+Randevuyu kim açtığı `randevular.kaynak`'ta durur: panel formu `panel`,
+ajan (`/api/randevu`) `ajan` yazar.
+
+**`/rapor` — kayıp ve kurtarma raporu** (yalnız yönetici, ay seçilebilir;
+`app/kazanc.py`). Üç blok: ayın alınan/teyit/gelen/gelmeyen/iptal sayıları,
+gelmeme oranı ve gelmeyenin TL karşılığı; hatırlatmaya "iptal" cevabı verip slotu
+erken boşaltan randevular; ajanın açtığı randevular ve kaçtı mesai dışında.
+Fiyat eşleştirmesi `randevular.hizmet` serbest metniyle `hizmetler.ad` arasında
+büyük/küçük harf duyarsızdır; eşleşmeyen kayıtlar **"fiyatı bilinmiyor"** olarak
+ayrı sayılır ve TL toplamına girmez — ortalama fiyatla doldurulmaz.
 
 ## Dosya haritası
 
@@ -324,6 +345,8 @@ app/iyilestirme.py  salt-okunur öneri taraması (bilgi tabanı boşluğu, tekra
 app/openwa.py    WhatsApp istemcisi + HMAC doğrulama
 app/saglik.py    bağlantı nöbetçisi
 app/hatirlatma.py randevu hatırlatmaları + giden mesaj kilitleri
+app/devri.py     insan devri: personel bildirimi + otomatik geri alma
+app/kazanc.py    /rapor — kayıp ve kurtarma raporu (yalnız yönetici)
 app/kullanici.py  kullanıcılar, parolalar, işlem izi
 hermes-home/SOUL.md  ajanın kimliği (bu klasöre özel)
 scripts/demo-veri.py  satış demosu için DemoDent verisi
