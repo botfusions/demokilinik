@@ -128,6 +128,16 @@ def son_kanal(conn, kisi_id: int) -> str:
     return satir[0] if satir else "whatsapp"
 
 
+def mesai_ici(simdi: datetime) -> bool:
+    """Şu an çalışma penceresi içinde miyiz (aynı pencere: CALISMA_* env).
+
+    Mesai dışında personel yok: devir açılmaz, aktarım mesajı dönüş saatiyle
+    gider, ajan FAQ'ya devam eder. Pencere ayarlar tablosundan env'e basılır.
+    """
+    gunler, ac, kapa = crm._calisma_penceresi()
+    return simdi.isoweekday() in gunler and ac <= simdi.time() < kapa
+
+
 def aktarim_mesaji(simdi: datetime) -> str:
     """K2: mesai dışında gelen devir talebine dönüş zamanı eklenir.
 

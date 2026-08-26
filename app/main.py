@@ -1359,7 +1359,18 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
         if kisi["insan_devri_at"]:
             return
         if kural.devir_istedi_mi(mesaj):
-            _devri_baslat(conn, kisi)
+            if devri.mesai_ici(datetime.now()):
+                _devri_baslat(conn, kisi)
+            else:
+                # Mesai dışı: personel yok, devri AÇILMAZ (gece bildirimi de
+                # gitmez). Dönüş saati mesajı gider, ajan FAQ'ya devam eder;
+                # mesai içinde tekrar isterse devir normal açılır.
+                metin = devri.aktarim_mesaji(datetime.now())
+                gorusme_ekle(conn, kid, "giden", metin)
+                try:
+                    devri.gonder("whatsapp", telefon, metin)
+                except Exception as e:
+                    log.warning("Mesai dışı aktarım mesajı gitmedi (%s): %s", telefon, e)
             return
 
         # 'sistem' satırları gorusme_gecmisi'nde filtrelenir (İK-3); yeni mesajı

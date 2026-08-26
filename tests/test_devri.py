@@ -54,6 +54,8 @@ def istemci(conn, monkeypatch):
     monkeypatch.setattr(hatirlatma, "sessiz_saatte_mi", lambda an: False)
     monkeypatch.setattr(hatirlatma, "SAATLIK_TAVAN", 9999)
     monkeypatch.setattr(hatirlatma, "GUNLUK_TAVAN", 9999)
+    # devir kapısı mesaiye takılmasın — testler gece de koşsun (T10 kapatır)
+    monkeypatch.setattr(devri, "mesai_ici", lambda an: True)
 
     c = TestClient(main.app)
     c.gonderilenler = gonderilenler
@@ -524,3 +526,44 @@ def test_t9_bilinmeyen_numaraya_yazilinca_kisi_acilmaz(istemci, conn):
     assert y.status_code == 200
     # giden kaydı yalnız bilinen hastaya düşer; yeni kisi açılmaz
     assert kisi_bul(conn, TELEFON) is None
+
+
+# ── T10: mesai dışında devir açılmaz ────────────────────────
+
+def test_t10_mesai_disinda_devir_acilmaz(istemci, conn, monkeypatch):
+    """Gece devir talebi: devri AÇILMAZ, personel bildirimi GITMEZ, dönüş
+    saati içeren aktarım mesajı gider, ajan diğer sorulara devam eder."""
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    monkeypatch.setattr(devri, "mesai_ici", lambda an: False)
+
+    y = _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.T10a")
+    assert y.status_code == 200
+
+    kisi = _kisi(conn)
+    assert kisi["insan_devri_at"] is None, "mesai dışında devir açıldı"
+    assert len(_bildirimler(istemci)) == 0, "gece personel bildirimi gitti"
+    kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kisi["id"], limit=5)]
+    assert any("itibaren" in m for m in kayitlar), "dönüş saati mesajı yok"
+
+
+def test_t10_mesai_icinde_devir_normal_acilir(istemci, conn):
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.T10b")
+    assert _kisi(conn)["insan_devri_at"] is not None
+
+
+def test_t10_mesai_disinda_sonraki_soru_ajana_gider(istemci, conn, monkeypatch):
+    """Mesai dışı devir talebi ajanı kapatmaz: takip sorusu AI cevaplar."""
+    monkeypatch.setattr(devri, "mesai_ici", lambda an: False)
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.T10c")
+    onceki = len(istemci.gonderilenler)
+
+    _gonder(istemci, "dolgu fiyatı ne kadar", "wamid.T10d")
+    assert len(istemci.gonderilenler) == onceki + 1, "ajan mesai dışı FAQ cevaplamıyor"
+
+
+def test_t10_mesai_ici_saati_hesaplar():
+    from datetime import datetime
+    # varsayılan pencere 1-5 günleri 09:00-18:00
+    assert devri.mesai_ici(datetime(2026, 8, 27, 14, 0)) is True    # perşembe öğlen
+    assert devri.mesai_ici(datetime(2026, 8, 27, 19, 30)) is False  # perşembe akşam
+    assert devri.mesai_ici(datetime(2026, 8, 30, 11, 0)) is False   # pazar (test ortamı ctesi açık)
