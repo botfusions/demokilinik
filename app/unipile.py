@@ -122,7 +122,11 @@ def olay_ayikla(olay: dict, getir=None) -> dict | None:
         return None
     metin = str(m.get("text") or "").strip()
     mid = m.get("id")
-    gonderen = str(m.get("sender_id") or "")
+    gonderen = m.get("sender_id") or ""
+    if isinstance(gonderen, dict):   # attendee objesi: ig:{'attendee_id':...} dökümünü önle
+        gonderen = (gonderen.get("attendee_provider_id")
+                    or gonderen.get("attendee_id") or "")
+    gonderen = str(gonderen)
     if not metin or not mid or not gonderen:
         return None
     if gonderen == os.environ.get("INSTAGRAM_HESAP_ID", ""):

@@ -71,6 +71,15 @@ def test_mesaj_olayi_ayiklanir():
                  "metin": "fiyat ne kadar", "ad": None}
 
 
+def test_gonderen_attendee_sozlugu_gelse_de_igsid_duser():
+    # sender_id attendee objesi olarak geldiğinde ig:{'attendee_id':...}
+    # dökümü yerine provider id'si düşmeli (canlıda kisiler.telefon'u kirletti)
+    att = {"attendee_id": "k1Bv", "attendee_provider_id": "18086807756252833",
+           "attendee_name": "Reseptaai"}
+    m = unipile.olay_ayikla(_olay(gonderen=att))
+    assert m["igsid"] == "18086807756252833"
+
+
 def test_mesaj_json_dizesi_olarak_gelirse_cozulur():
     import json
     o = _olay()

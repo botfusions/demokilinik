@@ -19,21 +19,23 @@
     Parola en az 8 karakter. Personel randevu ve bilgi girer; yönetici ayrıca
     doktor ve kullanıcı tanımlar.
   </p>
-  <form method="post" action="/kullanicilar">
+  <form method="post" action="/kullanicilar" autocomplete="off">
     <div class="satir">
       <div>
         <label for="ka">Kullanıcı adı</label>
-        <input id="ka" name="kullanici_adi" placeholder="ayse" autocapitalize="none" required>
+        <input id="ka" name="kullanici_adi" placeholder="ayse" autocapitalize="none"
+               autocomplete="off" required>
       </div>
       <div>
         <label for="ad">Ad soyad</label>
-        <input id="ad" name="ad" placeholder="Ayşe Yılmaz">
+        <input id="ad" name="ad" placeholder="Ayşe Yılmaz" autocomplete="off">
       </div>
     </div>
     <div class="satir">
       <div>
         <label for="pr">Parola</label>
-        <input id="pr" type="password" name="parola" minlength="8" required>
+        <input id="pr" type="password" name="parola" minlength="8"
+               autocomplete="new-password" required>
       </div>
       <div>
         <label for="rl">Rol</label>
