@@ -4,7 +4,7 @@
 
 <div class="kart">
   <h2>{{ kisi.ad or 'İsimsiz' }} — {{ kisi.telefon }}
-    {% if kisi.insan_devri_at %}<span class="rozet acil">İnsan devrede</span>{% endif %}
+    {% if kisi.insan_devri_at %}<span class="rozet acil">İnsan devrede{% if kisi.devir_nedeni %} — {{ kisi.devir_nedeni }}{% endif %}</span>{% endif %}
   </h2>
   <p class="bos" style="margin-top:-8px">
     İlk temas {{ kisi.ilk_temas.strftime('%d.%m.%Y') }} ·
@@ -25,7 +25,7 @@
     {% for g in gorusmeler %}
     <tr>
       <td>{{ g.olusturma.strftime('%d.%m %H:%M') }}</td>
-      <td>{{ 'Hasta' if g.yon == 'gelen' else 'Ajan' }}</td>
+      <td>{{ 'Hasta' if g.yon == 'gelen' else ('Sistem' if g.yon == 'sistem' else 'Ajan') }}</td>
       <td>{{ g.mesaj }}</td>
     </tr>
     {% endfor %}

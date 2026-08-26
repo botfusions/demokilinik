@@ -34,9 +34,13 @@
 </div>
 {% if devir_sayisi %}
 <div class="kart" style="margin-bottom:14px; padding:10px 16px">
-  <span class="rozet acil">İnsan devrede: {{ devir_sayisi }} hasta</span>
+  <span class="rozet acil yan">İnsan devri bekliyor: {{ devir_sayisi }} hasta</span>
   <span class="etiket" style="margin-left:8px">asistan bu hastalara cevap yazmıyor —
-    <a href="/hastalar">panelden yazın</a></span>
+    devralmak için hastayı açın:</span>
+  {% for k in devirdekiler %}
+  <a href="/hastalar/{{ k.id }}" class="rozet acil yan" style="margin-left:8px">
+    {{ k.ad or k.telefon }}{% if k.devir_nedeni %} · {{ k.devir_nedeni }}{% endif %} →</a>
+  {% endfor %}
 </div>
 {% endif %}
 

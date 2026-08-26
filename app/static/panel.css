@@ -581,3 +581,7 @@ details[open] > summary::before { content:'▾ '; }
 a.user-card { text-decoration:none; }
 a.user-card.active { border-color:var(--primary); }
 a.user-card.active .uc-chev { color:var(--primary); }
+
+/* Devir bekliyor rozeti — dikkat çeksin diye yanıp söner */
+@keyframes rozet-yan { 50% { opacity:.45; } }
+.rozet.acil.yan { animation:rozet-yan 1.6s ease-in-out infinite; }

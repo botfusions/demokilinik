@@ -28,10 +28,14 @@ CREATE TABLE IF NOT EXISTS kisiler (
 -- ayrı bir kolonla taşınmaz.
 ALTER TABLE kisiler ADD COLUMN IF NOT EXISTS insan_devri_at timestamptz;
 
+-- Devir nedeni — "Hasta personel talep etti" / "Personel devraldı"; serbest
+-- metin, sonraki fazdaki ajan tetikleri (tıbbi/acil) yeni neden ekler.
+ALTER TABLE kisiler ADD COLUMN IF NOT EXISTS devir_nedeni text;
+
 CREATE TABLE IF NOT EXISTS gorusmeler (
     id             serial PRIMARY KEY,
     kisi_id        integer NOT NULL REFERENCES kisiler(id) ON DELETE CASCADE,
-    yon            text NOT NULL CHECK (yon IN ('gelen', 'giden')),
+    yon            text NOT NULL CHECK (yon IN ('gelen', 'giden', 'sistem')),
     mesaj          text NOT NULL,
     kanal          text NOT NULL DEFAULT 'whatsapp',
     -- Tekil; NULL'lar Postgres'te çakışmaz, giden mesajların bir kısmı id'siz olabilir
@@ -40,6 +44,11 @@ CREATE TABLE IF NOT EXISTS gorusmeler (
     olusturma      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS gorusmeler_kisi_idx ON gorusmeler (kisi_id, id);
+
+-- 'sistem' satırları ("devir açıldı: ...") rapor sayımı içindir; hastaya
+-- gitmez, ajan prompt'una girmez. Eski kurulumlarda CHECK dar — genişlet.
+ALTER TABLE gorusmeler DROP CONSTRAINT IF EXISTS gorusmeler_yon_check;
+ALTER TABLE gorusmeler ADD CONSTRAINT gorusmeler_yon_check CHECK (yon IN ('gelen', 'giden', 'sistem'));
 
 -- Haftalık kullanım raporu için (app/rapor.py) — $ maliyet değil, ham token.
 ALTER TABLE gorusmeler ADD COLUMN IF NOT EXISTS giris_token integer;
@@ -120,6 +129,9 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
 -- yoksa panel internete açıkken biri bilinen adı kilitler, klinik dışarı kalır).
 ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS basarisiz_deneme integer NOT NULL DEFAULT 0;
 ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS kilit_bitis timestamptz;
+
+-- Devir bildirimi: telefonu girilmiş aktif kullanıcılara WhatsApp gider (app/devri.py)
+ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS telefon text;
 
 -- Kim ne yaptı. Randevu değiştiren, bilgi silen, kullanıcı ekleyen hep buraya düşer.
 CREATE TABLE IF NOT EXISTS islem_kaydi (

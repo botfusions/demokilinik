@@ -71,7 +71,8 @@ def parola_dogrula(parola: str, kayitli: str) -> bool:
 # ── kullanıcılar ────────────────────────────────────────────
 
 def kullanici_ekle(conn: psycopg.Connection, kullanici_adi: str, parola: str,
-                   rol: str = "personel", ad: str | None = None) -> int:
+                   rol: str = "personel", ad: str | None = None,
+                   telefon: str | None = None) -> int:
     kullanici_adi = kullanici_adi.strip().lower()
     ozet = parola_hash(parola)   # zayıf parola burada patlar, kayıt açılmaz
 
@@ -82,10 +83,10 @@ def kullanici_ekle(conn: psycopg.Connection, kullanici_adi: str, parola: str,
 
         cur.execute(
             """
-            INSERT INTO kullanicilar (kullanici_adi, ad, parola_hash, rol)
-            VALUES (%s, %s, %s, %s) RETURNING id
+            INSERT INTO kullanicilar (kullanici_adi, ad, parola_hash, rol, telefon)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
             """,
-            (kullanici_adi, ad, ozet, rol),
+            (kullanici_adi, ad, ozet, rol, (telefon or "").strip() or None),
         )
         kid = cur.fetchone()[0]
     conn.commit()
@@ -145,11 +146,27 @@ def kullanicilar_listele(conn: psycopg.Connection) -> list[dict]:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            SELECT id, kullanici_adi, ad, rol, aktif, son_giris, olusturma
+            SELECT id, kullanici_adi, ad, rol, aktif, son_giris, olusturma, telefon
               FROM kullanicilar ORDER BY aktif DESC, rol, kullanici_adi
             """
         )
         return cur.fetchall()
+
+
+def kullanici_telefon_yaz(conn: psycopg.Connection, kullanici_id: int,
+                          telefon: str | None) -> None:
+    """Bildirim WhatsApp'ı — boş gelirse silinir, bildirim o kişiye gitmez."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE kullanicilar SET telefon = %s WHERE id = %s",
+                    ((telefon or "").strip() or None, kullanici_id))
+    conn.commit()
+
+
+def bildirim_numaralari(conn: psycopg.Connection) -> list[str]:
+    """Devir bildirimi gidecek numaralar: telefonlu aktif kullanıcılar."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT telefon FROM kullanicilar WHERE aktif AND telefon IS NOT NULL")
+        return [r[0] for r in cur.fetchall()]
 
 
 def kullanici_getir(conn: psycopg.Connection, kullanici_id: int) -> dict | None:

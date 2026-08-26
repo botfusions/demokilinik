@@ -256,4 +256,123 @@ def test_panel_hasta_sayfasinda_rozet_ve_ana_sayfada_sayac(istemci, panel, conn)
     r = panel.get(f"/hastalar/{kid}")
     assert "İnsan devrede" in r.text
     r = panel.get("/")
-    assert "İnsan devrede: 1" in r.text
+    assert "İnsan devri bekliyor: 1 hasta" in r.text
+    assert f'href="/hastalar/{kid}"' in r.text, "devirdeki hasta kartta linkli"
+
+
+# ── T9: personel WhatsApp bildirimi (numaralar panelden, kullanicilar tablosu) ──
+
+def _personel_ekle(conn, ad: str, telefon: str | None):
+    from app.kullanici import kullanici_ekle
+    return kullanici_ekle(conn, ad, "duzenlibirparola", "personel", None, telefon)
+
+
+def test_t9_devir_baslayinca_personel_numaralarina_bildirim_gider(istemci, conn):
+    _personel_ekle(conn, "sekreter", "+905551112233")
+    _personel_ekle(conn, "yonetici", "+905334445566")
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D15")
+
+    bildirimler = [g for g in istemci.gonderilenler if "İnsan müdahalesi gerekli" in g[1]]
+    assert {tel for tel, _ in bildirimler} == {"+905551112233", "+905334445566"}
+    metin = bildirimler[0][1]
+    assert TELEFON in metin and "Neden: " + devri.NEDEN_HASTA in metin
+    assert "yetkiliyle görüşmek istiyorum" in metin, "son mesaj önizlemesi girmeli"
+
+
+def test_t9_bir_numara_hataliysa_digeri_yine_alir_devir_dusmez(istemci, conn, monkeypatch):
+    _personel_ekle(conn, "patlayan", "+905550000000")
+    _personel_ekle(conn, "saglam", "+905551111111")
+    giden = []
+
+    def _kismi_patla(tel, metin):
+        if tel == "+905550000000":
+            raise RuntimeError("numara yok")
+        giden.append((tel, metin))
+        return "wamid.OUT"
+    monkeypatch.setattr(openwa, "mesaj_gonder", _kismi_patla)
+
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D16")
+    assert _kisi(conn)["insan_devri_at"] is not None, "bildirim hatası devri düşürmez"
+    assert ("+905551111111", giden[-1][1]) and "İnsan müdahalesi gerekli" in giden[-1][1], \
+        "sağlam numara bildirimi aldı"
+
+
+def test_t9_numarasiz_kullaniciya_bildirim_yok(istemci, conn):
+    _personel_ekle(conn, "telefonsuz", None)
+    onceki = len(istemci.gonderilenler)
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D17")
+    assert _kisi(conn)["insan_devri_at"] is not None
+    assert len(istemci.gonderilenler) == onceki + 1, "yalnız hastaya aktarım mesajı gitti"
+
+
+def test_t9_pasif_kullaniciya_bildirim_gitmez(istemci, conn):
+    from app.kullanici import kullanici_durum_yaz
+    kid = _personel_ekle(conn, "izinli", "+905550009999")
+    kullanici_durum_yaz(conn, kid, False)
+
+    onceki = len(istemci.gonderilenler)
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D23")
+    assert len(istemci.gonderilenler) == onceki + 1, "pasifleştirilen personel bildirim almaz"
+
+
+def test_t9_panelden_numara_guncellenir(istemci, panel, conn):
+    """Yönetici Kullanıcılar sayfasından bildirim numarası yazar/siler."""
+    from app.kullanici import kullanicilar_listele, kullanici_telefon_yaz
+    _personel_ekle(conn, "sekreter", None)
+    kid = kullanicilar_listele(conn)[0]["id"]
+
+    panel.post(f"/kullanicilar/{kid}/telefon", data={"telefon": "+905557778888"})
+    assert kullanicilar_listele(conn)[0]["telefon"] == "+905557778888"
+
+    panel.post(f"/kullanicilar/{kid}/telefon", data={"telefon": ""})
+    assert kullanicilar_listele(conn)[0]["telefon"] is None
+
+
+# ── T10: devir nedeni kaydı ─────────────────────────────────
+
+def test_t10_hasta_tetiginde_neden_kaydedilir_sistem_satiri_duser(istemci, panel, conn):
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D18")
+    kid = _kisi(conn)["id"]
+
+    assert _kisi(conn)["devir_nedeni"] == devri.NEDEN_HASTA
+    kayitlar = [g["mesaj"] for g in gorusme_gecmisi(conn, kid, limit=10)]
+    assert f"devir açıldı: {devri.NEDEN_HASTA}" in kayitlar
+
+    panel.post(f"/hastalar/{kid}/devri-bitir")
+    assert _kisi(conn)["devir_nedeni"] is None, "devir bitince neden temizlenir"
+
+
+def test_t10_panel_devral_dugmesi_nedenini_yazar(istemci, panel, conn):
+    _gonder(istemci, "randevu almak istiyorum", "wamid.D19")
+    kid = _kisi(conn)["id"]
+
+    panel.post(f"/hastalar/{kid}/devri-baslat")
+    assert _kisi(conn)["devir_nedeni"] == devri.NEDEN_PANEL
+
+    r = panel.get(f"/hastalar/{kid}")
+    assert f"İnsan devrede — {devri.NEDEN_PANEL}" in r.text
+
+
+def test_t10_sistem_satiri_ajan_gecmisine_girmez(istemci, panel, conn, monkeypatch):
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D20")
+    panel.post(f"/hastalar/{_kisi(conn)['id']}/devri-bitir")
+
+    yakalanan = {}
+    def _yakala(gecmis, mesaj, **kw):
+        yakalanan["gecmis"] = gecmis
+        return "Test yanıtı", {}
+    monkeypatch.setattr(ajan, "cevap_uret", _yakala)
+
+    _gonder(istemci, "insan gibi konuşuyorsun çok başarılı", "wamid.D22")
+    assert yakalanan["gecmis"], "ajan çağrılmış olmalı"
+    assert all(g["yon"] != "sistem" for g in yakalanan["gecmis"]), \
+        "devir kaydı ajan prompt'una girmemeli"
+
+
+def test_t11_rapor_devir_dokumunu_icerir(istemci, conn):
+    _gonder(istemci, "yetkiliyle görüşmek istiyorum", "wamid.D21")
+
+    from app import rapor
+    from app.crm import kullanim_ozeti
+    m = rapor._mesaj(kullanim_ozeti(conn, 3600))
+    assert f"Devir: 1 ({devri.NEDEN_HASTA} 1)" in m

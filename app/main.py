@@ -83,6 +83,7 @@ from app.kullanici import (  # noqa: E402
     kullanici_durum_yaz,
     kullanici_ekle,
     kullanici_getir,
+    kullanici_telefon_yaz,
     kullanicilar_listele,
     parola_degistir,
 )
@@ -402,6 +403,7 @@ def ozet(request: Request, conn=Depends(db)):
         "bugun": f"{b.day} {AYLAR_TR[b.month - 1]} {b.year}, {GUNLER_TR[b.weekday()]}",
         "sayilar": ozet_sayilar(conn),
         "devir_sayisi": len(devirdekiler(conn)),
+        "devirdekiler": devirdekiler(conn),
         "gunler": gunler,
         "saatler": saatler,
         "yogun_gun": yogun_gun if yogun_gun and yogun_gun["adet"] else None,
@@ -873,7 +875,8 @@ def hasta_mesaj(request: Request, kisi_id: int, metin: str = Form(...), conn=Dep
 def hasta_devri_baslat(request: Request, kisi_id: int, conn=Depends(db)):
     """Personel kendi başına devralır — hasta istemese de araya girebilmeli."""
     _kisi_ya_404(conn, kisi_id)
-    devir_yaz(conn, kisi_id, datetime.now())
+    devir_yaz(conn, kisi_id, datetime.now(), devri.NEDEN_PANEL)
+    gorusme_ekle(conn, kisi_id, "sistem", f"devir açıldı: {devri.NEDEN_PANEL}")
     islem_yaz(conn, _kim(request), "insan devrini başlattı", f"hasta #{kisi_id}")
     return RedirectResponse(f"/hastalar/{kisi_id}", status_code=303)
 
@@ -945,13 +948,24 @@ def kullanici_sayfasi(request: Request, hata: str = "", conn=Depends(db)):
 @app.post("/kullanicilar", dependencies=[Depends(yonetici)])
 def kullanici_kaydet(request: Request, kullanici_adi: str = Form(...),
                      parola: str = Form(...), rol: str = Form("personel"),
-                     ad: str = Form(""), conn=Depends(db)):
+                     ad: str = Form(""), telefon: str = Form(""),
+                     conn=Depends(db)):
     try:
-        kid = kullanici_ekle(conn, kullanici_adi, parola, rol, ad.strip() or None)
+        kid = kullanici_ekle(conn, kullanici_adi, parola, rol, ad.strip() or None,
+                             telefon.strip() or None)
     except (ParolaZayif, KullaniciVar) as e:
         return RedirectResponse(f"/kullanicilar?hata={e}", status_code=303)
 
     islem_yaz(conn, _kim(request), "kullanıcı açtı", f"#{kid} {kullanici_adi} ({rol})")
+    return RedirectResponse("/kullanicilar", status_code=303)
+
+
+@app.post("/kullanicilar/{kullanici_id}/telefon", dependencies=[Depends(yonetici)])
+def kullanici_telefon(request: Request, kullanici_id: int, telefon: str = Form(""),
+                      conn=Depends(db)):
+    kullanici_telefon_yaz(conn, kullanici_id, telefon)
+    islem_yaz(conn, _kim(request), "bildirim numarası güncelledi",
+              f"kullanıcı #{kullanici_id}")
     return RedirectResponse("/kullanicilar", status_code=303)
 
 
@@ -1239,10 +1253,16 @@ def _unipile_mesaji_isle(m: dict) -> None:
         conn.close()
 
 
-def _devri_baslat(conn, kisi: dict) -> None:
-    """Devri açar, hastaya aktarım mesajı yollar. Görünürlük panelde: rozet + sayaç."""
+def _devri_baslat(conn, kisi: dict, neden: str = devri.NEDEN_HASTA) -> None:
+    """Devri açar, hastaya aktarım mesajı yollar, personele haber verir.
+
+    Görünürlük: panelde rozet + sayaç, personel WhatsApp'ına bildirim
+    (DEVRI_BILDIRIM_NUMARALARI boşsa bildirim atlanır). 'sistem' satırı
+    haftalık raporun devir sayımı için.
+    """
     simdi = datetime.now()
-    devir_yaz(conn, kisi["id"], simdi)
+    devir_yaz(conn, kisi["id"], simdi, neden)
+    gorusme_ekle(conn, kisi["id"], "sistem", f"devir açıldı: {neden}")
 
     metin = devri.aktarim_mesaji(simdi)   # K2: mesai dışındaysa dönüş saati eklenir
     gorusme_ekle(conn, kisi["id"], "giden", metin)
@@ -1250,6 +1270,11 @@ def _devri_baslat(conn, kisi: dict) -> None:
         devri.gonder("whatsapp", kisi["telefon"], metin)
     except Exception as e:
         log.warning("Devir aktarım mesajı gitmedi (%s): %s", kisi["telefon"], e)
+
+    try:
+        devri.personel_bildir(conn, kisi, neden)
+    except Exception as e:
+        log.warning("Personel bildirimi gönderilemedi: %s", e)
 
 
 def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) -> None:
@@ -1271,7 +1296,8 @@ def _mesaji_isle(telefon: str, mesaj: str, wa_id: str | None, ad: str | None) ->
             _devri_baslat(conn, kisi)
             return
 
-        gecmis = gorusme_gecmisi(conn, kid, limit=10)[:-1]  # yeni mesajı prompt ayrıca ekler
+        # 'sistem' satırları (devir kaydı) prompt'a girmez; yeni mesajı prompt ayrıca ekler
+        gecmis = [g for g in gorusme_gecmisi(conn, kid, limit=20) if g["yon"] != "sistem"][-10:-1]
 
         # Kural (LLM'siz) → hatırlatma kısayolu (LLM'siz) → hafif yol (araçsız
         # LLM) → tam ajan (araçlı LLM). Sıralama en ucuzdan en pahalıya:

@@ -97,15 +97,26 @@ def personel_notu_yaz(conn: psycopg.Connection, kisi_id: int, not_: str) -> None
 
 # ── insan devri ─────────────────────────────────────────────
 
-def devir_yaz(conn: psycopg.Connection, kisi_id: int, zaman) -> None:
+def devir_yaz(conn: psycopg.Connection, kisi_id: int, zaman, neden: str | None = None) -> None:
     """`None` devri bitirir; `now()` başlatır ya da K1 sayacını tazeler.
 
     Kolon tek başına hem "devir açık mı" hem "son personel teması ne zaman"
     sorusunu taşır — panel mesaj gönderince değeri now() yapılır, otomatik
-    geri alma sayacı oradan işler.
+    geri alma sayacı oradan işler. `neden` yalnızca devri açarken yazılır;
+    sayaç tazelemede (neden=None) mevcut neden korunur.
     """
     with conn.cursor() as cur:
-        cur.execute("UPDATE kisiler SET insan_devri_at = %s WHERE id = %s", (zaman, kisi_id))
+        if zaman is None:
+            cur.execute(
+                "UPDATE kisiler SET insan_devri_at = NULL, devir_nedeni = NULL WHERE id = %s",
+                (kisi_id,),
+            )
+        else:
+            cur.execute(
+                "UPDATE kisiler SET insan_devri_at = %s, "
+                "devir_nedeni = coalesce(%s, devir_nedeni) WHERE id = %s",
+                (zaman, neden, kisi_id),
+            )
     conn.commit()
 
 
@@ -486,7 +497,19 @@ def kullanim_ozeti(conn: psycopg.Connection, pencere_saniye: int) -> dict:
             (pencere_saniye, pencere_saniye, pencere_saniye),
         )
         giden, giris, cikis = cur.fetchone()
-    return {"giden_mesaj": giden, "giris_token": giris, "cikis_token": cikis}
+
+        # Devir dökümü — 'devir açıldı: {neden}' sistem satırlarından
+        cur.execute(
+            """
+            SELECT split_part(mesaj, ': ', 2), count(*) FROM gorusmeler
+            WHERE yon = 'sistem' AND mesaj LIKE 'devir açıldı: %%'
+              AND olusturma >= now() - make_interval(secs => %s)
+            GROUP BY 1
+            """,
+            (pencere_saniye,),
+        )
+        devir = dict(cur.fetchall())
+    return {"giden_mesaj": giden, "giris_token": giris, "cikis_token": cikis, "devir": devir}
 
 
 # ── doktorlar ───────────────────────────────────────────────

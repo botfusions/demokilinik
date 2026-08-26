@@ -12,7 +12,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from app import crm, openwa
+from app import crm, openwa, kullanici
 
 log = logging.getLogger(__name__)
 
@@ -28,9 +28,55 @@ GERI_ALMA_MESAJI = (
     "Bu arada ben yardımcı olabilirim."
 )
 
+NEDEN_HASTA = "Hasta personel talep etti"
+NEDEN_PANEL = "Personel devraldı"
+
 
 def _otomatik_saat() -> float:
     return float(os.environ.get("DEVRI_OTOMATIK_SAAT", "2"))
+
+
+def bildirim_numaralari(conn) -> list[str]:
+    """Devir bildirimi gidecek personel numaraları — panelden yönetilir
+    (Kullanıcılar sayfası, 'Bildirim WhatsApp'ı' alanı)."""
+    return kullanici.bildirim_numaralari(conn)
+
+
+def personel_bildir(conn, kisi: dict, neden: str) -> int:
+    """Devir başlarken personel WhatsApp numaralarına haber yollar.
+
+    Tek yönlü uyarıdır: personel bildirime cevap yazamaz, devralmayı
+    panelden yapar. Bir numara hatalıysa diğerleri yine alır — bildirim
+    hatası devir akışını asla düşürmez.
+    """
+    numaralar = bildirim_numaralari(conn)
+    if not numaralar:
+        return 0
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT mesaj FROM gorusmeler WHERE kisi_id = %s AND yon = 'gelen' "
+            "ORDER BY id DESC LIMIT 1",
+            (kisi["id"],),
+        )
+        satir = cur.fetchone()
+    son_mesaj = (satir[0][:80] + "…") if satir and len(satir[0]) > 80 else (satir[0] if satir else "")
+
+    metin = (
+        "İnsan müdahalesi gerekli.\n"
+        f"Hasta: {kisi['ad'] or 'İsimsiz'} ({kisi['telefon']})\n"
+        f"Neden: {neden}\n"
+        f"Son mesaj: {son_mesaj or '-'}\n"
+        "Panelden devralın."
+    )
+    giden = 0
+    for no in numaralar:
+        try:
+            gonder("whatsapp", no, metin)
+            giden += 1
+        except Exception as e:   # bildirim hatası devri bozmaz
+            log.warning("Personel bildirimi gitmedi (%s): %s", no, e)
+    return giden
 
 
 def gonder(kanal: str, telefon: str, metin: str) -> None:
