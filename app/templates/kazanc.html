@@ -1,0 +1,71 @@
+{% extends "temel.html" %}
+{% block baslik %}Kayıp ve Kurtarma Raporu — Klinik Paneli{% endblock %}
+
+{% block icerik %}
+
+{% include "yonetici_sekmeler.html" %}
+
+<div class="baslik-satir">
+  <div>
+    <h1>Kayıp ve Kurtarma Raporu</h1>
+    <div class="alt-baslik">
+      {{ ay_adi }} — aylık randevu kaybı ve asistanın getirdiği randevular.
+      Fiyatlar hizmet tablosundan eşleştirilir; eşleşmeyen hizmet "fiyatı
+      bilinmiyor" olarak ayrı sayılır.
+    </div>
+  </div>
+  <form method="get" action="/rapor" class="ay-secim" style="display:flex;gap:8px">
+    <select name="ay">
+      {% for a in aylar %}
+      <option value="{{ a.deger }}" {% if a.deger == secili %}selected{% endif %}>{{ a.ad }}</option>
+      {% endfor %}
+    </select>
+    <button>Göster</button>
+  </form>
+</div>
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Kayıp</h2>
+  <div class="kaydir"><table>
+    <tr><th>Alınan</th><th>Teyit</th><th>Geldi</th><th>Gelmedi</th><th>İptal</th><th>Gelmeme oranı</th><th>Gelmeyenin TL karşılığı</th></tr>
+    <tr>
+      <td>{{ ozet.toplam }}</td>
+      <td>{{ ozet.sayilar.onayli }}</td>
+      <td>{{ ozet.sayilar.geldi }}</td>
+      <td>{{ ozet.sayilar.gelmedi }}</td>
+      <td>{{ ozet.sayilar.iptal }}</td>
+      <td>{{ ozet.gelmeme_orani_metni }}</td>
+      <td>{{ tl(ozet.gelmedi_tl) }} TL</td>
+    </tr>
+  </table></div>
+  {% if ozet.gelmedi_fiyatsiz %}
+  <p class="bos">{{ ozet.gelmedi_fiyatsiz }} gelmeyen randevunun hizmet adı fiyat
+     tablosunda yok — "fiyatı bilinmiyor" grubunda sayıldı, TL toplamına girmedi.</p>
+  {% endif %}
+</div>
+
+<div class="kart" style="margin-bottom:14px">
+  <h2>Erken boşalan kapasite</h2>
+  <p class="bos" style="margin-top:-8px">
+    Hatırlatması gönderildikten sonra hastanın iptal ettiği randevu sayısı:
+    <b>{{ ozet.erken_bosalan }}</b>. Bu, panelden değil hastadan gelen iptaldir;
+    personel iptalleri işlem kaydından elenir. İptal zamanı ayrıca kaydedilmediği
+    için "hatırlatmaya cevaben" ile "kendiliğinden" iptal ayrıştırılamaz — bu
+    yüzden bu tabloda korelasyon iddiası yoktur.
+  </p>
+</div>
+
+<div class="kart">
+  <h2>Asistanın getirdiği</h2>
+  <div class="kaydir"><table>
+    <tr><th>Ajan randevusu</th><th>Mesai dışı açılan</th></tr>
+    <tr>
+      <td>{{ ozet.ajan }}</td>
+      <td>{{ ozet.ajan_mesai_disi }}</td>
+    </tr>
+  </table></div>
+  <p class="bos">"Mesai dışı": randevunun açıldığı anda klinik çalışma penceresinin
+     dışında olması — hasta gece ya da kapalı gün yazıp almıştır.</p>
+</div>
+
+{% endblock %}

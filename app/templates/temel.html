@@ -61,7 +61,7 @@
          elle yazsa da 403 döner — koruma iki katmanlı. #}
       {% if kullanici %}
       {% set yonetici_mi = kullanici.rol == 'admin' %}
-      <{{ 'a' if yonetici_mi else 'div' }} class="user-card {% if sayfa in ['yonetici','bilgi','kullanicilar','iyilestirme','doktor'] %}active{% endif %}"
+      <{{ 'a' if yonetici_mi else 'div' }} class="user-card {% if sayfa in ['yonetici','bilgi','kullanicilar','iyilestirme','doktor','rapor'] %}active{% endif %}"
         {% if yonetici_mi %}href="/yonetici" title="Yönetici Paneli"{% endif %}>
         <div class="avatar">{{ (kullanici.ad or kullanici.kullanici_adi)[0] | upper }}</div>
         <div class="user-meta">

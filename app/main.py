@@ -24,7 +24,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 PROJE_KOKU = Path(__file__).resolve().parent.parent
 load_dotenv(PROJE_KOKU / ".env")
 
-from app import ajan, bildirim, devri, doktor, hafif, hatirlatma, instagram, iyilestirme, kural, openwa, rapor, saglik, unipile  # noqa: E402  (load_dotenv'den sonra)
+from app import ajan, bildirim, devri, doktor, hafif, hatirlatma, instagram, iyilestirme, kazanc, kural, openwa, rapor, saglik, unipile  # noqa: E402  (load_dotenv'den sonra)
 from app.crm import (  # noqa: E402
     CalismaSaatiDisi,
     GecmisTarih,
@@ -65,6 +65,7 @@ from app.crm import (  # noqa: E402
 from app.db import baglan, sema_kur  # noqa: E402
 from app.hizmet import (  # noqa: E402
     HizmetVar,
+    _tl,
     fiyat_guncelle,
     fiyat_metni,
     hizmet_ekle,
@@ -592,6 +593,39 @@ def iyilestirme_sayfasi(request: Request, conn=Depends(db)):
         "bosluklar": iyilestirme.kb_bosluklari(conn),
         "tekrarlar": iyilestirme.tekrarlanan_sorular(conn),
         "saglik": saglik.saglik_ozeti(conn),
+    })
+
+
+# ── kayıp ve kurtarma raporu ────────────────────────────────
+
+@app.get("/rapor", response_class=HTMLResponse, dependencies=[Depends(yonetici)])
+def rapor_sayfasi(request: Request, ay: str = "", conn=Depends(db)):
+    """İK-6: ay bazlı kayıp/kurtarma tablosu. Ay 'YYYY-MM' olarak seçilir;
+    boş ya da geçersizse içinde bulunulan ay gösterilir."""
+    b = date.today()
+    y, m = b.year, b.month
+    if ay:
+        try:
+            y, m = (int(x) for x in ay.split("-"))
+            kazanc.ay_baslangic(y, m)  # yıl/ay aralığı denetimi
+        except ValueError:
+            y, m = b.year, b.month
+
+    # Son 12 ay seçim kutusu için — en yeni önce.
+    aylar, a = [], b.replace(day=1)
+    for _ in range(12):
+        aylar.append({"deger": f"{a.year}-{a.month:02d}",
+                      "ad": f"{AYLAR_TR[a.month - 1]} {a.year}"})
+        a = (a - timedelta(days=1)).replace(day=1)
+
+    return sablonlar.TemplateResponse(request, "kazanc.html", {
+        "sayfa": "rapor",
+        "kullanici": _kim(request),
+        "ozet": kazanc.ay_ozeti(conn, y, m),
+        "ay_adi": f"{AYLAR_TR[m - 1]} {y}",
+        "aylar": aylar,
+        "secili": f"{y}-{m:02d}",
+        "tl": _tl,
     })
 
 
